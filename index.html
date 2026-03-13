@@ -2,51 +2,632 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Basket IQ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0d0d0f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Basket Lab</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
+<body class="app-body">
 
-<div class="container">
+<!-- Pantalla de registro / inicio de sesión -->
+<div id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <img src="images/logo-basketlab.svg" alt="Basket Lab" class="auth-logo">
+            <h1>Basket Lab</h1>
+            <p class="auth-credit">By Coach Fritz</p>
+            <p class="auth-subtitle">Registrate o iniciá sesión para continuar</p>
+        </div>
+        <div class="auth-tabs">
+            <button type="button" class="auth-tab active" data-tab="login">Iniciar sesión</button>
+            <button type="button" class="auth-tab" data-tab="register">Registrarse</button>
+        </div>
+
+        <form id="auth-form-login" class="auth-form active">
+            <label>Usuario o correo</label>
+            <input type="text" id="login-identificador" placeholder="Usuario o email" required autocomplete="username">
+            <label>Contraseña</label>
+            <input type="password" id="login-password" placeholder="Contraseña" required autocomplete="current-password">
+            <p id="auth-login-error" class="auth-error" aria-live="polite"></p>
+            <button type="submit" class="auth-btn">Entrar</button>
+        </form>
+
+        <form id="auth-form-register" class="auth-form">
+            <label>Nombre de usuario</label>
+            <input type="text" id="register-username" placeholder="Usuario" required autocomplete="username" minlength="2">
+            <label>Correo electrónico</label>
+            <input type="email" id="register-email" placeholder="tu@email.com" required autocomplete="email">
+            <label>Nombre</label>
+            <input type="text" id="register-name" placeholder="Tu nombre" required autocomplete="name">
+            <label>Contraseña</label>
+            <input type="password" id="register-password" placeholder="Mínimo 6 caracteres" required autocomplete="new-password" minlength="6">
+            <label>Confirmar contraseña</label>
+            <input type="password" id="register-password2" placeholder="Repetir contraseña" required autocomplete="new-password">
+            <p id="auth-register-error" class="auth-error" aria-live="polite"></p>
+            <button type="submit" class="auth-btn">Crear cuenta</button>
+        </form>
+    </div>
+</div>
+
+<div id="app-container" class="container" hidden>
 
     <aside class="sidebar">
-        <h1>Basket IQ</h1>
+        <div class="sidebar-brand">
+            <img src="images/logo-basketlab.svg" alt="Basket Lab" class="sidebar-logo">
+            <div class="sidebar-brand-text">
+                <h1 class="sidebar-brand-title" onclick="loadContent('dashboard')" onkeydown="if(event.key==='Enter') loadContent('dashboard')" role="button" tabindex="0" title="Ir al inicio">Basket Lab</h1>
+                <p class="sidebar-credit">By Coach Fritz</p>
+                <p class="sidebar-user" id="sidebar-user-name"></p>
+                <button type="button" class="sidebar-logout" id="btn-logout">Cerrar sesión</button>
+            </div>
+        </div>
 
-        <h3>Ataques Zona</h3>
-        <ul>
-            <li onclick="loadContent('vs23')">vs 2-3</li>
-            <li onclick="loadContent('vs131')">vs 1-3-1</li>
-            <li onclick="loadContent('vs32')">vs 3-2</li>
-            <li onclick="loadContent('vs41')">vs 4-1</li>
-        </ul>
+        <nav class="sidebar-nav">
+            <!-- Fundamentos -->
+            <div class="sidebar-group">
+                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="fundamentos">
+                    <span class="sidebar-toggle-icon">▶</span>
+                    <span>Fundamentos</span>
+                </div>
+                <ul class="sidebar-submenu" id="fundamentos">
+                    <!-- 1️⃣ Dribbling -->
+                    <li class="sidebar-group">
+                        <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="fund-dribbling">
+                            <span class="sidebar-toggle-icon">▶</span>
+                            <span>1️⃣ Dribbling</span>
+                        </div>
+                        <ul class="sidebar-submenu" id="fund-dribbling">
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="drible-control">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Drible de control</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="drible-control">
+                                    <li onclick="loadContent('fund_drible_estatico')">Drible estático</li>
+                                    <li onclick="loadContent('fund_drible_bajo_proteccion')">Drible bajo de protección</li>
+                                    <li onclick="loadContent('fund_drible_alto_avance')">Drible alto de avance</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="drible-avance">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Drible de avance</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="drible-avance">
+                                    <li onclick="loadContent('fund_drible_velocidad')">Drible en velocidad</li>
+                                    <li onclick="loadContent('fund_drible_cambio_ritmo')">Drible de cambio de ritmo</li>
+                                    <li onclick="loadContent('fund_drible_transicion')">Drible de transición</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="cambios-direccion">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Cambios de dirección</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="cambios-direccion">
+                                    <li onclick="loadContent('fund_crossover')">Crossover</li>
+                                    <li onclick="loadContent('fund_between_legs')">Between the legs</li>
+                                    <li onclick="loadContent('fund_behind_back')">Behind the back</li>
+                                    <li onclick="loadContent('fund_spin_move')">Spin move</li>
+                                    <li onclick="loadContent('fund_hesitation_crossover')">Hesitation crossover</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="drible-proteccion">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Drible de protección</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="drible-proteccion">
+                                    <li onclick="loadContent('fund_drible_lateral')">Drible lateral</li>
+                                    <li onclick="loadContent('fund_retreat_dribble')">Retreat dribble</li>
+                                    <li onclick="loadContent('fund_pull_back_dribble')">Pull back dribble</li>
+                                    <li onclick="loadContent('fund_reverse_dribble')">Reverse dribble</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="drible-creacion">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Drible de creación</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="drible-creacion">
+                                    <li onclick="loadContent('fund_hesitation')">Hesitation</li>
+                                    <li onclick="loadContent('fund_in_out')">In &amp; out</li>
+                                    <li onclick="loadContent('fund_double_crossover')">Double crossover</li>
+                                    <li onclick="loadContent('fund_shamgod')">Shamgod</li>
+                                    <li onclick="loadContent('fund_combo_dribbles')">Combo dribbles</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="drible-escape">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Drible de escape</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="drible-escape">
+                                    <li onclick="loadContent('fund_escape_dribble')">Escape dribble</li>
+                                    <li onclick="loadContent('fund_spin_escape')">Spin escape</li>
+                                    <li onclick="loadContent('fund_behind_back_escape')">Behind back escape</li>
+                                    <li onclick="loadContent('fund_step_back_dribble')">Step back dribble</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
 
-        <h3>Hombre a Hombre</h3>
-        <ul>
-            <li onclick="loadContent('abierto')">Sistema Abierto</li>
-            <li onclick="loadContent('cerrado')">Sistema Cerrado</li>
-        </ul>
+                    <!-- 2️⃣ Pase -->
+                    <li class="sidebar-group">
+                        <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="fund-pase">
+                            <span class="sidebar-toggle-icon">▶</span>
+                            <span>2️⃣ Pase</span>
+                        </div>
+                        <ul class="sidebar-submenu" id="fund-pase">
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="pases-basicos">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Pases básicos</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="pases-basicos">
+                                    <li onclick="loadContent('fund_pase_pecho')">Pase de pecho</li>
+                                    <li onclick="loadContent('fund_pase_picado')">Pase picado</li>
+                                    <li onclick="loadContent('fund_pase_encima_cabeza')">Pase por encima de la cabeza</li>
+                                    <li onclick="loadContent('fund_pase_beisbol')">Pase de béisbol</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="pases-movimiento">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Pases en movimiento</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="pases-movimiento">
+                                    <li onclick="loadContent('fund_pase_transicion')">Pase en transición</li>
+                                    <li onclick="loadContent('fund_pase_adelantado')">Pase adelantado</li>
+                                    <li onclick="loadContent('fund_pase_carrera')">Pase en carrera</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="pases-creativos">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Pases creativos</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="pases-creativos">
+                                    <li onclick="loadContent('fund_no_look_pass')">No-look pass</li>
+                                    <li onclick="loadContent('fund_hook_pass')">Hook pass</li>
+                                    <li onclick="loadContent('fund_behind_back_pass')">Behind the back pass</li>
+                                    <li onclick="loadContent('fund_bounce_wrap_pass')">Bounce wrap pass</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="pases-presion">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Pases bajo presión</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="pases-presion">
+                                    <li onclick="loadContent('fund_skip_pass')">Skip pass</li>
+                                    <li onclick="loadContent('fund_kick_out_pass')">Kick out pass</li>
+                                    <li onclick="loadContent('fund_pocket_pass')">Pocket pass</li>
+                                    <li onclick="loadContent('fund_drop_pass')">Drop pass</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="pases-pickroll">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Pases en pick and roll</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="pases-pickroll">
+                                    <li onclick="loadContent('fund_pocket_pass')">Pocket pass</li>
+                                    <li onclick="loadContent('fund_lob_pass')">Lob pass</li>
+                                    <li onclick="loadContent('fund_bounce_pass_roll')">Bounce pass al roll</li>
+                                    <li onclick="loadContent('fund_skip_lado_debil')">Skip al lado débil</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
 
-        <h3>Presión</h3>
-        <ul>
-            <li onclick="loadContent('fullcourt')">Full Court</li>
-            <li onclick="loadContent('doubleteam')">Double Team</li>
-        </ul>
+                    <!-- 3️⃣ Tiro -->
+                    <li class="sidebar-group">
+                        <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="fund-tiro">
+                            <span class="sidebar-toggle-icon">▶</span>
+                            <span>3️⃣ Tiro</span>
+                        </div>
+                        <ul class="sidebar-submenu" id="fund-tiro">
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="tiro-basico">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Tiro básico</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="tiro-basico">
+                                    <li onclick="loadContent('fund_set_shot')">Set shot</li>
+                                    <li onclick="loadContent('fund_tiro_suspension')">Tiro en suspensión (jump shot)</li>
+                                    <li onclick="loadContent('fund_tiro_libre')">Tiro libre</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="tiro-movimiento">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Tiro en movimiento</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="tiro-movimiento">
+                                    <li onclick="loadContent('fund_pull_up')">Pull up</li>
+                                    <li onclick="loadContent('fund_one_dribble_pull_up')">One dribble pull up</li>
+                                    <li onclick="loadContent('fund_two_dribble_pull_up')">Two dribble pull up</li>
+                                    <li onclick="loadContent('fund_step_in_shot')">Step in shot</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="tiro-exterior">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Tiro exterior</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="tiro-exterior">
+                                    <li onclick="loadContent('fund_catch_shoot')">Catch and shoot</li>
+                                    <li onclick="loadContent('fund_spot_up')">Spot up</li>
+                                    <li onclick="loadContent('fund_off_screen_shot')">Off screen shot</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="tiro-avanzado">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Tiro avanzado</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="tiro-avanzado">
+                                    <li onclick="loadContent('fund_step_back')">Step back</li>
+                                    <li onclick="loadContent('fund_side_step')">Side step</li>
+                                    <li onclick="loadContent('fund_fadeaway')">Fadeaway</li>
+                                    <li onclick="loadContent('fund_turnaround_jumper')">Turnaround jumper</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="tiro-penetracion">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Tiro en penetración</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="tiro-penetracion">
+                                    <li onclick="loadContent('fund_floater')">Floater</li>
+                                    <li onclick="loadContent('fund_runner')">Runner</li>
+                                    <li onclick="loadContent('fund_tear_drop')">Tear drop</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
 
-        <h3>Planilla</h3>
-        <ul>
-            <li onclick="loadBoard()">Pizarra Virtual</li>
-        </ul>
+                    <!-- 4️⃣ Finalizaciones -->
+                    <li class="sidebar-group">
+                        <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="fund-finalizaciones">
+                            <span class="sidebar-toggle-icon">▶</span>
+                            <span>4️⃣ Finalizaciones</span>
+                        </div>
+                        <ul class="sidebar-submenu" id="fund-finalizaciones">
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="bandejas">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Bandejas</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="bandejas">
+                                    <li onclick="loadContent('fund_bandeja_derecha')">Bandeja derecha</li>
+                                    <li onclick="loadContent('fund_bandeja_izquierda')">Bandeja izquierda</li>
+                                    <li onclick="loadContent('fund_reverse_layup')">Reverse layup</li>
+                                    <li onclick="loadContent('fund_power_layup')">Power layup</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="finalizaciones-contacto">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Finalizaciones con contacto</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="finalizaciones-contacto">
+                                    <li onclick="loadContent('fund_inside_hand_finish')">Inside hand finish</li>
+                                    <li onclick="loadContent('fund_outside_hand_finish')">Outside hand finish</li>
+                                    <li onclick="loadContent('fund_pro_hop_finish')">Pro hop finish</li>
+                                    <li onclick="loadContent('fund_eurostep')">Eurostep</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="finalizaciones-avanzadas">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Finalizaciones avanzadas</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="finalizaciones-avanzadas">
+                                    <li onclick="loadContent('fund_spin_finish')">Spin finish</li>
+                                    <li onclick="loadContent('fund_floater_finish')">Floater finish</li>
+                                    <li onclick="loadContent('fund_high_glass_finish')">High glass finish</li>
+                                    <li onclick="loadContent('fund_reverse_finish')">Reverse finish</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="finalizaciones-defensores">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Finalizaciones sobre defensores</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="finalizaciones-defensores">
+                                    <li onclick="loadContent('fund_up_under')">Up and under</li>
+                                    <li onclick="loadContent('fund_pump_fake_finish')">Pump fake finish</li>
+                                    <li onclick="loadContent('fund_step_through')">Step through</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- 5️⃣ Juego de pies -->
+                    <li class="sidebar-group">
+                        <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="fund-footwork">
+                            <span class="sidebar-toggle-icon">▶</span>
+                            <span>5️⃣ Juego de pies</span>
+                        </div>
+                        <ul class="sidebar-submenu" id="fund-footwork">
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="paradas">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Paradas</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="paradas">
+                                    <li onclick="loadContent('fund_jump_stop')">Jump stop</li>
+                                    <li onclick="loadContent('fund_stride_stop')">Stride stop</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="pivotes">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Pivotes</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="pivotes">
+                                    <li onclick="loadContent('fund_pivote_frontal')">Pivote frontal</li>
+                                    <li onclick="loadContent('fund_pivote_reverso')">Pivote reverso</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="arranques">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Arranques</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="arranques">
+                                    <li onclick="loadContent('fund_salida_abierta')">Salida abierta</li>
+                                    <li onclick="loadContent('fund_salida_cruzada')">Salida cruzada</li>
+                                    <li onclick="loadContent('fund_salida_directa')">Salida directa</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="movimientos-ofensivos">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Movimientos ofensivos</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="movimientos-ofensivos">
+                                    <li onclick="loadContent('fund_jab_step')">Jab step</li>
+                                    <li onclick="loadContent('fund_shot_fake')">Shot fake</li>
+                                    <li onclick="loadContent('fund_triple_threat')">Triple threat moves</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- 6️⃣ Posteo -->
+                    <li class="sidebar-group">
+                        <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="fund-posteo">
+                            <span class="sidebar-toggle-icon">▶</span>
+                            <span>6️⃣ Posteo</span>
+                        </div>
+                        <ul class="sidebar-submenu" id="fund-posteo">
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="post-posicion">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Posición</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="post-posicion">
+                                    <li onclick="loadContent('fund_sellar_defensor')">Sellar defensor</li>
+                                    <li onclick="loadContent('fund_recepcion_poste')">Recepción en el poste</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="post-basicos">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Movimientos básicos</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="post-basicos">
+                                    <li onclick="loadContent('fund_drop_step')">Drop step</li>
+                                    <li onclick="loadContent('fund_hook_shot')">Hook shot</li>
+                                    <li onclick="loadContent('fund_up_under_post')">Up and under</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="post-avanzados">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Movimientos avanzados</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="post-avanzados">
+                                    <li onclick="loadContent('fund_spin_move_post')">Spin move</li>
+                                    <li onclick="loadContent('fund_fadeaway_post')">Fadeaway</li>
+                                    <li onclick="loadContent('fund_dream_shake')">Dream shake</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- 7️⃣ Defensa individual -->
+                    <li class="sidebar-group">
+                        <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="fund-defensa">
+                            <span class="sidebar-toggle-icon">▶</span>
+                            <span>7️⃣ Defensa individual</span>
+                        </div>
+                        <ul class="sidebar-submenu" id="fund-defensa">
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="def-posicion">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Posición defensiva</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="def-posicion">
+                                    <li onclick="loadContent('fund_stance')">Stance</li>
+                                    <li onclick="loadContent('fund_slide_defensivo')">Slide defensivo</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="def-balon">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Defensa al balón</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="def-balon">
+                                    <li onclick="loadContent('fund_contener_drible')">Contener drible</li>
+                                    <li onclick="loadContent('fund_cortar_penetracion')">Cortar penetración</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="def-sin-balon">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Defensa sin balón</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="def-sin-balon">
+                                    <li onclick="loadContent('fund_deny')">Deny</li>
+                                    <li onclick="loadContent('fund_help_defense')">Help defense</li>
+                                    <li onclick="loadContent('fund_closeout')">Closeout</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- 8️⃣ Rebote -->
+                    <li class="sidebar-group">
+                        <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="fund-rebote">
+                            <span class="sidebar-toggle-icon">▶</span>
+                            <span>8️⃣ Rebote</span>
+                        </div>
+                        <ul class="sidebar-submenu" id="fund-rebote">
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="rebote-defensivo">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Rebote defensivo</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="rebote-defensivo">
+                                    <li onclick="loadContent('fund_box_out')">Box out</li>
+                                    <li onclick="loadContent('fund_captura')">Captura</li>
+                                </ul>
+                            </li>
+                            <li class="sidebar-group">
+                                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="rebote-ofensivo">
+                                    <span class="sidebar-toggle-icon">▶</span>
+                                    <span>Rebote ofensivo</span>
+                                </div>
+                                <ul class="sidebar-submenu" id="rebote-ofensivo">
+                                    <li onclick="loadContent('fund_tip')">Tip</li>
+                                    <li onclick="loadContent('fund_segundo_salto')">Segundo salto</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Ataques -->
+            <div class="sidebar-group">
+                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="ataques">
+                    <span class="sidebar-toggle-icon">▶</span>
+                    <span>Ataques</span>
+                </div>
+                <ul class="sidebar-submenu" id="ataques">
+                    <li class="sidebar-group">
+                        <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="ataques-zona">
+                            <span class="sidebar-toggle-icon">▶</span>
+                            <span>Zona</span>
+                        </div>
+                        <ul class="sidebar-submenu" id="ataques-zona">
+                            <li onclick="loadContent('vs23')">vs 2-3</li>
+                            <li onclick="loadContent('vs131')">vs 1-3-1</li>
+                            <li onclick="loadContent('vs32')">vs 3-2</li>
+                            <li onclick="loadContent('vs41')">vs 4-1</li>
+                        </ul>
+                    </li>
+                    <li class="sidebar-group">
+                        <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="ataques-hombre">
+                            <span class="sidebar-toggle-icon">▶</span>
+                            <span>Hombre a Hombre</span>
+                        </div>
+                        <ul class="sidebar-submenu" id="ataques-hombre">
+                            <li onclick="loadContent('abierto')">Sistema Abierto</li>
+                            <li onclick="loadContent('cerrado')">Sistema Cerrado</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Defensas en Zona -->
+            <div class="sidebar-group">
+                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="defensas-zona">
+                    <span class="sidebar-toggle-icon">▶</span>
+                    <span>Defensas en Zona</span>
+                </div>
+                <ul class="sidebar-submenu" id="defensas-zona">
+                    <li onclick="loadContent('zone23_defense')">Zona 2-3</li>
+                    <li onclick="loadContent('zone32_defense')">Zona 3-2</li>
+                    <li onclick="loadContent('zone131_defense')">Zona 1-3-1</li>
+                </ul>
+            </div>
+
+            <!-- Presión -->
+            <div class="sidebar-group">
+                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="presion">
+                    <span class="sidebar-toggle-icon">▶</span>
+                    <span>Presión</span>
+                </div>
+                <ul class="sidebar-submenu" id="presion">
+                    <li onclick="loadContent('fullcourt')">Full Court</li>
+                    <li onclick="loadContent('press221')">2-2-1</li>
+                    <li onclick="loadContent('doubleteam')">Double Team</li>
+                </ul>
+            </div>
+
+            <!-- Planilla -->
+            <div class="sidebar-group">
+                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="planilla">
+                    <span class="sidebar-toggle-icon">▶</span>
+                    <span>Planilla</span>
+                </div>
+                <ul class="sidebar-submenu" id="planilla">
+                    <li onclick="loadBoard()">Pizarra Virtual</li>
+                </ul>
+            </div>
+
+            <!-- Planificación de Entrenamientos -->
+            <div class="sidebar-group">
+                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="planificacion-menu">
+                    <span class="sidebar-toggle-icon">▶</span>
+                    <span>Planificación de Entrenamientos</span>
+                </div>
+                <ul class="sidebar-submenu" id="planificacion-menu">
+                    <li onclick="loadContent('planificacion')">Planificar entrenamientos</li>
+                    <li onclick="loadContent('planificacion_anual')">Planificación anual</li>
+                </ul>
+            </div>
+
+            <!-- Jugadas Guardadas -->
+            <div class="sidebar-group">
+                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="jugadas">
+                    <span class="sidebar-toggle-icon">▶</span>
+                    <span>Jugadas Guardadas</span>
+                </div>
+                <ul class="sidebar-submenu" id="jugadas">
+                    <li onclick="loadContent('plays_library')">Biblioteca de jugadas</li>
+                </ul>
+            </div>
+        </nav>
     </aside>
 
     <main class="content" id="content">
-        <h2>Bienvenido a Basket IQ</h2>
-        <p>Seleccioná un sistema para comenzar.</p>
+        <p class="content-placeholder">Cargando…</p>
     </main>
-
-    <img src="images/cancha.svg" width="400">
 
 </div>
 
+<script src="js/fundamentos-data.js"></script>
 <script src="js/main.js"></script>
+<script>
+    function toggleSidebarGroup(elm) {
+        var groupId = elm.getAttribute('data-group');
+        var sub = document.getElementById(groupId);
+        var icon = elm.querySelector('.sidebar-toggle-icon');
+        if (!sub) return;
+        var isOpen = sub.classList.contains('open');
+        sub.classList.toggle('open', !isOpen);
+        elm.classList.toggle('open', !isOpen);
+        if (icon) icon.textContent = isOpen ? '▶' : '▼';
+    }
+</script>
 </body>
 </html>
