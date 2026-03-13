@@ -39,6 +39,14 @@ body {
     justify-content: center;
     background: var(--bg-dark);
     padding: 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    box-sizing: border-box;
 }
 
 .auth-screen.hidden {
@@ -53,6 +61,22 @@ body {
     border-radius: var(--radius);
     padding: 32px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    margin: auto;
+    flex-shrink: 0;
+}
+
+@media (max-height: 700px), (max-width: 480px) {
+    .auth-screen {
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding: 12px;
+        padding-bottom: 60px;
+    }
+    .auth-card {
+        margin: 0 auto 32px;
+        padding: 20px 18px;
+        min-height: min-content;
+    }
 }
 
 .auth-brand {

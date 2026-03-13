@@ -1990,7 +1990,14 @@ function initBoard() {
         if (dragging && e.cancelable) e.preventDefault();
         drag(e);
     }, { passive: false });
-    canvas.addEventListener("touchend", stopDrag, { passive: true });
+    canvas.addEventListener("touchend", function (e) {
+        if (isLineMode && !dragging && e.changedTouches && e.changedTouches.length > 0) {
+            lineHandledByTouch = true;
+            var t = e.changedTouches[0];
+            handleLineClick({ clientX: t.clientX, clientY: t.clientY, touches: [], changedTouches: e.changedTouches });
+        }
+        stopDrag();
+    }, { passive: true });
     canvas.addEventListener("touchcancel", stopDrag);
 
     drawCourt();
@@ -2117,8 +2124,14 @@ function setLineType(type) {
     isLineMode = true;
 }
 
+var lineHandledByTouch = false;
+
 function handleLineClick(e) {
     if (!isLineMode) return;
+    if (lineHandledByTouch) {
+        lineHandledByTouch = false;
+        return;
+    }
     const { x, y } = getEventCoords(e);
 
     if (!lineStart) {
