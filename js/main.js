@@ -198,6 +198,8 @@ let lineStart = null;
 let currentLineType = "normal";
 let dragging = false;
 let isLineMode = false;
+let isDrawingLine = false;
+let currentLinePath = [];
 
 // Jugadas
 let currentPlaySteps = [];
@@ -2085,6 +2087,13 @@ function getEventCoords(e) {
 function startDrag(e) {
     const { x, y } = getEventCoords(e);
 
+    // En modo líneas: comenzar un trazo libre del usuario
+    if (isLineMode) {
+        isDrawingLine = true;
+        currentLinePath = [{ x, y }];
+        return;
+    }
+
     players.forEach(p => {
         const distance = Math.hypot(p.x - x, p.y - y);
         if (distance < 18) {
@@ -2103,14 +2112,40 @@ function startDrag(e) {
 }
 
 function drag(e) {
-    if (!dragging || !selectedPlayer) return;
     const { x, y } = getEventCoords(e);
+
+    if (isLineMode && isDrawingLine) {
+        // Agregar punto al trazo actual y redibujar la pizarra (incluyendo la línea en construcción)
+        currentLinePath.push({ x, y });
+        drawCourt();
+        return;
+    }
+
+    if (!dragging || !selectedPlayer) return;
     selectedPlayer.x = x;
     selectedPlayer.y = y;
     drawCourt();
 }
 
 function stopDrag() {
+    if (isLineMode && isDrawingLine) {
+        if (currentLinePath.length > 1) {
+            const first = currentLinePath[0];
+            const last = currentLinePath[currentLinePath.length - 1];
+            lines.push({
+                type: currentLineType,
+                path: currentLinePath.slice(),
+                x1: first.x,
+                y1: first.y,
+                x2: last.x,
+                y2: last.y
+            });
+        }
+        isDrawingLine = false;
+        currentLinePath = [];
+        drawCourt();
+    }
+
     dragging = false;
     selectedPlayer = null;
 }
@@ -2125,6 +2160,8 @@ function setLineType(type) {
     if (currentLineType === type && isLineMode) {
         isLineMode = false;
         lineStart = null;
+        isDrawingLine = false;
+        currentLinePath = [];
         return;
     }
 
@@ -2359,11 +2396,11 @@ function drawScene(targetCtx) {
         targetCtx.setLineDash([]);
 
         if (line.type === "normal") {
-            drawCurvedLineOnContext(targetCtx, line, false);
+            drawCurvedOrFreehandLineOnContext(targetCtx, line);
             drawArrowOnContext(targetCtx, line.x1, line.y1, line.x2, line.y2);
         } else if (line.type === "dashed") {
             targetCtx.setLineDash([8, 6]);
-            drawCurvedLineOnContext(targetCtx, line, true);
+            drawCurvedOrFreehandLineOnContext(targetCtx, line);
             targetCtx.setLineDash([]);
             drawArrowOnContext(targetCtx, line.x1, line.y1, line.x2, line.y2);
         } else if (line.type === "zigzag") {
@@ -2406,28 +2443,53 @@ function drawScene(targetCtx) {
         targetCtx.lineTo(ball.x + 12, ball.y);
         targetCtx.stroke();
     }
+
+    // Línea en construcción (cuando el usuario está dibujando en modo líneas)
+    if (isLineMode && isDrawingLine && currentLinePath.length > 1) {
+        const preview = {
+            type: currentLineType,
+            path: currentLinePath,
+            x1: currentLinePath[0].x,
+            y1: currentLinePath[0].y,
+            x2: currentLinePath[currentLinePath.length - 1].x,
+            y2: currentLinePath[currentLinePath.length - 1].y
+        };
+        targetCtx.strokeStyle = "black";
+        targetCtx.lineWidth = 2;
+        if (currentLineType === "dashed") {
+            targetCtx.setLineDash([8, 6]);
+        }
+        drawCurvedOrFreehandLineOnContext(targetCtx, preview);
+        targetCtx.setLineDash([]);
+    }
 }
 
-// Curva suave para las líneas normales/punteadas
-function getCurveControlPoint(line) {
+// Dibuja la línea según el trazo del usuario si hay path; si no, usa una curva suave entre dos puntos
+function drawCurvedOrFreehandLineOnContext(targetCtx, line) {
+    if (line.path && line.path.length > 1) {
+        targetCtx.beginPath();
+        targetCtx.moveTo(line.path[0].x, line.path[0].y);
+        for (let i = 1; i < line.path.length; i++) {
+            targetCtx.lineTo(line.path[i].x, line.path[i].y);
+        }
+        targetCtx.stroke();
+        return;
+    }
+
+    // Fallback para líneas viejas: curva suave entre inicio y fin
     const mx = (line.x1 + line.x2) / 2;
     const my = (line.y1 + line.y2) / 2;
     const dx = line.x2 - line.x1;
     const dy = line.y2 - line.y1;
     const dist = Math.hypot(dx, dy) || 1;
-    const offset = dist * 0.2; // qué tan curva es la línea
+    const offset = dist * 0.2;
     const angle = Math.atan2(dy, dx);
-    // Punto de control desplazado perpendicularmente a la izquierda de la dirección
     const cx = mx - offset * Math.sin(angle);
     const cy = my + offset * Math.cos(angle);
-    return { cx, cy };
-}
 
-function drawCurvedLineOnContext(targetCtx, line, dashed) {
-    const cp = getCurveControlPoint(line);
     targetCtx.beginPath();
     targetCtx.moveTo(line.x1, line.y1);
-    targetCtx.quadraticCurveTo(cp.cx, cp.cy, line.x2, line.y2);
+    targetCtx.quadraticCurveTo(cx, cy, line.x2, line.y2);
     targetCtx.stroke();
 }
 
