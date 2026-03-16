@@ -1979,7 +1979,14 @@ function initBoard() {
     canvas.addEventListener("mousemove", drag);
     canvas.addEventListener("mouseup", stopDrag);
     canvas.addEventListener("mouseleave", stopDrag);
-    canvas.addEventListener("click", handleLineClick);
+    canvas.addEventListener("click", function (e) {
+        // Si el último evento fue táctil, ignoramos este click sintético
+        if (lineHandledByTouch) {
+            lineHandledByTouch = false;
+            return;
+        }
+        handleLineClick(e);
+    });
 
     // Tactil (Android, iOS): mismos handlers con getEventCoords
     canvas.addEventListener("touchstart", function (e) {
@@ -1992,9 +1999,11 @@ function initBoard() {
     }, { passive: false });
     canvas.addEventListener("touchend", function (e) {
         if (isLineMode && !dragging && e.changedTouches && e.changedTouches.length > 0) {
-            lineHandledByTouch = true;
+            // Dibujar la línea usando el toque final y marcar que este gesto ya se manejó,
+            // para que el click sintético posterior no vuelva a dibujar.
             var t = e.changedTouches[0];
             handleLineClick({ clientX: t.clientX, clientY: t.clientY, touches: [], changedTouches: e.changedTouches });
+            lineHandledByTouch = true;
         }
         stopDrag();
     }, { passive: true });
@@ -2128,10 +2137,6 @@ var lineHandledByTouch = false;
 
 function handleLineClick(e) {
     if (!isLineMode) return;
-    if (lineHandledByTouch) {
-        lineHandledByTouch = false;
-        return;
-    }
     const { x, y } = getEventCoords(e);
 
     if (!lineStart) {
@@ -2354,17 +2359,11 @@ function drawScene(targetCtx) {
         targetCtx.setLineDash([]);
 
         if (line.type === "normal") {
-            targetCtx.beginPath();
-            targetCtx.moveTo(line.x1, line.y1);
-            targetCtx.lineTo(line.x2, line.y2);
-            targetCtx.stroke();
+            drawCurvedLineOnContext(targetCtx, line, false);
             drawArrowOnContext(targetCtx, line.x1, line.y1, line.x2, line.y2);
         } else if (line.type === "dashed") {
             targetCtx.setLineDash([8, 6]);
-            targetCtx.beginPath();
-            targetCtx.moveTo(line.x1, line.y1);
-            targetCtx.lineTo(line.x2, line.y2);
-            targetCtx.stroke();
+            drawCurvedLineOnContext(targetCtx, line, true);
             targetCtx.setLineDash([]);
             drawArrowOnContext(targetCtx, line.x1, line.y1, line.x2, line.y2);
         } else if (line.type === "zigzag") {
@@ -2407,6 +2406,29 @@ function drawScene(targetCtx) {
         targetCtx.lineTo(ball.x + 12, ball.y);
         targetCtx.stroke();
     }
+}
+
+// Curva suave para las líneas normales/punteadas
+function getCurveControlPoint(line) {
+    const mx = (line.x1 + line.x2) / 2;
+    const my = (line.y1 + line.y2) / 2;
+    const dx = line.x2 - line.x1;
+    const dy = line.y2 - line.y1;
+    const dist = Math.hypot(dx, dy) || 1;
+    const offset = dist * 0.2; // qué tan curva es la línea
+    const angle = Math.atan2(dy, dx);
+    // Punto de control desplazado perpendicularmente a la izquierda de la dirección
+    const cx = mx - offset * Math.sin(angle);
+    const cy = my + offset * Math.cos(angle);
+    return { cx, cy };
+}
+
+function drawCurvedLineOnContext(targetCtx, line, dashed) {
+    const cp = getCurveControlPoint(line);
+    targetCtx.beginPath();
+    targetCtx.moveTo(line.x1, line.y1);
+    targetCtx.quadraticCurveTo(cp.cx, cp.cy, line.x2, line.y2);
+    targetCtx.stroke();
 }
 
 
