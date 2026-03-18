@@ -109,6 +109,22 @@ body {
     color: var(--text-muted);
 }
 
+.auth-local-notice {
+    margin: 14px 0 0;
+    padding: 12px 14px;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+    background: rgba(255, 152, 0, 0.08);
+    border: 1px solid rgba(255, 152, 0, 0.25);
+    border-radius: var(--radius-sm);
+    text-align: left;
+}
+
+.auth-local-notice strong {
+    color: var(--accent);
+}
+
 .auth-tabs {
     display: flex;
     gap: 0;
@@ -867,6 +883,13 @@ body {
     font-size: 1.05rem;
 }
 
+.play-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
 .play-delete-button {
     background: transparent;
     border-radius: 999px;
@@ -1044,7 +1067,25 @@ body {
 
 .entrenamiento-card-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+    align-items: center;
+}
+
+.btn-pdf-ent {
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-weight: 700;
+    background: rgba(76, 175, 80, 0.18);
+    color: #81c784;
+    border: 1px solid rgba(129, 199, 132, 0.45);
+    white-space: nowrap;
+}
+
+.btn-pdf-ent:hover {
+    background: rgba(76, 175, 80, 0.28);
 }
 
 .btn-editar,

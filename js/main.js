@@ -39,20 +39,29 @@ function clearCurrentUser() {
 }
 
 function hashPassword(password) {
+    if (typeof crypto === "undefined" || !crypto.subtle) {
+        return Promise.reject(new Error("NO_CRYPTO"));
+    }
     return crypto.subtle.digest("SHA-256", new TextEncoder().encode(password)).then(function (buf) {
         return Array.from(new Uint8Array(buf)).map(function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
     });
 }
 
+function normUserKey(name) {
+    return String(name || "").trim().toLowerCase();
+}
+
 function register(username, email, name, password) {
     var users = getUsers();
-    var lower = username.toLowerCase();
+    var uName = String(username || "").trim();
+    var lower = uName.toLowerCase();
     var emailLower = email.toLowerCase().trim();
-    if (users.some(function (u) { return u.usernameLower === lower; })) return { ok: false, error: "Ese nombre de usuario ya está en uso." };
-    if (users.some(function (u) { return u.emailLower === emailLower; })) return { ok: false, error: "Ese correo ya está registrado." };
+    if (!uName.length) return Promise.resolve({ ok: false, error: "Ingresá un nombre de usuario." });
+    if (users.some(function (u) { return normUserKey(u.usernameLower || u.username) === lower; })) return Promise.resolve({ ok: false, error: "Ese nombre de usuario ya está en uso." });
+    if (users.some(function (u) { return u.emailLower === emailLower; })) return Promise.resolve({ ok: false, error: "Ese correo ya está registrado." });
     return hashPassword(password).then(function (passwordHash) {
         users.push({
-            username: username.trim(),
+            username: uName,
             usernameLower: lower,
             email: email.trim(),
             emailLower: emailLower,
@@ -69,8 +78,15 @@ function register(username, email, name, password) {
 function login(identificador, password) {
     var users = getUsers();
     var id = identificador.trim().toLowerCase();
-    var user = users.find(function (u) { return u.usernameLower === id || u.emailLower === id; });
-    if (!user) return Promise.resolve({ ok: false, error: "Usuario o correo no encontrado." });
+    var user = users.find(function (u) {
+        return normUserKey(u.usernameLower || u.username) === id || (u.emailLower || "") === id;
+    });
+    if (!user) {
+        return Promise.resolve({
+            ok: false,
+            error: "Usuario o correo no encontrado. Recordá: la cuenta existe solo en este navegador y en esta misma dirección (mismo link). Si te registraste en otro enlace o dispositivo, creá cuenta acá o entrá siempre desde el mismo sitio."
+        });
+    }
     return hashPassword(password).then(function (passwordHash) {
         if (user.passwordHash !== passwordHash) return { ok: false, error: "Contraseña incorrecta." };
         setCurrentUser({ username: user.username, email: user.email, name: user.name });
@@ -137,6 +153,10 @@ function attachAuthListeners() {
             errEl.textContent = "";
             login(ident, pwd).then(function (result) {
                 if (result.ok) showApp(); else errEl.textContent = result.error || "Error al iniciar sesión.";
+            }).catch(function (err) {
+                errEl.textContent = err && err.message === "NO_CRYPTO"
+                    ? "Esta página no puede usar cuentas de forma segura. Abrí Basket Lab desde el sitio publicado (HTTPS), no como archivo en la PC."
+                    : "No se pudo iniciar sesión. Probá de nuevo o usá el mismo enlace donde te registraste.";
             });
         };
     }
@@ -162,6 +182,10 @@ function attachAuthListeners() {
             }
             register(username, email, name, pwd).then(function (result) {
                 if (result.ok) showApp(); else errEl.textContent = result.error || "Error al registrarse.";
+            }).catch(function (err) {
+                errEl.textContent = err && err.message === "NO_CRYPTO"
+                    ? "No se puede registrar desde aquí. Usá el enlace publicado de Basket Lab (GitHub Pages / web), no el archivo .html abierto directo."
+                    : "Error al registrarse. Probá desde el sitio web publicado.";
             });
         };
     }
@@ -356,8 +380,9 @@ function buildListaEntrenamientos() {
                     <p class="entrenamiento-duracion">Duración total: <strong>${total} min</strong></p>
                 </div>
                 <div class="entrenamiento-card-actions">
-                    <button type="button" class="btn-editar" onclick="renderPlanificacionView(${e.id})">Editar</button>
-                    <button type="button" class="btn-borrar" onclick="deleteEntrenamiento(${e.id})">Borrar</button>
+                    <button type="button" class="btn-pdf-ent" onclick="event.stopPropagation(); printEntrenamiento(${e.id})">Descargar PDF</button>
+                    <button type="button" class="btn-editar" onclick="event.stopPropagation(); renderPlanificacionView(${e.id})">Editar</button>
+                    <button type="button" class="btn-borrar" onclick="event.stopPropagation(); deleteEntrenamiento(${e.id})">Borrar</button>
                 </div>
             </article>
         `;
@@ -431,7 +456,7 @@ function buildEditorEntrenamiento(ent) {
                 <strong>Duración total: ${total} min</strong>
             </div>
             <div class="planificacion-actions planificacion-actions-inline">
-                <button type="button" class="toolbar-button" onclick="printEntrenamiento(${ent.id})">Imprimir PDF</button>
+                <button type="button" class="toolbar-button" onclick="printEntrenamiento(${ent.id})">Descargar PDF</button>
             </div>
             <form id="form-entrenamiento" class="form-entrenamiento">
                 <input type="hidden" name="id" value="${ent.id || ""}">
@@ -528,21 +553,23 @@ function buildEntrenamientoPrintHtml(ent) {
     const total = calcularDuracionTotal(ent.bloques);
     const bloques = (ent.bloques || []).slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
 
-    const bloquesRows = bloques.map((b, idx) => {
+    const bloquesCards = bloques.map((b, idx) => {
         const titulo = escapeHtml(b.titulo || "Sin título");
         const desc = b.descripcion ? escapeHtml(b.descripcion) : "";
-        const tipo = escapeHtml(getTipoBloqueLabel(b.tipo_bloque));
+        const fundamento = escapeHtml(getTipoBloqueLabel(b.tipo_bloque));
         const dur = Number(b.duracion_minutos) || 0;
         return `
-            <tr>
-                <td class="col-orden">${idx + 1}</td>
-                <td class="col-tipo">${tipo}</td>
-                <td class="col-titulo">
-                    <div class="titulo">${titulo}</div>
-                    ${desc ? `<div class="desc">${desc}</div>` : ``}
-                </td>
-                <td class="col-duracion">${dur} min</td>
-            </tr>
+            <div class="bloquePdf">
+              <div class="bloquePdfBar">
+                <span class="bloquePdfNum">Bloque ${idx + 1}</span>
+                <span class="bloquePdfFundamento">${fundamento}</span>
+                <span class="bloquePdfDur">${dur} min</span>
+              </div>
+              <div class="bloquePdfBody">
+                <h3 class="bloquePdfTitulo">${titulo}</h3>
+                ${desc ? `<div class="bloquePdfDesc">${desc}</div>` : `<div class="bloquePdfDesc muted">Sin descripción.</div>`}
+              </div>
+            </div>
         `;
     }).join("");
 
@@ -654,33 +681,50 @@ function buildEntrenamientoPrintHtml(ent) {
       letter-spacing:0.02em;
       text-transform:uppercase;
     }
-    .sectionBody{ padding:0; }
-    table{
-      width:100%;
-      border-collapse:collapse;
-      font-size:13px;
+    .sectionBody{ padding:14px; background:#fafafa; }
+    .bloquePdf{
+      margin-bottom:16px;
+      border:2px solid #e65100;
+      border-radius:12px;
+      overflow:hidden;
+      page-break-inside:avoid;
+      box-shadow:0 2px 8px rgba(0,0,0,0.06);
     }
-    thead th{
-      text-align:left;
-      color:var(--muted);
+    .bloquePdf:last-child{ margin-bottom:0; }
+    .bloquePdfBar{
+      display:flex;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:10px;
+      padding:10px 14px;
+      background:linear-gradient(135deg, #fff3e0, #ffe0b2);
+      border-bottom:2px solid #ff9800;
+    }
+    .bloquePdfNum{
       font-size:11px;
-      letter-spacing:0.08em;
+      font-weight:800;
       text-transform:uppercase;
-      background:#fff;
-      padding:10px 12px;
-      border-bottom:1px solid var(--border);
+      letter-spacing:0.06em;
+      color:#e65100;
     }
-    tbody td{
-      padding:10px 12px;
-      border-bottom:1px solid var(--border);
-      vertical-align:top;
+    .bloquePdfFundamento{
+      flex:1;
+      font-size:14px;
+      font-weight:800;
+      color:#1a1a1a;
     }
-    tbody tr:last-child td{ border-bottom:none; }
-    .col-orden{ width:44px; color:var(--muted); font-weight:700; }
-    .col-tipo{ width:140px; }
-    .col-duracion{ width:92px; text-align:right; font-weight:800; }
-    .titulo{ font-weight:800; }
-    .desc{ margin-top:4px; color:var(--muted); line-height:1.35; }
+    .bloquePdfDur{
+      font-size:15px;
+      font-weight:800;
+      color:#fff;
+      background:#e65100;
+      padding:6px 14px;
+      border-radius:999px;
+    }
+    .bloquePdfBody{ padding:14px 16px; background:#fff; }
+    .bloquePdfTitulo{ margin:0 0 8px; font-size:16px; color:#111; }
+    .bloquePdfDesc{ font-size:13px; line-height:1.5; color:#374151; }
+    .bloquePdfDesc.muted{ color:var(--muted); font-style:italic; }
     .notas{
       padding:12px 14px;
       font-size:13px;
@@ -740,19 +784,7 @@ function buildEntrenamientoPrintHtml(ent) {
         <p class="sub" style="margin:0;">${bloques.length} bloque(s)</p>
       </div>
       <div class="sectionBody">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Tipo</th>
-              <th>Bloque</th>
-              <th style="text-align:right;">Duración</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${bloquesRows || `<tr><td colspan="4" style="padding:14px; color:var(--muted);">No hay bloques cargados.</td></tr>`}
-          </tbody>
-        </table>
+        ${bloquesCards || `<p style="margin:0; color:var(--muted); padding:8px;">No hay bloques cargados.</p>`}
       </div>
     </div>
 
@@ -778,13 +810,130 @@ function buildEntrenamientoPrintHtml(ent) {
     `;
 }
 
-function printEntrenamiento(entrenamientoId) {
+/** Datos del entrenamiento para PDF: si estás en el editor, usa lo que hay en el formulario (aunque no guardaste). */
+function getEntrenamientoForPdf(entrenamientoId) {
     const list = getEntrenamientos();
     const ent = list.find(e => e.id === entrenamientoId);
+    if (!ent) return null;
+    const form = document.getElementById("form-entrenamiento");
+    if (form) {
+        const fid = form.querySelector('input[name="id"]');
+        if (fid && parseInt(fid.value, 10) === entrenamientoId) {
+            const fd = new FormData(form);
+            return Object.assign({}, ent, {
+                nombre: String(fd.get("nombre") || ""),
+                fecha: String(fd.get("fecha") || ""),
+                categoria: String(fd.get("categoria") || ""),
+                notas_generales: String(fd.get("notas_generales") || "")
+            });
+        }
+    }
+    return ent;
+}
+
+function printEntrenamiento(entrenamientoId) {
+    const ent = getEntrenamientoForPdf(entrenamientoId);
     if (!ent) return;
     const html = buildEntrenamientoPrintHtml(ent);
     const w = window.open("", "_blank");
-    if (!w) return;
+    if (!w) {
+        alert("Permití ventanas emergentes para generar el PDF.");
+        return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+}
+
+function buildPlayPrintHtml(play) {
+    const user = getCurrentUser();
+    const coachName = (user && (user.name || user.username)) ? escapeHtml(user.name || user.username) : "—";
+    const name = escapeHtml(play.name || "Jugada");
+    const steps = Array.isArray(play.steps) ? play.steps : [];
+    const stepsHtml = steps.length
+        ? steps.map((stepUrl, idx) => {
+            const src = typeof stepUrl === "string" ? stepUrl : "";
+            return `
+            <div class="jPaso">
+              <div class="jPasoBar">
+                <span class="jPasoTit">Paso ${idx + 1}</span>
+                <span class="jPasoSub">de ${steps.length}</span>
+              </div>
+              <div class="jPasoImgWrap">
+                <img src="${src}" alt="Paso ${idx + 1}" />
+              </div>
+            </div>`;
+        }).join("")
+        : `<p class="jEmpty">No hay pasos en esta jugada.</p>`;
+
+    return `
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jugada — ${name}</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;padding:28px;font-family:"Segoe UI",system-ui,sans-serif;color:#111;background:#fff}
+    .page{max-width:820px;margin:0 auto}
+    .header{display:flex;align-items:center;gap:18px;padding-bottom:16px;border-bottom:2px solid #e5e7eb}
+    .logo{width:74px;height:74px;flex-shrink:0}
+    h1{margin:0;font-size:26px;line-height:1.15}
+    .sub{margin:8px 0 0;color:#6b7280;font-size:14px}
+    .badge{display:inline-block;padding:6px 12px;border-radius:999px;background:linear-gradient(135deg,rgba(255,152,0,.2),rgba(230,81,0,.12));color:#7c2d12;font-weight:800;font-size:12px;border:1px solid rgba(255,152,0,.4)}
+    .intro{margin:20px 0;padding:14px 16px;background:#fff8e1;border-left:4px solid #ff9800;border-radius:0 10px 10px 0;font-size:14px;line-height:1.5}
+    .jPaso{margin-bottom:22px;border:2px solid #1e3a5f;border-radius:14px;overflow:hidden;page-break-inside:avoid;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+    .jPasoBar{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:linear-gradient(135deg,#1e3a5f,#2d5a87);color:#fff}
+    .jPasoTit{font-size:16px;font-weight:800}
+    .jPasoSub{font-size:13px;opacity:.9}
+    .jPasoImgWrap{padding:12px;background:#f8fafc;text-align:center}
+    .jPasoImgWrap img{max-width:100%;height:auto;display:block;margin:0 auto;border-radius:8px;border:1px solid #e5e7eb}
+    .jEmpty{color:#6b7280;padding:20px;text-align:center}
+    .footer{margin-top:24px;display:flex;justify-content:space-between;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;padding-top:14px}
+    .printHint{margin-top:14px;padding:10px 12px;border:1px dashed rgba(17,24,39,.25);border-radius:12px;color:#6b7280;font-size:12px}
+    @media print{
+      body{padding:0}
+      .page{max-width:none;margin:0}
+      .printHint{display:none}
+      @page{size:A4;margin:12mm}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <img class="logo" src="images/logo-basketlab.svg" alt="Basket Lab" />
+      <div>
+        <h1>${name}</h1>
+        <p class="sub"><span class="badge">Jugada · ${steps.length} paso(s)</span> &nbsp; Coach: <strong>${coachName}</strong></p>
+      </div>
+    </div>
+    <p class="intro"><strong>Paso a paso:</strong> cada recuadro muestra el estado de la pizarra en orden. Ideal para repasar con el equipo o imprimir como guía.</p>
+    ${stepsHtml}
+    <div class="footer">
+      <div>Basket Lab · By Coach Fritz</div>
+      <div>Generado: ${formatFechaAR(new Date().toISOString())}</div>
+    </div>
+    <div class="printHint">Tip: en impresión elegí <strong>Guardar como PDF</strong>.</div>
+  </div>
+  <script>
+    window.addEventListener('load', function () { window.focus(); window.print(); });
+  </script>
+</body>
+</html>`;
+}
+
+function printPlayPdf(playId) {
+    loadSavedPlaysFromStorage();
+    const play = savedPlays.find(p => p.id === playId);
+    if (!play) return;
+    const html = buildPlayPrintHtml(play);
+    const w = window.open("", "_blank");
+    if (!w) {
+        alert("Permití ventanas emergentes para descargar el PDF.");
+        return;
+    }
     w.document.open();
     w.document.write(html);
     w.document.close();
@@ -1548,7 +1697,10 @@ function loadContent(sectionId) {
                     <article class="play-card">
                         <div class="play-card-header">
                             <h3>${play.name}</h3>
-                            <button class="play-delete-button" onclick="deletePlay(${play.id})">Borrar</button>
+                            <div class="play-card-actions">
+                                <button type="button" class="toolbar-button" onclick="printPlayPdf(${play.id})">Descargar PDF</button>
+                                <button class="play-delete-button" onclick="deletePlay(${play.id})">Borrar</button>
+                            </div>
                         </div>
                         <div class="play-steps-grid">
                 `;
