@@ -866,6 +866,14 @@ function buildPlayPrintHtml(play) {
         }).join("")
         : `<p class="jEmpty">No hay pasos en esta jugada.</p>`;
 
+    const descRaw = String(play.description || "").trim();
+    const descripcionBlock = descRaw
+        ? `<section class="jDescripcion">
+            <h2 class="jDescripcionTit">Descripción</h2>
+            <div class="jDescripcionBody">${escapeHtml(descRaw)}</div>
+          </section>`
+        : "";
+
     return `
 <!doctype html>
 <html lang="es">
@@ -890,6 +898,9 @@ function buildPlayPrintHtml(play) {
     .jPasoImgWrap{padding:12px;background:#f8fafc;text-align:center}
     .jPasoImgWrap img{max-width:100%;height:auto;display:block;margin:0 auto;border-radius:8px;border:1px solid #e5e7eb}
     .jEmpty{color:#6b7280;padding:20px;text-align:center}
+    .jDescripcion{margin:20px 0 24px;padding:16px 18px;background:#f0f7ff;border:2px solid #1e3a5f;border-radius:12px;page-break-inside:avoid}
+    .jDescripcionTit{margin:0 0 10px;font-size:15px;font-weight:800;color:#1e3a5f;text-transform:uppercase;letter-spacing:.04em}
+    .jDescripcionBody{font-size:14px;line-height:1.55;color:#1a1a1a;white-space:pre-wrap}
     .footer{margin-top:24px;display:flex;justify-content:space-between;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;padding-top:14px}
     .printHint{margin-top:14px;padding:10px 12px;border:1px dashed rgba(17,24,39,.25);border-radius:12px;color:#6b7280;font-size:12px}
     @media print{
@@ -909,6 +920,7 @@ function buildPlayPrintHtml(play) {
         <p class="sub"><span class="badge">Jugada · ${steps.length} paso(s)</span> &nbsp; Coach: <strong>${coachName}</strong></p>
       </div>
     </div>
+    ${descripcionBlock}
     <p class="intro"><strong>Paso a paso:</strong> cada recuadro muestra el estado de la pizarra en orden. Ideal para repasar con el equipo o imprimir como guía.</p>
     ${stepsHtml}
     <div class="footer">
@@ -1696,12 +1708,14 @@ function loadContent(sectionId) {
                 playsHtml += `
                     <article class="play-card">
                         <div class="play-card-header">
-                            <h3>${play.name}</h3>
+                            <h3>${escapeHtml(play.name || "")}</h3>
                             <div class="play-card-actions">
                                 <button type="button" class="toolbar-button" onclick="printPlayPdf(${play.id})">Descargar PDF</button>
+                                <button type="button" class="play-edit-button" onclick="openEditPlayModal(${play.id})">Editar</button>
                                 <button class="play-delete-button" onclick="deletePlay(${play.id})">Borrar</button>
                             </div>
                         </div>
+                        ${play.description ? `<div class="play-card-desc">${escapeHtml(play.description)}</div>` : `<p class="play-card-desc-empty">Sin descripción — usá <strong>Editar</strong> para agregar texto (aparece en el PDF).</p>`}
                         <div class="play-steps-grid">
                 `;
 
@@ -2102,6 +2116,12 @@ function loadBoard() {
             <button class="toolbar-button" onclick="clearCurrentPlaySteps()">Borrar pasos jugada</button>
         </div>
 
+        <div class="play-description-field">
+            <label for="play-description-input">Descripción de la jugada</label>
+            <p class="play-description-hint">Opcional. Se guarda con la jugada y aparece en el PDF (objetivo, variantes, lecturas defensivas, etc.).</p>
+            <textarea id="play-description-input" class="play-description-textarea" rows="5" placeholder="Ej.: Salida desde esquina, prioridad al tiro en esquina si el defensor baja..."></textarea>
+        </div>
+
         <div class="board-layout">
             <div class="board-canvas-wrapper">
                 <canvas id="cancha" width="800" height="600"
@@ -2113,6 +2133,8 @@ function loadBoard() {
     `;
 
     currentPlaySteps = [];
+    const descIn = document.getElementById("play-description-input");
+    if (descIn) descIn.value = "";
 
     initBoard();
     renderCurrentPlaySteps();
@@ -2134,6 +2156,10 @@ function initBoard() {
     canvas.addEventListener("mouseup", stopDrag);
     canvas.addEventListener("mouseleave", stopDrag);
     canvas.addEventListener("click", function (e) {
+        if (lineSuppressNextClick) {
+            lineSuppressNextClick = false;
+            return;
+        }
         // Si el último evento fue táctil, ignoramos este click sintético
         if (lineHandledByTouch) {
             lineHandledByTouch = false;
@@ -2153,11 +2179,14 @@ function initBoard() {
     }, { passive: false });
     canvas.addEventListener("touchend", function (e) {
         if (isLineMode && !dragging && e.changedTouches && e.changedTouches.length > 0) {
-            // Dibujar la línea usando el toque final y marcar que este gesto ya se manejó,
-            // para que el click sintético posterior no vuelva a dibujar.
+            // Solo modo dos toques: si hubo trazo libre (varios puntos), no llamar handleLineClick
+            // antes de stopDrag (evita segmento fantasma entre fin del trazo anterior y este).
             var t = e.changedTouches[0];
-            handleLineClick({ clientX: t.clientX, clientY: t.clientY, touches: [], changedTouches: e.changedTouches });
-            lineHandledByTouch = true;
+            var wasFreehand = isDrawingLine && currentLinePath.length > 1;
+            if (!wasFreehand) {
+                handleLineClick({ clientX: t.clientX, clientY: t.clientY, touches: [], changedTouches: e.changedTouches });
+                lineHandledByTouch = true;
+            }
         }
         stopDrag();
     }, { passive: true });
@@ -2292,6 +2321,7 @@ function stopDrag() {
                 x2: last.x,
                 y2: last.y
             });
+            lineSuppressNextClick = true; // evita que el click post-mouseup una este trazo con el siguiente
         }
         isDrawingLine = false;
         currentLinePath = [];
@@ -2323,6 +2353,8 @@ function setLineType(type) {
 }
 
 var lineHandledByTouch = false;
+/** Tras soltar el mouse de un trazo libre, el navegador dispara un "click" que antes armaba una línea fantasma. */
+var lineSuppressNextClick = false;
 
 function handleLineClick(e) {
     if (!isLineMode) return;
@@ -2399,9 +2431,13 @@ function saveCurrentPlay() {
     const name = prompt("Nombre de la jugada:");
     if (!name) return;
 
+    const descEl = document.getElementById("play-description-input");
+    const description = descEl ? String(descEl.value || "").trim() : "";
+
     const play = {
         id: Date.now(),
-        name,
+        name: name.trim(),
+        description,
         steps: currentPlaySteps.slice()
     };
 
@@ -2410,6 +2446,7 @@ function saveCurrentPlay() {
     savePlaysToStorage();
 
     currentPlaySteps = [];
+    if (descEl) descEl.value = "";
     renderCurrentPlaySteps();
 
     alert("Jugada guardada en la biblioteca.");
@@ -2421,6 +2458,76 @@ function deletePlay(id) {
     savePlaysToStorage();
     // Recargar la vista de biblioteca
     loadContent("plays_library");
+}
+
+function closeEditPlayModal() {
+    const el = document.getElementById("play-edit-modal");
+    if (el && el._onEscape) {
+        document.removeEventListener("keydown", el._onEscape);
+    }
+    if (el) el.remove();
+}
+
+function openEditPlayModal(playId) {
+    loadSavedPlaysFromStorage();
+    const play = savedPlays.find(function (p) { return p.id === playId; });
+    if (!play) return;
+    closeEditPlayModal();
+
+    const overlay = document.createElement("div");
+    overlay.id = "play-edit-modal";
+    overlay.className = "play-edit-modal-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-labelledby", "play-edit-modal-title");
+
+    overlay.innerHTML =
+        '<div class="play-edit-modal">' +
+        '<h3 id="play-edit-modal-title">Editar jugada</h3>' +
+        '<label for="play-edit-name">Nombre</label>' +
+        '<input type="text" id="play-edit-name" class="play-edit-input" autocomplete="off" />' +
+        '<label for="play-edit-desc">Descripción</label>' +
+        '<p class="play-edit-hint">Aparece en la biblioteca y en el PDF. Podés dejarla vacía.</p>' +
+        '<textarea id="play-edit-desc" class="play-edit-textarea" rows="7" placeholder="Objetivo, variantes, lecturas..."></textarea>' +
+        '<div class="play-edit-modal-actions">' +
+        '<button type="button" class="play-edit-btn-cancel" id="play-edit-cancel">Cancelar</button>' +
+        '<button type="button" class="toolbar-button toolbar-button-accent" id="play-edit-save">Guardar</button>' +
+        "</div></div>";
+
+    overlay.addEventListener("click", function (e) {
+        if (e.target === overlay) closeEditPlayModal();
+    });
+
+    document.body.appendChild(overlay);
+
+    function onEscape(ev) {
+        if (ev.key === "Escape") closeEditPlayModal();
+    }
+    overlay._onEscape = onEscape;
+    document.addEventListener("keydown", onEscape);
+
+    document.getElementById("play-edit-name").value = play.name || "";
+    document.getElementById("play-edit-desc").value = play.description || "";
+
+    document.getElementById("play-edit-cancel").onclick = closeEditPlayModal;
+    document.getElementById("play-edit-save").onclick = function () {
+        var name = document.getElementById("play-edit-name").value.trim();
+        if (!name) {
+            alert("El nombre no puede estar vacío.");
+            return;
+        }
+        var desc = document.getElementById("play-edit-desc").value.trim();
+        loadSavedPlaysFromStorage();
+        var p = savedPlays.find(function (x) { return x.id === playId; });
+        if (!p) return;
+        p.name = name;
+        p.description = desc;
+        savePlaysToStorage();
+        closeEditPlayModal();
+        loadContent("plays_library");
+    };
+
+    document.getElementById("play-edit-name").focus();
 }
 
 function renderCurrentPlaySteps() {
@@ -2549,12 +2656,12 @@ function drawScene(targetCtx) {
 
         if (line.type === "normal") {
             drawCurvedOrFreehandLineOnContext(targetCtx, line);
-            drawArrowOnContext(targetCtx, line.x1, line.y1, line.x2, line.y2);
+            drawArrowForLine(targetCtx, line);
         } else if (line.type === "dashed") {
             targetCtx.setLineDash([8, 6]);
             drawCurvedOrFreehandLineOnContext(targetCtx, line);
             targetCtx.setLineDash([]);
-            drawArrowOnContext(targetCtx, line.x1, line.y1, line.x2, line.y2);
+            drawArrowForLine(targetCtx, line);
         } else if (line.type === "zigzag") {
             drawZigZagOnContext(targetCtx, line);
         } else if (line.type === "screen") {
@@ -2613,6 +2720,9 @@ function drawScene(targetCtx) {
         }
         drawCurvedOrFreehandLineOnContext(targetCtx, preview);
         targetCtx.setLineDash([]);
+        if (currentLineType === "normal" || currentLineType === "dashed") {
+            drawArrowAtPathEnd(targetCtx, currentLinePath);
+        }
     }
 }
 
@@ -2649,6 +2759,28 @@ function drawCurvedOrFreehandLineOnContext(targetCtx, line) {
 // ===============================
 // FLECHA
 // ===============================
+/** Flecha al final del trazo, apuntando en la dirección del último segmento (no inicio→fin global). */
+function drawArrowAtPathEnd(targetCtx, path) {
+    if (!path || path.length < 2) return;
+    const n = path.length;
+    const xTip = path[n - 1].x;
+    const yTip = path[n - 1].y;
+    let i = n - 2;
+    while (i >= 0 && Math.hypot(xTip - path[i].x, yTip - path[i].y) < 5) {
+        i--;
+    }
+    if (i < 0) i = 0;
+    drawArrowOnContext(targetCtx, path[i].x, path[i].y, xTip, yTip);
+}
+
+function drawArrowForLine(targetCtx, line) {
+    if (line.path && line.path.length > 1) {
+        drawArrowAtPathEnd(targetCtx, line.path);
+    } else {
+        drawArrowOnContext(targetCtx, line.x1, line.y1, line.x2, line.y2);
+    }
+}
+
 function drawArrowOnContext(targetCtx, x1, y1, x2, y2) {
 
     const headlen = 12;
