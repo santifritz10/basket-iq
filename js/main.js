@@ -1755,12 +1755,36 @@ function loadContent(sectionId) {
         const ventajas = (f.ventajas || []).map(function (v) { return "<li>" + v + "</li>"; }).join("");
         const desventajas = (f.desventajas || []).map(function (d) { return "<li>" + d + "</li>"; }).join("");
         const momentos = (f.momentos || []).map(function (m) { return "<li>" + m + "</li>"; }).join("");
+        const videoEmbed = (function () {
+            var rawUrl = String(f.video_url || "").trim();
+            if (!rawUrl) return "";
+            var embedUrl = rawUrl;
+            var shortsMatch = rawUrl.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]+)/);
+            var watchMatch = rawUrl.match(/[?&]v=([a-zA-Z0-9_-]+)/);
+            if (shortsMatch && shortsMatch[1]) {
+                embedUrl = "https://www.youtube.com/embed/" + shortsMatch[1];
+            } else if (watchMatch && watchMatch[1]) {
+                embedUrl = "https://www.youtube.com/embed/" + watchMatch[1];
+            }
+            return (
+                '<h3 class="section-title">Video de referencia</h3>' +
+                '<div class="video-grid">' +
+                '  <div class="video-card">' +
+                '    <h4>' + escapeHtml(f.video_titulo || "Video") + '</h4>' +
+                '    <div class="video-wrapper">' +
+                '      <iframe src="' + embedUrl + '" title="' + escapeHtml(f.video_titulo || "Video de fundamentos") + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>' +
+                "    </div>" +
+                "  </div>" +
+                "</div>"
+            );
+        })();
         contentDiv.innerHTML = (
             "<section class=\"manual-section\">" +
             "<h2>" + (f.nombre || sectionId) + "</h2>" +
             "<h3 class=\"section-title\">Ventajas</h3><ul>" + ventajas + "</ul>" +
             "<h3 class=\"section-title\">Desventajas</h3><ul>" + desventajas + "</ul>" +
             "<h3 class=\"section-title\">Momentos convenientes</h3><ul>" + momentos + "</ul>" +
+            videoEmbed +
             "</section>"
         );
         return;
@@ -2460,6 +2484,20 @@ function renderDashboard() {
         '    <div class="dashboard-card dashboard-card-tip">' +
         '      <h3 class="dashboard-card-title">Tip de coaching</h3>' +
         '      <p class="dashboard-tip-text">"' + tip + '"</p>' +
+        '    </div>' +
+        '    <div class="dashboard-card dashboard-card-social">' +
+        '      <h3 class="dashboard-card-title">Redes Basket Lab</h3>' +
+        '      <p class="dashboard-social-subtitle">Seguinos para ver contenido, ideas de entrenamiento y jugadas.</p>' +
+        '      <div class="dashboard-social-links">' +
+        '        <a class="dashboard-social-link dashboard-social-link-youtube" href="https://www.youtube.com/@BasketLab8" target="_blank" rel="noopener noreferrer">' +
+        '          <span class="dashboard-social-icon">▶</span>' +
+        '          <span class="dashboard-social-text">YouTube</span>' +
+        '        </a>' +
+        '        <a class="dashboard-social-link dashboard-social-link-instagram" href="https://www.instagram.com/basketlab8/" target="_blank" rel="noopener noreferrer">' +
+        '          <span class="dashboard-social-icon">◎</span>' +
+        '          <span class="dashboard-social-text">Instagram</span>' +
+        '        </a>' +
+        '      </div>' +
         '    </div>' +
         '  </div>' +
         '</div>'

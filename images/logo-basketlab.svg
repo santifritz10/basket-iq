@@ -1,26 +1,72 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Basket Lab by Coach Fritz">
   <defs>
-    <radialGradient id="bg" cx="42%" cy="38%" r="58%">
-      <stop offset="0%" style="stop-color:#e8a050"/>
-      <stop offset="65%" style="stop-color:#d07030"/>
-      <stop offset="100%" style="stop-color:#b05828"/>
+    <radialGradient id="ballFill" cx="40%" cy="28%" r="70%">
+      <stop offset="0%" stop-color="#ffb33a"/>
+      <stop offset="40%" stop-color="#ff8a00"/>
+      <stop offset="100%" stop-color="#e45700"/>
     </radialGradient>
-    <radialGradient id="edge" cx="50%" cy="50%" r="50%">
-      <stop offset="88%" style="stop-color:transparent"/>
-      <stop offset="100%" style="stop-color:rgba(0,0,0,0.15)"/>
-    </radialGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-opacity="0.25"/>
+    <linearGradient id="titleFill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffb347"/>
+      <stop offset="100%" stop-color="#ff6d00"/>
+    </linearGradient>
+    <linearGradient id="ribbonFill" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#140607"/>
+      <stop offset="50%" stop-color="#251112"/>
+      <stop offset="100%" stop-color="#140607"/>
+    </linearGradient>
+    <filter id="drop" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="8" flood-color="#000" flood-opacity="0.42"/>
     </filter>
   </defs>
-  <!-- Pelota -->
-  <circle cx="50" cy="50" r="44" fill="url(#bg)" filter="url(#shadow)"/>
-  <circle cx="50" cy="50" r="44" fill="url(#edge)" stroke="#7a4a1e" stroke-width="0.8"/>
-  <!-- Costuras estilo pelota real (curvas negras) -->
-  <path d="M 14 18 C 8 50 8 50 14 82" fill="none" stroke="#1a1a1a" stroke-width="2.2" stroke-linecap="round"/>
-  <path d="M 86 18 C 92 50 92 50 86 82" fill="none" stroke="#1a1a1a" stroke-width="2.2" stroke-linecap="round"/>
-  <path d="M 18 12 C 50 6 50 6 82 12 M 18 88 C 50 94 50 94 82 88" fill="none" stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round"/>
-  <!-- Texto sobre la pelota -->
-  <text x="50" y="43" text-anchor="middle" fill="#1a1a1a" font-family="Segoe UI, system-ui, sans-serif" font-weight="700" font-size="12">Basket Lab</text>
-  <text x="50" y="58" text-anchor="middle" fill="#333" font-family="Segoe UI, system-ui, sans-serif" font-weight="400" font-size="6.5">by Coach Fritz</text>
+
+  <!-- Base shield -->
+  <path d="M256 46 L430 140 L392 342 L256 468 L120 342 L82 140 Z"
+        fill="#170607"
+        stroke="#ff5a00"
+        stroke-width="8"
+        filter="url(#drop)"/>
+
+  <!-- Basketball -->
+  <circle cx="256" cy="200" r="154" fill="url(#ballFill)" stroke="#170607" stroke-width="10"/>
+  <path d="M102 200 H410" fill="none" stroke="#170607" stroke-width="10" stroke-linecap="round"/>
+  <path d="M256 46 V354" fill="none" stroke="#170607" stroke-width="10" stroke-linecap="round"/>
+  <path d="M126 110 C238 150 274 250 386 290" fill="none" stroke="#170607" stroke-width="10" stroke-linecap="round"/>
+  <path d="M126 290 C238 250 274 150 386 110" fill="none" stroke="#170607" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Top title -->
+  <g transform="translate(0 2)">
+    <text x="256" y="232"
+          text-anchor="middle"
+          fill="url(#titleFill)"
+          stroke="#130506"
+          stroke-width="8"
+          paint-order="stroke"
+          font-family="Segoe UI, Arial, sans-serif"
+          font-weight="900"
+          font-size="110"
+          letter-spacing="3">BASKET</text>
+  </g>
+
+  <!-- Mid badge -->
+  <rect x="162" y="238" width="188" height="82" rx="24" fill="#170607" stroke="#ff5a00" stroke-width="6"/>
+  <text x="256" y="296"
+        text-anchor="middle"
+        fill="url(#titleFill)"
+        font-family="Segoe UI, Arial, sans-serif"
+        font-weight="900"
+        font-size="70"
+        letter-spacing="2">LAB</text>
+
+  <!-- Bottom ribbon -->
+  <path d="M86 364 C156 332 356 332 426 364 L414 420 C337 446 175 446 98 420 Z"
+        fill="url(#ribbonFill)"
+        stroke="#ff5a00"
+        stroke-width="7"/>
+  <text x="256" y="405"
+        text-anchor="middle"
+        fill="#ff8a00"
+        font-family="Segoe UI, Arial, sans-serif"
+        font-weight="800"
+        font-size="48"
+        letter-spacing="1">BY COACH FRITZ</text>
 </svg>

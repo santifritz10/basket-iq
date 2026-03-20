@@ -5,7 +5,9 @@ window.FUNDAMENTOS_CONTENIDO = {
         nombre: "Drible estático",
         ventajas: ["Permite leer la defensa sin avanzar.", "Mantiene la triple amenaza (pasar, tirar, botar).", "Útil para recibir y decidir con calma."],
         desventajas: ["No genera ventaja si el defensor está bien parado.", "Puede ralentizar el ataque si se abusa."],
-        momentos: ["Al recibir el balón para evaluar opciones.", "En situaciones de último segundo para no errar.", "Cuando el defensor cede espacio y no conviene botar aún."]
+        momentos: ["Al recibir el balón para evaluar opciones.", "En situaciones de último segundo para no errar.", "Cuando el defensor cede espacio y no conviene botar aún."],
+        video_url: "https://www.youtube.com/shorts/iBP54bSAymw",
+        video_titulo: "Drible estático — referencia"
     },
     fund_drible_bajo_proteccion: {
         nombre: "Drible bajo de protección",
