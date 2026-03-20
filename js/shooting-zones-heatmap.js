@@ -85,6 +85,10 @@
     ];
 
     function loadState() {
+        if (global.BasketLabDataSync && typeof global.BasketLabDataSync.loadData === "function") {
+            var cloudBacked = global.BasketLabDataSync.loadData("shooting_heatmap");
+            if (cloudBacked && typeof cloudBacked === "object") return cloudBacked;
+        }
         try {
             var raw = localStorage.getItem(STORAGE_KEY);
             if (!raw) return {};
@@ -96,6 +100,9 @@
     }
 
     function saveState(state) {
+        if (global.BasketLabDataSync && typeof global.BasketLabDataSync.saveData === "function") {
+            global.BasketLabDataSync.saveData("shooting_heatmap", state);
+        }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }
 

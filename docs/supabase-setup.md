@@ -39,7 +39,7 @@ Esta guia explica, paso a paso y sin suponer conocimiento previo, como dejar Sup
    - o el puerto local que uses.
 3. En **Redirect URLs** agregar:
    - `http://localhost:5500`
-   - `   `
+   - `http://127.0.0.1:5500`
 4. Guardar.
 
 ## 5) Crear tabla `profiles` + RLS
@@ -64,6 +64,12 @@ Esta guia explica, paso a paso y sin suponer conocimiento previo, como dejar Sup
   - lea su propio perfil
   - inserte su propio perfil
   - actualice su propio perfil
+- Tabla `user_app_data` (sincronizacion cross-device) con tipos:
+  - `plays`
+  - `trainings`
+  - `annual_plans`
+  - `shooting_heatmap`
+- Politicas RLS para que cada usuario solo lea/edite sus propios datos de app.
 
 ## 6) Copiar credenciales del proyecto
 
@@ -96,6 +102,20 @@ No abrir `index.html` con doble click (`file://`) porque rompera flujos de auten
 7. En Supabase:
    - **Authentication** -> **Users**: debe aparecer el usuario.
    - **Table Editor** -> `profiles`: debe existir la fila del perfil.
+   - **Table Editor** -> `user_app_data`: deben aparecer filas para los tipos usados.
+
+## 8.1) Prueba cross-device (celular/PC/iPad)
+
+1. Iniciar sesion con la misma cuenta en PC.
+2. Crear/editar:
+   - un entrenamiento,
+   - una jugada,
+   - una planificacion anual.
+3. Cerrar sesion o recargar la pagina (para forzar pull de nube).
+4. Iniciar sesion con la misma cuenta en otro dispositivo.
+5. Verificar que se ve exactamente el mismo contenido.
+
+Nota: la app usa cache local para offline. Si no hay internet, guarda localmente y sincroniza al reconectar.
 
 ## 9) Problemas comunes
 

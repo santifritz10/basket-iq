@@ -251,7 +251,12 @@ function showApp() {
     if (userNameEl && cur) userNameEl.textContent = cur.name || cur.username;
     var btnLogout = document.getElementById("btn-logout");
     if (btnLogout) btnLogout.onclick = function () { logout(); };
-    loadContent("dashboard");
+    bootstrapUserDataSync()
+        .finally(function () {
+            loadSavedPlaysFromStorage();
+            entrenamientos = getEntrenamientos();
+            loadContent("dashboard");
+        });
 }
 
 function showAuthScreen() {
@@ -277,6 +282,8 @@ function logout() {
         })
         .finally(function () {
             authCurrentUser = null;
+            dataSyncDirtyTypes = {};
+            dataSyncBootstrapPromise = null;
             showAuthScreen();
         });
 }
@@ -405,51 +412,242 @@ let currentLinePath = [];
 let currentPlaySteps = [];
 let savedPlays = [];
 const PLAYS_STORAGE_KEY = "basketIQ_plays";
+const ENTRENAMIENTOS_STORAGE_KEY = "basketLab_entrenamientos";
+const PLANIFICACION_ANUAL_STORAGE_KEY = "basketLab_planificacion_anual";
+const SHOOTING_HEATMAP_STORAGE_KEY = "basketLab_shootingHeatmap7";
+
+const APP_DATA_TYPES = {
+    plays: "plays",
+    trainings: "trainings",
+    annualPlans: "annual_plans",
+    shootingHeatmap: "shooting_heatmap"
+};
+
+const APP_DATA_STORAGE_KEYS = {
+    [APP_DATA_TYPES.plays]: PLAYS_STORAGE_KEY,
+    [APP_DATA_TYPES.trainings]: ENTRENAMIENTOS_STORAGE_KEY,
+    [APP_DATA_TYPES.annualPlans]: PLANIFICACION_ANUAL_STORAGE_KEY,
+    [APP_DATA_TYPES.shootingHeatmap]: SHOOTING_HEATMAP_STORAGE_KEY
+};
+
+let dataSyncFlushTimer = null;
+let dataSyncDirtyTypes = {};
+let dataSyncInProgress = false;
+let dataSyncBootstrapPromise = null;
+let dataSyncBoundOnlineListener = false;
+
+function getDefaultDataForType(dataType) {
+    if (dataType === APP_DATA_TYPES.shootingHeatmap) return {};
+    return [];
+}
+
+function hasDataContent(dataType, value) {
+    if (dataType === APP_DATA_TYPES.shootingHeatmap) {
+        return value && typeof value === "object" && Object.keys(value).length > 0;
+    }
+    return Array.isArray(value) && value.length > 0;
+}
+
+function readJsonStorageValue(storageKey, fallbackValue) {
+    try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw == null) return fallbackValue;
+        const parsed = JSON.parse(raw);
+        return parsed == null ? fallbackValue : parsed;
+    } catch (e) {
+        return fallbackValue;
+    }
+}
+
+function getStorageKeyForCurrentUser(baseStorageKey) {
+    const user = getCurrentUser();
+    const userId = user && user.id ? user.id : "guest";
+    return baseStorageKey + "__" + userId;
+}
+
+function getLocalDataByType(dataType) {
+    const baseStorageKey = APP_DATA_STORAGE_KEYS[dataType];
+    if (!baseStorageKey) return getDefaultDataForType(dataType);
+
+    const scopedKey = getStorageKeyForCurrentUser(baseStorageKey);
+    const scopedRaw = localStorage.getItem(scopedKey);
+    if (scopedRaw != null) {
+        return readJsonStorageValue(scopedKey, getDefaultDataForType(dataType));
+    }
+
+    // Migración silenciosa desde clave legacy (sin scope de usuario).
+    const legacyRaw = localStorage.getItem(baseStorageKey);
+    if (legacyRaw != null) {
+        const legacyData = readJsonStorageValue(baseStorageKey, getDefaultDataForType(dataType));
+        try {
+            localStorage.setItem(scopedKey, JSON.stringify(legacyData));
+        } catch (e) {
+            // No-op: si no se puede persistir cache local, la app sigue.
+        }
+        return legacyData;
+    }
+
+    return getDefaultDataForType(dataType);
+}
+
+function setLocalDataByType(dataType, value) {
+    const baseStorageKey = APP_DATA_STORAGE_KEYS[dataType];
+    if (!baseStorageKey) return;
+    const scopedKey = getStorageKeyForCurrentUser(baseStorageKey);
+    localStorage.setItem(scopedKey, JSON.stringify(value));
+}
+
+function markDataTypeDirty(dataType) {
+    dataSyncDirtyTypes[dataType] = true;
+    if (dataSyncFlushTimer) clearTimeout(dataSyncFlushTimer);
+    dataSyncFlushTimer = setTimeout(function () {
+        flushPendingDataSync();
+    }, 600);
+}
+
+async function upsertRemoteDataType(dataType) {
+    const client = getSupabaseClient();
+    const user = getCurrentUser();
+    if (!client || !user || !user.id) return;
+
+    const payload = getLocalDataByType(dataType);
+    const result = await client.from("user_app_data").upsert({
+        user_id: user.id,
+        data_type: dataType,
+        payload: payload
+    }, { onConflict: "user_id,data_type" });
+
+    if (result.error) throw result.error;
+}
+
+async function flushPendingDataSync() {
+    if (dataSyncInProgress) return;
+    if (!navigator.onLine) return;
+    const client = getSupabaseClient();
+    const user = getCurrentUser();
+    if (!client || !user || !user.id) return;
+
+    const types = Object.keys(dataSyncDirtyTypes).filter(function (t) { return dataSyncDirtyTypes[t]; });
+    if (!types.length) return;
+
+    dataSyncInProgress = true;
+    try {
+        for (var i = 0; i < types.length; i++) {
+            var dataType = types[i];
+            await upsertRemoteDataType(dataType);
+            dataSyncDirtyTypes[dataType] = false;
+        }
+    } catch (error) {
+        console.error("[DataSync] flush error", error);
+    } finally {
+        dataSyncInProgress = false;
+    }
+}
+
+async function bootstrapUserDataSync() {
+    const client = getSupabaseClient();
+    const user = getCurrentUser();
+    if (!client || !user || !user.id) return;
+
+    if (!dataSyncBoundOnlineListener) {
+        window.addEventListener("online", function () {
+            flushPendingDataSync();
+        });
+        dataSyncBoundOnlineListener = true;
+    }
+
+    if (dataSyncBootstrapPromise) return dataSyncBootstrapPromise;
+
+    dataSyncBootstrapPromise = (async function () {
+        const dataTypes = [
+            APP_DATA_TYPES.plays,
+            APP_DATA_TYPES.trainings,
+            APP_DATA_TYPES.annualPlans,
+            APP_DATA_TYPES.shootingHeatmap
+        ];
+
+        try {
+            const remoteResult = await client
+                .from("user_app_data")
+                .select("data_type,payload")
+                .eq("user_id", user.id);
+
+            if (remoteResult.error) throw remoteResult.error;
+
+            const remoteMap = {};
+            (remoteResult.data || []).forEach(function (row) {
+                remoteMap[row.data_type] = row.payload;
+            });
+
+            for (var i = 0; i < dataTypes.length; i++) {
+                var t = dataTypes[i];
+                var remoteData = Object.prototype.hasOwnProperty.call(remoteMap, t) ? remoteMap[t] : undefined;
+                var localData = getLocalDataByType(t);
+
+                if (remoteData !== undefined && remoteData !== null) {
+                    setLocalDataByType(t, remoteData);
+                    continue;
+                }
+
+                if (hasDataContent(t, localData)) {
+                    // Migración automática inicial: no hay data en nube, sí en local.
+                    await upsertRemoteDataType(t);
+                }
+            }
+
+            await flushPendingDataSync();
+            console.log("[DataSync] bootstrap completed");
+        } catch (error) {
+            console.error("[DataSync] bootstrap error", error);
+        } finally {
+            dataSyncBootstrapPromise = null;
+        }
+    })();
+
+    return dataSyncBootstrapPromise;
+}
+
+window.BasketLabDataSync = {
+    loadData: function (dataType) {
+        return getLocalDataByType(dataType);
+    },
+    saveData: function (dataType, value) {
+        setLocalDataByType(dataType, value);
+        markDataTypeDirty(dataType);
+    },
+    flush: function () {
+        return flushPendingDataSync();
+    }
+};
 
 // ===============================
 // UTILIDAD: JUGADAS GUARDADAS
 // ===============================
 
 function loadSavedPlaysFromStorage() {
-    try {
-        const data = localStorage.getItem(PLAYS_STORAGE_KEY);
-        if (!data) {
-            savedPlays = [];
-            return;
-        }
-        const parsed = JSON.parse(data);
-        savedPlays = Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-        savedPlays = [];
-    }
+    const parsed = getLocalDataByType(APP_DATA_TYPES.plays);
+    savedPlays = Array.isArray(parsed) ? parsed : [];
 }
 
 function savePlaysToStorage() {
-    localStorage.setItem(PLAYS_STORAGE_KEY, JSON.stringify(savedPlays));
+    setLocalDataByType(APP_DATA_TYPES.plays, savedPlays);
+    markDataTypeDirty(APP_DATA_TYPES.plays);
 }
 
 // ===============================
 // PLANIFICACIÓN DE ENTRENAMIENTOS
 // ===============================
 
-const ENTRENAMIENTOS_STORAGE_KEY = "basketLab_entrenamientos";
 let entrenamientos = [];
 
-const PLANIFICACION_ANUAL_STORAGE_KEY = "basketLab_planificacion_anual";
-
 function getPlanificacionesAnuales() {
-    try {
-        const data = localStorage.getItem(PLANIFICACION_ANUAL_STORAGE_KEY);
-        if (!data) return [];
-        const parsed = JSON.parse(data);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-        return [];
-    }
+    const parsed = getLocalDataByType(APP_DATA_TYPES.annualPlans);
+    return Array.isArray(parsed) ? parsed : [];
 }
 
 function savePlanificacionesAnuales(list) {
-    localStorage.setItem(PLANIFICACION_ANUAL_STORAGE_KEY, JSON.stringify(list));
+    setLocalDataByType(APP_DATA_TYPES.annualPlans, list);
+    markDataTypeDirty(APP_DATA_TYPES.annualPlans);
 }
 
 function createCiclosBimestrales(anio) {
@@ -505,18 +703,13 @@ const TIPOS_BLOQUE = [
 ];
 
 function getEntrenamientos() {
-    try {
-        const data = localStorage.getItem(ENTRENAMIENTOS_STORAGE_KEY);
-        if (!data) return [];
-        const parsed = JSON.parse(data);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-        return [];
-    }
+    const parsed = getLocalDataByType(APP_DATA_TYPES.trainings);
+    return Array.isArray(parsed) ? parsed : [];
 }
 
 function saveEntrenamientos() {
-    localStorage.setItem(ENTRENAMIENTOS_STORAGE_KEY, JSON.stringify(entrenamientos));
+    setLocalDataByType(APP_DATA_TYPES.trainings, entrenamientos);
+    markDataTypeDirty(APP_DATA_TYPES.trainings);
 }
 
 function calcularDuracionTotal(bloques) {
