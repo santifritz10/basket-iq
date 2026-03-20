@@ -1658,3 +1658,252 @@ body {
         min-height: 44px;
     }
 }
+
+/* ===== Entrenamiento de tiro (7 zonas) ===== */
+.sh-wrap {
+    max-width: 1100px;
+}
+
+.sh-header h2 {
+    margin-top: 0;
+    color: var(--accent);
+}
+
+.sh-header p {
+    color: var(--text-muted);
+    line-height: 1.5;
+    max-width: 720px;
+}
+
+.sh-layout {
+    display: grid;
+    grid-template-columns: minmax(420px, 640px) 1fr;
+    gap: 28px;
+    align-items: start;
+    margin-top: 20px;
+}
+
+@media (max-width: 900px) {
+    .sh-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.sh-svg-box {
+    border-radius: 20px;
+    overflow: auto;
+    padding: 12px;
+    background: linear-gradient(160deg, #2a1f18 0%, #1a1410 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 12px 40px rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 152, 0, 0.2);
+}
+
+.sh-svg {
+    display: block;
+    width: 100%;
+    min-width: 500px;
+    height: auto;
+    border-radius: 14px;
+}
+
+.sh-line,
+.sh-line-rect,
+.sh-ft-ring {
+    stroke: #fffef8;
+    stroke-width: 2.4;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sh-line-dash {
+    stroke-dasharray: 10 7;
+    opacity: 0.92;
+}
+
+.sh-line-thin {
+    stroke: #fffef8;
+    stroke-width: 1.6;
+}
+
+.sh-zone-shape {
+    stroke: #ffffff;
+    stroke-width: 2.6;
+    stroke-linejoin: round;
+    pointer-events: all;
+    transition: fill 0.22s ease, filter 0.15s ease;
+}
+
+.sh-zone-g:hover .sh-zone-shape {
+    filter: brightness(1.06);
+}
+
+.sh-zone-g--sel .sh-zone-shape {
+    stroke: #ffb74d;
+    stroke-width: 3.8;
+    filter: drop-shadow(0 0 10px rgba(255, 152, 0, 0.55));
+}
+
+.sh-zone-lbl {
+    font-family: system-ui, "Segoe UI", sans-serif;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    fill: #fff;
+    stroke: rgba(0, 0, 0, 0.55);
+    stroke-width: 0.35px;
+    paint-order: stroke fill;
+    pointer-events: none;
+}
+
+.sh-zone-pct {
+    font-family: system-ui, "Segoe UI", sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+    fill: #fff;
+    stroke: rgba(0, 0, 0, 0.5);
+    stroke-width: 0.3px;
+    paint-order: stroke fill;
+    pointer-events: none;
+}
+
+.sh-panel {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+}
+
+.sh-panel-title {
+    margin: 0 0 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text);
+}
+
+.sh-panel-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.sh-btn {
+    flex: 1;
+    min-width: 120px;
+    padding: 14px 20px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-sans);
+}
+
+.sh-btn-make {
+    background: linear-gradient(135deg, #2e7d32, #43a047);
+    color: #fff;
+}
+
+.sh-btn-miss {
+    background: var(--sidebar-bg);
+    color: var(--text);
+    border: 2px solid var(--card-border);
+}
+
+.sh-stats-card,
+.sh-workout-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    margin-bottom: 18px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+.sh-stats-card h3,
+.sh-workout-card h3 {
+    margin: 0 0 12px;
+    font-size: 1rem;
+    color: var(--accent);
+}
+
+.sh-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+.sh-table th,
+.sh-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.sh-table .sh-pct {
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.sh-total {
+    margin: 14px 0 0;
+    padding: 12px;
+    background: rgba(255, 152, 0, 0.08);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+}
+
+.sh-workout-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.sh-workout-row label {
+    font-weight: 600;
+}
+
+.sh-workout-row input[type="number"] {
+    width: 72px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--card-border);
+    background: var(--sidebar-bg);
+    color: var(--text);
+}
+
+.sh-workout-list {
+    margin: 0;
+    padding-left: 20px;
+    line-height: 1.7;
+    font-size: 0.9rem;
+}
+
+.sh-toolbar {
+    margin-top: 8px;
+}
+
+.sh-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 0.8rem;
+    margin-top: 10px;
+}
+
+.sh-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sh-legend i {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+}

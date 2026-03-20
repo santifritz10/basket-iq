@@ -1,97 +1,244 @@
 // ===============================
-// AUTENTICACIÓN (registro / login)
+// AUTENTICACIÓN (Supabase)
 // ===============================
 
-const AUTH_USERS_KEY = "basketLab_users";
-const AUTH_SESSION_KEY = "basketLab_currentUser";
+var authCurrentUser = null;
 
-function getUsers() {
-    try {
-        const data = localStorage.getItem(AUTH_USERS_KEY);
-        if (!data) return [];
-        const parsed = JSON.parse(data);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-        return [];
-    }
+function isSupabaseReady() {
+    return Boolean(window.basketLabSupabase && window.basketLabSupabase.client);
 }
 
-function saveUsers(users) {
-    localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
+function getSupabaseClient() {
+    return isSupabaseReady() ? window.basketLabSupabase.client : null;
+}
+
+function normalizeUsername(value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function setAuthUiError(message) {
+    var loginError = document.getElementById("auth-login-error");
+    var registerError = document.getElementById("auth-register-error");
+    if (loginError) loginError.textContent = message || "";
+    if (registerError) registerError.textContent = message || "";
 }
 
 function getCurrentUser() {
-    try {
-        const data = localStorage.getItem(AUTH_SESSION_KEY);
-        if (!data) return null;
-        return JSON.parse(data);
-    } catch (e) {
+    return authCurrentUser;
+}
+
+function mapSupabaseAuthError(error) {
+    var message = String((error && error.message) || "").toLowerCase();
+    var name = String((error && error.name) || "").toLowerCase();
+    var statusCode = Number((error && error.status) || 0);
+    if (name.indexOf("authretryablefetcherror") >= 0 || message.indexOf("failed to fetch") >= 0 || statusCode === 503 || statusCode === 504) {
+        return "Supabase no está respondiendo en este momento (503/504). Esperá 1-2 minutos y probá de nuevo.";
+    }
+    if (message.indexOf("already registered") >= 0 || message.indexOf("already been registered") >= 0) {
+        return "Ese correo ya está registrado.";
+    }
+    if (message.indexOf("invalid login credentials") >= 0) {
+        return "Correo o contraseña incorrectos.";
+    }
+    if (message.indexOf("email not confirmed") >= 0) {
+        return "Tu correo todavía no está confirmado. Revisá tu bandeja y volvé a intentar.";
+    }
+    if (message.indexOf("password should be at least") >= 0) {
+        return "La contraseña debe tener al menos 6 caracteres.";
+    }
+    return (error && error.message) || "No se pudo completar la operación de autenticación.";
+}
+
+function toAppUser(authUser, profile) {
+    var userMeta = (authUser && authUser.user_metadata) || {};
+    var username = (profile && profile.username) || userMeta.username || (authUser && authUser.email ? authUser.email.split("@")[0] : "usuario");
+    var name = (profile && profile.full_name) || userMeta.full_name || username;
+    return {
+        id: authUser ? authUser.id : null,
+        username: username,
+        email: authUser ? authUser.email : "",
+        name: name
+    };
+}
+
+async function upsertProfile(authUser, profileInput) {
+    var client = getSupabaseClient();
+    if (!client || !authUser) return;
+    var usernameRaw = (profileInput && profileInput.username) || (authUser.user_metadata && authUser.user_metadata.username) || (authUser.email ? authUser.email.split("@")[0] : "usuario");
+    var username = normalizeUsername(usernameRaw);
+    var payload = {
+        id: authUser.id,
+        username: username,
+        full_name: (profileInput && profileInput.full_name) || (authUser.user_metadata && authUser.user_metadata.full_name) || username
+    };
+    var upsertResult = await client.from("profiles").upsert(payload, { onConflict: "id" });
+    if (upsertResult.error) throw upsertResult.error;
+}
+
+async function getAuthenticatedSessionUser() {
+    var client = getSupabaseClient();
+    if (!client) return null;
+    var sessionResult = await client.auth.getSession();
+    if (sessionResult.error) throw sessionResult.error;
+    var session = sessionResult.data && sessionResult.data.session;
+    return session && session.user ? session.user : null;
+}
+
+async function loadCurrentUserFromSession() {
+    var client = getSupabaseClient();
+    if (!client) {
+        authCurrentUser = null;
         return null;
     }
-}
 
-function setCurrentUser(user) {
-    localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({ username: user.username, email: user.email, name: user.name }));
-}
+    var sessionResult = await client.auth.getSession();
+    if (sessionResult.error) throw sessionResult.error;
 
-function clearCurrentUser() {
-    localStorage.removeItem(AUTH_SESSION_KEY);
-}
-
-function hashPassword(password) {
-    if (typeof crypto === "undefined" || !crypto.subtle) {
-        return Promise.reject(new Error("NO_CRYPTO"));
+    var session = sessionResult.data && sessionResult.data.session;
+    if (!session || !session.user) {
+        authCurrentUser = null;
+        return null;
     }
-    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(password)).then(function (buf) {
-        return Array.from(new Uint8Array(buf)).map(function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
-    });
-}
 
-function normUserKey(name) {
-    return String(name || "").trim().toLowerCase();
-}
+    var authUser = session.user;
+    var profileData = null;
 
-function register(username, email, name, password) {
-    var users = getUsers();
-    var uName = String(username || "").trim();
-    var lower = uName.toLowerCase();
-    var emailLower = email.toLowerCase().trim();
-    if (!uName.length) return Promise.resolve({ ok: false, error: "Ingresá un nombre de usuario." });
-    if (users.some(function (u) { return normUserKey(u.usernameLower || u.username) === lower; })) return Promise.resolve({ ok: false, error: "Ese nombre de usuario ya está en uso." });
-    if (users.some(function (u) { return u.emailLower === emailLower; })) return Promise.resolve({ ok: false, error: "Ese correo ya está registrado." });
-    return hashPassword(password).then(function (passwordHash) {
-        users.push({
-            username: uName,
-            usernameLower: lower,
-            email: email.trim(),
-            emailLower: emailLower,
-            name: name.trim(),
-            passwordHash: passwordHash
-        });
-        saveUsers(users);
-        var user = { username: users[users.length - 1].username, email: users[users.length - 1].email, name: users[users.length - 1].name };
-        setCurrentUser(user);
-        return { ok: true, user: user };
-    });
-}
+    try {
+        var profileResult = await client
+            .from("profiles")
+            .select("username, full_name")
+            .eq("id", authUser.id)
+            .maybeSingle();
 
-function login(identificador, password) {
-    var users = getUsers();
-    var id = identificador.trim().toLowerCase();
-    var user = users.find(function (u) {
-        return normUserKey(u.usernameLower || u.username) === id || (u.emailLower || "") === id;
-    });
-    if (!user) {
-        return Promise.resolve({
-            ok: false,
-            error: "Usuario o correo no encontrado. Recordá: la cuenta existe solo en este navegador y en esta misma dirección (mismo link). Si te registraste en otro enlace o dispositivo, creá cuenta acá o entrá siempre desde el mismo sitio."
-        });
+        if (profileResult.error) throw profileResult.error;
+
+        if (!profileResult.data) {
+            try {
+                await upsertProfile(authUser, {});
+                profileResult = await client
+                    .from("profiles")
+                    .select("username, full_name")
+                    .eq("id", authUser.id)
+                    .maybeSingle();
+                if (profileResult.error) throw profileResult.error;
+                profileData = profileResult.data || null;
+            } catch (upsertError) {
+                console.error("[Auth][session] Could not create/read profile, using auth metadata fallback", upsertError);
+            }
+        } else {
+            profileData = profileResult.data;
+        }
+    } catch (profileQueryError) {
+        console.error("[Auth][session] profiles query failed, using auth metadata fallback", profileQueryError);
     }
-    return hashPassword(password).then(function (passwordHash) {
-        if (user.passwordHash !== passwordHash) return { ok: false, error: "Contraseña incorrecta." };
-        setCurrentUser({ username: user.username, email: user.email, name: user.name });
-        return { ok: true, user: user };
-    });
+
+    authCurrentUser = toAppUser(authUser, profileData);
+    return authCurrentUser;
+}
+
+async function register(username, email, name, password) {
+    var client = getSupabaseClient();
+    if (!client) {
+        return { ok: false, error: "Supabase no está configurado. Revisá js/supabase-config.js." };
+    }
+
+    var normalizedUsername = normalizeUsername(username);
+    if (!normalizedUsername) return { ok: false, error: "Ingresá un nombre de usuario." };
+
+    try {
+        var signUpResult = await client.auth.signUp({
+            email: String(email || "").trim(),
+            password: password,
+            options: {
+                data: {
+                    username: normalizedUsername,
+                    full_name: String(name || "").trim()
+                }
+            }
+        });
+        console.log("[Auth][signUp] response", {
+            hasUser: Boolean(signUpResult && signUpResult.data && signUpResult.data.user),
+            hasSession: Boolean(signUpResult && signUpResult.data && signUpResult.data.session)
+        });
+
+        if (signUpResult.error) {
+            console.error("[Auth][signUp] error", signUpResult.error);
+            return { ok: false, error: mapSupabaseAuthError(signUpResult.error) };
+        }
+
+        var authUser = signUpResult.data && signUpResult.data.user;
+        if (!authUser) {
+            console.error("[Auth][signUp] Missing data.user in response");
+            return { ok: false, error: "No se pudo crear el usuario en Supabase." };
+        }
+
+        var sessionUser = await getAuthenticatedSessionUser();
+        if (sessionUser && sessionUser.id === authUser.id) {
+            try {
+                await upsertProfile(authUser, { username: normalizedUsername, full_name: String(name || "").trim() });
+                console.log("[Auth][signUp] Profile upserted for authenticated user", authUser.id);
+            } catch (profileError) {
+                console.error("[Auth][signUp] profile upsert error", profileError);
+                return { ok: false, error: "Usuario creado, pero no se pudo guardar el perfil. Revisá la tabla/políticas de profiles." };
+            }
+
+            var current = await loadCurrentUserFromSession();
+            if (!current) {
+                console.error("[Auth][signUp] Session exists but app user could not be loaded");
+                return { ok: false, error: "No se pudo cargar la sesión luego del registro." };
+            }
+            return { ok: true, user: current };
+        }
+
+        authCurrentUser = null;
+        return {
+            ok: true,
+            user: null,
+            pendingEmailConfirmation: true
+        };
+    } catch (error) {
+        console.error("[Auth][signUp] unexpected error", error);
+        return { ok: false, error: mapSupabaseAuthError(error) };
+    }
+}
+
+async function login(email, password) {
+    var client = getSupabaseClient();
+    if (!client) {
+        return { ok: false, error: "Supabase no está configurado. Revisá js/supabase-config.js." };
+    }
+
+    try {
+        var loginResult = await client.auth.signInWithPassword({
+            email: String(email || "").trim(),
+            password: password
+        });
+        console.log("[Auth][signIn] response", {
+            hasUser: Boolean(loginResult && loginResult.data && loginResult.data.user),
+            hasSession: Boolean(loginResult && loginResult.data && loginResult.data.session)
+        });
+
+        if (loginResult.error) {
+            console.error("[Auth][signIn] error", loginResult.error);
+            return { ok: false, error: mapSupabaseAuthError(loginResult.error) };
+        }
+
+        var sessionUser = await getAuthenticatedSessionUser();
+        if (!sessionUser) {
+            console.error("[Auth][signIn] No active session after successful signIn");
+            return { ok: false, error: "Inicio de sesión incompleto: no se obtuvo una sesión válida." };
+        }
+
+        var current = await loadCurrentUserFromSession();
+        if (!current) {
+            console.error("[Auth][signIn] session available but app user mapping failed");
+            return { ok: false, error: "No se pudo cargar el perfil del usuario luego del login." };
+        }
+        return { ok: true, user: current };
+    } catch (error) {
+        console.error("[Auth][signIn] unexpected error", error);
+        return { ok: false, error: mapSupabaseAuthError(error) };
+    }
 }
 
 function showApp() {
@@ -118,8 +265,20 @@ function showAuthScreen() {
 }
 
 function logout() {
-    clearCurrentUser();
-    showAuthScreen();
+    var client = getSupabaseClient();
+    if (!client) {
+        authCurrentUser = null;
+        showAuthScreen();
+        return;
+    }
+    client.auth.signOut()
+        .catch(function () {
+            return null;
+        })
+        .finally(function () {
+            authCurrentUser = null;
+            showAuthScreen();
+        });
 }
 
 function switchAuthTab(tabName) {
@@ -154,9 +313,7 @@ function attachAuthListeners() {
             login(ident, pwd).then(function (result) {
                 if (result.ok) showApp(); else errEl.textContent = result.error || "Error al iniciar sesión.";
             }).catch(function (err) {
-                errEl.textContent = err && err.message === "NO_CRYPTO"
-                    ? "Esta página no puede usar cuentas de forma segura. Abrí Basket Lab desde el sitio publicado (HTTPS), no como archivo en la PC."
-                    : "No se pudo iniciar sesión. Probá de nuevo o usá el mismo enlace donde te registraste.";
+                errEl.textContent = mapSupabaseAuthError(err);
             });
         };
     }
@@ -181,22 +338,41 @@ function attachAuthListeners() {
                 return;
             }
             register(username, email, name, pwd).then(function (result) {
-                if (result.ok) showApp(); else errEl.textContent = result.error || "Error al registrarse.";
+                if (!result.ok) {
+                    errEl.textContent = result.error || "Error al registrarse.";
+                    return;
+                }
+                if (result.pendingEmailConfirmation) {
+                    switchAuthTab("login");
+                    document.getElementById("login-identificador").value = email;
+                    document.getElementById("auth-login-error").textContent = "Registro creado. Revisá tu correo para confirmar la cuenta y luego iniciá sesión.";
+                    return;
+                }
+                showApp();
             }).catch(function (err) {
-                errEl.textContent = err && err.message === "NO_CRYPTO"
-                    ? "No se puede registrar desde aquí. Usá el enlace publicado de Basket Lab (GitHub Pages / web), no el archivo .html abierto directo."
-                    : "Error al registrarse. Probá desde el sitio web publicado.";
+                errEl.textContent = mapSupabaseAuthError(err);
             });
         };
     }
 }
 
 function initAuth() {
-    if (getCurrentUser()) {
-        showApp();
-    } else {
+    attachAuthListeners();
+    if (!isSupabaseReady()) {
         showAuthScreen();
+        var msg = "Supabase no está configurado. Completá js/supabase-config.js con URL y ANON KEY.";
+        setAuthUiError(msg);
+        return;
     }
+    loadCurrentUserFromSession()
+        .then(function (user) {
+            if (user) showApp(); else showAuthScreen();
+        })
+        .catch(function (error) {
+            console.error("[Auth][init] session validation error", error);
+            showAuthScreen();
+            setAuthUiError("No se pudo validar la sesión. Verificá la configuración de Supabase.");
+        });
 }
 
 // Ejecutar al cargar la página
@@ -229,7 +405,6 @@ let currentLinePath = [];
 let currentPlaySteps = [];
 let savedPlays = [];
 const PLAYS_STORAGE_KEY = "basketIQ_plays";
-
 
 // ===============================
 // UTILIDAD: JUGADAS GUARDADAS
@@ -1977,6 +2152,17 @@ function loadContent(sectionId) {
 
         case "dashboard":
             renderDashboard();
+            break;
+
+        case "shooting_training":
+        case "shooting_heatmap":
+            contentDiv.innerHTML = '<div id="shooting-heatmap-root"></div>';
+            if (typeof ShootingHeatmap !== "undefined") {
+                ShootingHeatmap.init(document.getElementById("shooting-heatmap-root"));
+            } else {
+                contentDiv.innerHTML =
+                    "<section class=\"manual-section\"><p>No se pudo cargar el módulo de tiro por zonas.</p></section>";
+            }
             break;
 
         default:
