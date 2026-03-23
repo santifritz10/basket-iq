@@ -415,19 +415,22 @@ const PLAYS_STORAGE_KEY = "basketIQ_plays";
 const ENTRENAMIENTOS_STORAGE_KEY = "basketLab_entrenamientos";
 const PLANIFICACION_ANUAL_STORAGE_KEY = "basketLab_planificacion_anual";
 const SHOOTING_HEATMAP_STORAGE_KEY = "basketLab_shootingHeatmap7";
+const PLAYERS_TRACKING_STORAGE_KEY = "basketLab_playersTracking";
 
 const APP_DATA_TYPES = {
     plays: "plays",
     trainings: "trainings",
     annualPlans: "annual_plans",
-    shootingHeatmap: "shooting_heatmap"
+    shootingHeatmap: "shooting_heatmap",
+    playersTracking: "players_tracking"
 };
 
 const APP_DATA_STORAGE_KEYS = {
     [APP_DATA_TYPES.plays]: PLAYS_STORAGE_KEY,
     [APP_DATA_TYPES.trainings]: ENTRENAMIENTOS_STORAGE_KEY,
     [APP_DATA_TYPES.annualPlans]: PLANIFICACION_ANUAL_STORAGE_KEY,
-    [APP_DATA_TYPES.shootingHeatmap]: SHOOTING_HEATMAP_STORAGE_KEY
+    [APP_DATA_TYPES.shootingHeatmap]: SHOOTING_HEATMAP_STORAGE_KEY,
+    [APP_DATA_TYPES.playersTracking]: PLAYERS_TRACKING_STORAGE_KEY
 };
 
 let dataSyncFlushTimer = null;
@@ -563,7 +566,8 @@ async function bootstrapUserDataSync() {
             APP_DATA_TYPES.plays,
             APP_DATA_TYPES.trainings,
             APP_DATA_TYPES.annualPlans,
-            APP_DATA_TYPES.shootingHeatmap
+            APP_DATA_TYPES.shootingHeatmap,
+            APP_DATA_TYPES.playersTracking
         ];
 
         try {
@@ -680,6 +684,49 @@ function createCiclosBimestrales(anio) {
     return ciclos;
 }
 
+function createCiclosFlexibles(anio) {
+    var y = Number(anio) || new Date().getFullYear();
+    var tramos = [
+        { nombre: "Tramo 1 · Base", ini: [1, 1], fin: [3, 31] },
+        { nombre: "Tramo 2 · Desarrollo", ini: [4, 1], fin: [6, 30] },
+        { nombre: "Tramo 3 · Competitivo", ini: [7, 1], fin: [9, 30] },
+        { nombre: "Tramo 4 · Cierre", ini: [10, 1], fin: [12, 31] }
+    ];
+    var ciclos = [];
+    var baseId = Date.now();
+    tramos.forEach(function (t, idx) {
+        var id = baseId + idx;
+        var dIni = new Date(y, t.ini[0] - 1, t.ini[1]);
+        var dFin = new Date(y, t.fin[0] - 1, t.fin[1]);
+        ciclos.push({
+            id: id,
+            nombre: t.nombre,
+            fecha_inicio: dIni.toISOString().slice(0, 10),
+            fecha_fin: dFin.toISOString().slice(0, 10),
+            objetivo_principal: "",
+            fundamentos_trabajados: "",
+            notas: ""
+        });
+    });
+    return ciclos;
+}
+
+function getPlanificacionMetodoInfo(metodo) {
+    var key = String(metodo || "bimestral");
+    if (key === "flexible") {
+        return {
+            label: "Planificación flexible",
+            descripcion: "Permite adaptar el volumen y los objetivos según calendario, torneos y disponibilidad del equipo.",
+            ciclosTitulo: "Tramos de planificación flexible"
+        };
+    }
+    return {
+        label: "Planificación bimestral",
+        descripcion: "Muy común en muchos países por su equilibrio entre estructura, seguimiento y ajustes durante la temporada.",
+        ciclosTitulo: "Ciclos bimestrales"
+    };
+}
+
 function getAllCiclos() {
     const planificaciones = getPlanificacionesAnuales();
     const out = [];
@@ -736,23 +783,80 @@ function renderPlanificacionView(editingId) {
     attachPlanificacionListEvents();
 }
 
+function getEntrenamientoFechaKey(entrenamiento) {
+    var raw = String((entrenamiento && entrenamiento.fecha) || "").trim();
+    if (!raw) return "";
+    var d = new Date(raw + "T00:00:00");
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().slice(0, 10);
+}
+
+function formatEntrenamientoFecha(entrenamiento) {
+    var key = getEntrenamientoFechaKey(entrenamiento);
+    if (!key) return "Sin fecha";
+    return new Date(key + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 function buildListaEntrenamientos() {
-    const list = entrenamientos.map(e => {
-        const total = calcularDuracionTotal(e.bloques);
-        const fecha = e.fecha ? new Date(e.fecha).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+    var groups = {};
+    entrenamientos.forEach(function (e) {
+        var categoria = String((e && e.categoria) || "").trim() || "Sin categoría";
+        if (!groups[categoria]) groups[categoria] = [];
+        groups[categoria].push(e);
+    });
+
+    var orderedCategories = Object.keys(groups).sort(function (a, b) {
+        function latestKey(category) {
+            return groups[category].reduce(function (best, item) {
+                var datePart = getEntrenamientoFechaKey(item);
+                var idPart = String(Number(item.id) || 0);
+                var key = datePart + "|" + idPart;
+                return key > best ? key : best;
+            }, "");
+        }
+        var aKey = latestKey(a);
+        var bKey = latestKey(b);
+        return aKey < bKey ? 1 : -1;
+    });
+
+    const list = orderedCategories.map(function (categoria) {
+        var items = groups[categoria].slice().sort(function (a, b) {
+            var aDate = getEntrenamientoFechaKey(a);
+            var bDate = getEntrenamientoFechaKey(b);
+            if (aDate !== bDate) return aDate < bDate ? 1 : -1;
+            return (Number(b.id) || 0) - (Number(a.id) || 0);
+        });
+
+        var firstDate = items[0] ? formatEntrenamientoFecha(items[0]) : "Sin fecha";
+        var cards = items.map(function (e) {
+            const total = calcularDuracionTotal(e.bloques);
+            const fecha = formatEntrenamientoFecha(e);
+            return `
+                <article class="entrenamiento-card" data-id="${e.id}">
+                    <div class="entrenamiento-card-main">
+                        <h3>${escapeHtml(e.nombre || "Sin nombre")}</h3>
+                        <p class="entrenamiento-meta">${escapeHtml(categoria)} · ${fecha}</p>
+                        <p class="entrenamiento-duracion">Duración total: <strong>${total} min</strong></p>
+                    </div>
+                    <div class="entrenamiento-card-actions">
+                        <button type="button" class="btn-pdf-ent" onclick="event.stopPropagation(); printEntrenamiento(${e.id})">Descargar PDF</button>
+                        <button type="button" class="btn-editar" onclick="event.stopPropagation(); renderPlanificacionView(${e.id})">Editar</button>
+                        <button type="button" class="btn-borrar" onclick="event.stopPropagation(); deleteEntrenamiento(${e.id})">Borrar</button>
+                    </div>
+                </article>
+            `;
+        }).join("");
+
         return `
-            <article class="entrenamiento-card" data-id="${e.id}">
-                <div class="entrenamiento-card-main">
-                    <h3>${escapeHtml(e.nombre || "Sin nombre")}</h3>
-                    <p class="entrenamiento-meta">${escapeHtml(e.categoria || "—")} · ${fecha}</p>
-                    <p class="entrenamiento-duracion">Duración total: <strong>${total} min</strong></p>
+            <details class="entrenamientos-folder" open>
+                <summary class="entrenamientos-folder-head">
+                    <span class="entrenamientos-folder-title">📁 ${escapeHtml(categoria)}</span>
+                    <span class="entrenamientos-folder-meta">${items.length} entrenamientos · Último: ${firstDate}</span>
+                </summary>
+                <div class="entrenamientos-folder-body">
+                    ${cards}
                 </div>
-                <div class="entrenamiento-card-actions">
-                    <button type="button" class="btn-pdf-ent" onclick="event.stopPropagation(); printEntrenamiento(${e.id})">Descargar PDF</button>
-                    <button type="button" class="btn-editar" onclick="event.stopPropagation(); renderPlanificacionView(${e.id})">Editar</button>
-                    <button type="button" class="btn-borrar" onclick="event.stopPropagation(); deleteEntrenamiento(${e.id})">Borrar</button>
-                </div>
-            </article>
+            </details>
         `;
     }).join("");
 
@@ -1549,12 +1653,14 @@ function renderPlanificacionAnualView() {
     var cards = list.map(function (p) {
         var fechaIni = p.fecha_inicio ? formatFechaAR(p.fecha_inicio) : "—";
         var fechaFin = p.fecha_fin ? formatFechaAR(p.fecha_fin) : "—";
+        var metodoInfo = getPlanificacionMetodoInfo(p.metodo_planificacion);
         return (
             '<article class="planificacion-anual-card" data-id="' + p.id + '">' +
             '  <div class="planificacion-anual-card-main">' +
             '    <h3>' + escapeHtml(p.nombre || "Planificación " + (p.temporada || "")) + '</h3>' +
             '    <p class="planificacion-anual-meta">' + escapeHtml(p.categoria || "—") + ' · Temporada ' + escapeHtml(String(p.temporada || "")) + '</p>' +
             '    <p class="planificacion-anual-fechas">' + fechaIni + ' – ' + fechaFin + '</p>' +
+            '    <p class="planificacion-anual-metodo"><strong>' + escapeHtml(metodoInfo.label) + ":</strong> " + escapeHtml(metodoInfo.descripcion) + '</p>' +
             '  </div>' +
             '  <div class="planificacion-anual-card-actions">' +
             '    <button type="button" class="btn-editar" onclick="renderPlanificacionAnualDetalleView(' + p.id + ')">Ver ciclos</button>' +
@@ -1567,7 +1673,7 @@ function renderPlanificacionAnualView() {
     contentDiv.innerHTML = (
         '<section class="manual-section planificacion-view">' +
         '  <h2>Planificación anual</h2>' +
-        '  <p>Organizá la temporada en ciclos bimestrales con objetivos técnicos. Cada planificación tiene 6 ciclos (Ene-Feb a Nov-Dic).</p>' +
+        '  <p>Elegí el método de planificación que mejor se adapte a tu equipo: bimestral (estructura tradicional) o flexible (ajuste según calendario).</p>' +
         '  <div class="planificacion-actions">' +
         '    <button type="button" class="toolbar-button toolbar-button-accent" onclick="mostrarModalPlanificacionAnual()">Crear planificación anual</button>' +
         '  </div>' +
@@ -1584,8 +1690,23 @@ function renderPlanificacionAnualView() {
         '        <option value="U13">U13</option><option value="U15">U15</option><option value="U17">U17</option><option value="Primera">Primera</option><option value="Otro">Otro</option>' +
         '      </select></div>' +
         '      <div class="form-row"><label>Temporada (año)</label><input type="number" name="temporada" min="2020" max="2030" value="' + new Date().getFullYear() + '" required></div>' +
+        '      <div class="form-row">' +
+        '        <label>Método de planificación</label>' +
+        '        <div class="plan-method-grid">' +
+        '          <label class="plan-method-option">' +
+        '            <input type="radio" name="metodo_planificacion" value="bimestral" checked>' +
+        '            <span class="plan-method-title">Bimestral (6 ciclos)</span>' +
+        '            <small>Muy común en muchos países. Ideal para sostener orden y evaluar avances cada 2 meses.</small>' +
+        '          </label>' +
+        '          <label class="plan-method-option">' +
+        '            <input type="radio" name="metodo_planificacion" value="flexible">' +
+        '            <span class="plan-method-title">Flexible (4 tramos)</span>' +
+        '            <small>Recomendado si querés ajustar carga y objetivos según torneos, calendario y realidad del grupo.</small>' +
+        '          </label>' +
+        '        </div>' +
+        '      </div>' +
         '      <div class="form-actions">' +
-        '        <button type="submit" class="toolbar-button toolbar-button-accent">Crear planificación y 6 ciclos</button>' +
+        '        <button type="submit" class="toolbar-button toolbar-button-accent">Crear planificación</button>' +
         '        <button type="button" class="toolbar-button" onclick="cerrarModalPlanificacionAnual()">Cancelar</button>' +
         '      </div>' +
         '    </form>' +
@@ -1601,9 +1722,10 @@ function renderPlanificacionAnualView() {
             var nombre = fd.get("nombre") || "";
             var categoria = fd.get("categoria") || "";
             var temporada = parseInt(fd.get("temporada"), 10) || new Date().getFullYear();
+            var metodo = String(fd.get("metodo_planificacion") || "bimestral");
             var listP = getPlanificacionesAnuales();
             var id = Date.now();
-            var ciclos = createCiclosBimestrales(temporada);
+            var ciclos = metodo === "flexible" ? createCiclosFlexibles(temporada) : createCiclosBimestrales(temporada);
             var fechaIni = temporada + "-01-01";
             var fechaFin = temporada + "-12-31";
             listP.push({
@@ -1611,6 +1733,7 @@ function renderPlanificacionAnualView() {
                 nombre: nombre,
                 categoria: categoria,
                 temporada: temporada,
+                metodo_planificacion: metodo,
                 fecha_inicio: fechaIni,
                 fecha_fin: fechaFin,
                 usuario_id: usuarioId,
@@ -1650,6 +1773,7 @@ function renderPlanificacionAnualDetalleView(planificacionId) {
         return;
     }
 
+    var metodoInfo = getPlanificacionMetodoInfo(plan.metodo_planificacion);
     var ciclosHtml = (plan.ciclos || []).map(function (c, idx) {
         var entList = getEntrenamientosForCicloByDate(c, plan);
         var count = entList.length;
@@ -1679,7 +1803,8 @@ function renderPlanificacionAnualDetalleView(planificacionId) {
         '    <h2>' + escapeHtml(plan.nombre || "Planificación " + plan.temporada) + '</h2>' +
         '  </div>' +
         '  <p class="planificacion-anual-meta">' + escapeHtml(plan.categoria || "—") + ' · Temporada ' + plan.temporada + '</p>' +
-        '  <h3 class="section-title">Ciclos bimestrales</h3>' +
+        '  <p class="planificacion-anual-metodo"><strong>' + escapeHtml(metodoInfo.label) + ":</strong> " + escapeHtml(metodoInfo.descripcion) + '</p>' +
+        '  <h3 class="section-title">' + escapeHtml(metodoInfo.ciclosTitulo) + '</h3>' +
         '  <div class="ciclos-grid" id="ciclos-grid">' + ciclosHtml + '</div>' +
         '</section>' +
         '<div id="modal-ciclo" class="modal" style="display:none;">' +
@@ -1738,6 +1863,542 @@ function editarCiclo(planificacionId, cicloId) {
 function cerrarModalCiclo() {
     var modal = document.getElementById("modal-ciclo");
     if (modal) modal.style.display = "none";
+}
+
+// ===============================
+// SEGUIMIENTO DE JUGADORES
+// ===============================
+
+var PLAYER_FUNDAMENTALS_SCHEMA = [
+    {
+        group: "Dribbling",
+        items: [
+            { key: "drib_control", label: "Control" },
+            { key: "drib_weak_hand", label: "Mano débil" }
+        ]
+    },
+    {
+        group: "Tiro",
+        items: [
+            { key: "shot_mechanics", label: "Mecánica" },
+            { key: "shot_consistency", label: "Consistencia" }
+        ]
+    },
+    {
+        group: "Pase",
+        items: [
+            { key: "pass_accuracy", label: "Precisión" },
+            { key: "pass_decisions", label: "Decisiones" }
+        ]
+    },
+    {
+        group: "Finalización",
+        items: [
+            { key: "finish_definition", label: "Definición" },
+            { key: "finish_both_hands", label: "Uso de ambas manos" }
+        ]
+    }
+];
+
+var PLAYER_STATS_FIELDS = [
+    { key: "ft_pct", label: "% tiros libres" },
+    { key: "fg_pct", label: "% tiros de campo" },
+    { key: "three_pct", label: "% triples" },
+    { key: "assists", label: "Asistencias" },
+    { key: "turnovers", label: "Pérdidas" },
+    { key: "rebounds", label: "Rebotes" }
+];
+
+function nowIso() {
+    return new Date().toISOString();
+}
+
+function formatDateTimeAR(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function getPlayersTracking() {
+    var parsed = getLocalDataByType(APP_DATA_TYPES.playersTracking);
+    return Array.isArray(parsed) ? parsed : [];
+}
+
+function savePlayersTracking(list) {
+    setLocalDataByType(APP_DATA_TYPES.playersTracking, list);
+    markDataTypeDirty(APP_DATA_TYPES.playersTracking);
+}
+
+function getDefaultPlayerFundamentals() {
+    var out = {};
+    PLAYER_FUNDAMENTALS_SCHEMA.forEach(function (group) {
+        group.items.forEach(function (item) {
+            out[item.key] = 3;
+        });
+    });
+    return out;
+}
+
+function getDefaultPlayerStats() {
+    return {
+        ft_pct: "",
+        fg_pct: "",
+        three_pct: "",
+        assists: "",
+        turnovers: "",
+        rebounds: ""
+    };
+}
+
+function normalizePlayer(raw) {
+    var p = raw || {};
+    return {
+        id: String(p.id || ("player_" + Date.now() + "_" + Math.round(Math.random() * 1000))),
+        name: String(p.name || "").trim(),
+        position: String(p.position || "").trim(),
+        age: p.age == null ? "" : p.age,
+        height: String(p.height || "").trim(),
+        level: String(p.level || "").trim(),
+        photo_url: String(p.photo_url || "").trim(),
+        fundamentals: Object.assign(getDefaultPlayerFundamentals(), p.fundamentals || {}),
+        stats: Object.assign(getDefaultPlayerStats(), p.stats || {}),
+        notes_history: Array.isArray(p.notes_history) ? p.notes_history : [],
+        goals: Array.isArray(p.goals) ? p.goals : [],
+        evolution: Array.isArray(p.evolution) ? p.evolution : [],
+        created_at: p.created_at || nowIso(),
+        updated_at: p.updated_at || nowIso()
+    };
+}
+
+function getPlayerById(playerId) {
+    var list = getPlayersTracking();
+    return list.find(function (p) { return String(p.id) === String(playerId); }) || null;
+}
+
+function upsertPlayer(player) {
+    var list = getPlayersTracking();
+    var idx = list.findIndex(function (p) { return String(p.id) === String(player.id); });
+    if (idx >= 0) list[idx] = player; else list.unshift(player);
+    savePlayersTracking(list);
+}
+
+function removePlayer(playerId) {
+    var list = getPlayersTracking().filter(function (p) { return String(p.id) !== String(playerId); });
+    savePlayersTracking(list);
+}
+
+function playerInitials(name) {
+    var txt = String(name || "").trim();
+    if (!txt) return "PL";
+    var chunks = txt.split(/\s+/).slice(0, 2);
+    return chunks.map(function (c) { return c.charAt(0).toUpperCase(); }).join("");
+}
+
+function pushPlayerEvolution(player, message) {
+    if (!message) return;
+    if (!Array.isArray(player.evolution)) player.evolution = [];
+    player.evolution.unshift({
+        id: "ev_" + Date.now() + "_" + Math.round(Math.random() * 1000),
+        text: message,
+        created_at: nowIso()
+    });
+    if (player.evolution.length > 120) player.evolution = player.evolution.slice(0, 120);
+}
+
+function renderPlayerCard(player) {
+    return (
+        '<article class="player-card" data-id="' + escapeHtml(player.id) + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\')">' +
+        '  <div class="player-card-main">' +
+        '    <h3>' + escapeHtml(player.name || "Jugador sin nombre") + '</h3>' +
+        '    <p class="player-card-meta">' + escapeHtml(player.position || "Sin posición") + " · " + (player.age || "—") + " años</p>" +
+        '    <p class="player-card-level">' + escapeHtml(player.level || "Nivel no definido") + "</p>" +
+        "  </div>" +
+        "</article>"
+    );
+}
+
+function renderPlayerList() {
+    var contentDiv = document.getElementById("content");
+    if (!contentDiv) return;
+    var players = getPlayersTracking().map(normalizePlayer);
+    players.sort(function (a, b) {
+        return String(a.name || "").localeCompare(String(b.name || ""), "es");
+    });
+    var cards = players.map(renderPlayerCard).join("");
+    contentDiv.innerHTML = (
+        '<section class="manual-section players-view">' +
+        '  <div class="players-header">' +
+        "    <h2>Seguimiento de Jugadores</h2>" +
+        "    <p>Registrá, evaluá y seguí la evolución individual de tus jugadores.</p>" +
+        '    <div class="players-actions">' +
+        '      <button type="button" class="toolbar-button toolbar-button-accent" onclick="renderPlayerCreateForm()">Agregar jugador</button>' +
+        "    </div>" +
+        "  </div>" +
+        '  <div class="players-grid">' + (cards || '<p class="text-muted">Todavía no hay jugadores cargados.</p>') + "</div>" +
+        "</section>"
+    );
+}
+
+function renderPlayerCreateForm() {
+    var contentDiv = document.getElementById("content");
+    if (!contentDiv) return;
+    contentDiv.innerHTML = (
+        '<section class="manual-section players-view">' +
+        '  <div class="planificacion-header">' +
+        '    <button type="button" class="btn-back" onclick="renderPlayerList()">← Volver a jugadores</button>' +
+        "    <h2>Nuevo jugador</h2>" +
+        "  </div>" +
+        '  <form id="player-create-form" class="player-basic-form">' +
+        '    <div class="form-row"><label>Nombre</label><input type="text" name="name" required placeholder="Ej: Juan Pérez"></div>' +
+        '    <div class="form-row form-row-inline">' +
+        '      <div><label>Posición</label><input type="text" name="position" placeholder="Base / Escolta / Alero"></div>' +
+        '      <div><label>Edad</label><input type="number" name="age" min="6" max="55" placeholder="15"></div>' +
+        "    </div>" +
+        '    <div class="form-row form-row-inline">' +
+        '      <div><label>Altura</label><input type="text" name="height" placeholder="1.82 m"></div>' +
+        '      <div><label>Nivel</label><input type="text" name="level" placeholder="Inicial / Intermedio / Avanzado"></div>' +
+        "    </div>" +
+        '    <div class="form-row"><label>Foto URL (opcional)</label><input type="url" name="photo_url" placeholder="https://..."></div>' +
+        '    <div class="form-actions">' +
+        '      <button type="submit" class="toolbar-button toolbar-button-accent">Guardar jugador</button>' +
+        '      <button type="button" class="toolbar-button" onclick="renderPlayerList()">Cancelar</button>' +
+        "    </div>" +
+        "  </form>" +
+        "</section>"
+    );
+
+    var form = document.getElementById("player-create-form");
+    if (!form) return;
+    form.onsubmit = function (ev) {
+        ev.preventDefault();
+        var fd = new FormData(form);
+        var player = normalizePlayer({
+            id: "player_" + Date.now() + "_" + Math.round(Math.random() * 1000),
+            name: fd.get("name"),
+            position: fd.get("position"),
+            age: fd.get("age"),
+            height: fd.get("height"),
+            level: fd.get("level"),
+            photo_url: fd.get("photo_url"),
+            created_at: nowIso(),
+            updated_at: nowIso()
+        });
+        pushPlayerEvolution(player, "Jugador creado");
+        upsertPlayer(player);
+        renderPlayerProfile(player.id);
+    };
+}
+
+function renderPlayerFundamentalsTab(player) {
+    return PLAYER_FUNDAMENTALS_SCHEMA.map(function (group) {
+        var rows = group.items.map(function (item) {
+            var value = Number(player.fundamentals[item.key] || 0);
+            var stars = [1, 2, 3, 4, 5].map(function (n) {
+                var active = n <= value ? "is-active" : "";
+                return '<button type="button" class="rating-star ' + active + '" onclick="updatePlayerRating(\'' + escapeHtml(player.id) + "','" + item.key + "'," + n + ')">★</button>';
+            }).join("");
+            return (
+                '<div class="player-rate-row">' +
+                '  <span class="player-rate-label">' + escapeHtml(item.label) + "</span>" +
+                '  <div class="player-stars">' + stars + "</div>" +
+                "</div>"
+            );
+        }).join("");
+        return (
+            '<section class="player-tab-card">' +
+            "  <h4>" + escapeHtml(group.group) + "</h4>" +
+            rows +
+            "</section>"
+        );
+    }).join("");
+}
+
+function renderPlayerStatsTab(player) {
+    var fields = PLAYER_STATS_FIELDS.map(function (f) {
+        return (
+            '<div class="form-row">' +
+            "  <label>" + escapeHtml(f.label) + "</label>" +
+            '  <input type="number" step="0.1" name="' + f.key + '" value="' + escapeHtml(String(player.stats[f.key] || "")) + '">' +
+            "</div>"
+        );
+    }).join("");
+    return (
+        '<form id="player-stats-form" class="player-tab-card">' +
+        fields +
+        '<div class="form-actions"><button type="submit" class="toolbar-button toolbar-button-accent">Guardar estadísticas</button></div>' +
+        "</form>"
+    );
+}
+
+function renderPlayerNotesTab(player) {
+    var notes = (player.notes_history || []).slice().sort(function (a, b) {
+        return String(a.created_at || "") < String(b.created_at || "") ? 1 : -1;
+    }).map(function (n) {
+        return (
+            '<article class="player-note-item">' +
+            '  <p>' + escapeHtml(n.text || "") + "</p>" +
+            '  <span>' + formatDateTimeAR(n.created_at) + "</span>" +
+            "</article>"
+        );
+    }).join("");
+    return (
+        '<div class="player-tab-card">' +
+        '  <div class="form-row"><label>Nueva nota</label><textarea id="player-note-input" rows="3" placeholder="Observaciones del entrenador..."></textarea></div>' +
+        '  <div class="form-actions"><button type="button" class="toolbar-button toolbar-button-accent" onclick="addPlayerNote(\'' + escapeHtml(player.id) + '\')">Guardar nota</button></div>' +
+        '  <div class="player-note-list">' + (notes || '<p class="text-muted">No hay notas todavía.</p>') + "</div>" +
+        "</div>"
+    );
+}
+
+function renderPlayerGoalsTab(player) {
+    var goals = (player.goals || []).slice().sort(function (a, b) {
+        return String(a.created_at || "") < String(b.created_at || "") ? 1 : -1;
+    }).map(function (g) {
+        return (
+            '<article class="player-goal-item">' +
+            '  <div class="player-goal-main">' +
+            "    <p>" + escapeHtml(g.text || "") + "</p>" +
+            '    <span>' + formatDateTimeAR(g.created_at) + "</span>" +
+            "  </div>" +
+            '  <div class="player-goal-actions">' +
+            '    <select onchange="updatePlayerGoalStatus(\'' + escapeHtml(player.id) + '\',\'' + escapeHtml(String(g.id)) + '\', this.value)">' +
+            '      <option value="pendiente" ' + (g.status === "pendiente" ? "selected" : "") + ">Pendiente</option>" +
+            '      <option value="en_progreso" ' + (g.status === "en_progreso" ? "selected" : "") + ">En progreso</option>" +
+            '      <option value="completado" ' + (g.status === "completado" ? "selected" : "") + ">Completado</option>" +
+            "    </select>" +
+            '    <button type="button" class="btn-borrar-small" onclick="deletePlayerGoal(\'' + escapeHtml(player.id) + '\',\'' + escapeHtml(String(g.id)) + '\')">Borrar</button>' +
+            "  </div>" +
+            "</article>"
+        );
+    }).join("");
+    return (
+        '<div class="player-tab-card">' +
+        '  <div class="form-row"><label>Nuevo objetivo</label><input type="text" id="player-goal-input" placeholder="Ej: Mejorar tiro de 3"></div>' +
+        '  <div class="form-actions"><button type="button" class="toolbar-button toolbar-button-accent" onclick="addPlayerGoal(\'' + escapeHtml(player.id) + '\')">Agregar objetivo</button></div>' +
+        '  <div class="player-goal-list">' + (goals || '<p class="text-muted">No hay objetivos cargados.</p>') + "</div>" +
+        "</div>"
+    );
+}
+
+function renderPlayerEvolutionTab(player) {
+    var items = (player.evolution || []).slice().sort(function (a, b) {
+        return String(a.created_at || "") < String(b.created_at || "") ? 1 : -1;
+    }).map(function (ev) {
+        return (
+            '<article class="player-evolution-item">' +
+            '  <p>' + escapeHtml(ev.text || "") + "</p>" +
+            '  <span>' + formatDateTimeAR(ev.created_at) + "</span>" +
+            "</article>"
+        );
+    }).join("");
+    return '<div class="player-tab-card">' + (items || '<p class="text-muted">Todavía no hay cambios registrados.</p>') + "</div>";
+}
+
+function renderPlayerProfile(playerId, activeTab) {
+    var contentDiv = document.getElementById("content");
+    if (!contentDiv) return;
+    var player = getPlayerById(playerId);
+    if (!player) {
+        renderPlayerList();
+        return;
+    }
+    player = normalizePlayer(player);
+    var tab = activeTab || "fundamentals";
+    var photo = player.photo_url
+        ? ('<img src="' + escapeHtml(player.photo_url) + '" alt="' + escapeHtml(player.name || "Jugador") + '" class="player-profile-photo">')
+        : ('<div class="player-profile-photo-placeholder">' + escapeHtml(playerInitials(player.name)) + "</div>");
+
+    var tabContent = "";
+    if (tab === "fundamentals") tabContent = renderPlayerFundamentalsTab(player);
+    if (tab === "stats") tabContent = renderPlayerStatsTab(player);
+    if (tab === "notes") tabContent = renderPlayerNotesTab(player);
+    if (tab === "goals") tabContent = renderPlayerGoalsTab(player);
+    if (tab === "evolution") tabContent = renderPlayerEvolutionTab(player);
+
+    contentDiv.innerHTML = (
+        '<section class="manual-section players-view">' +
+        '  <div class="player-profile-header">' +
+        '    <button type="button" class="btn-back" onclick="renderPlayerList()">← Volver a jugadores</button>' +
+        '    <div class="player-profile-head-grid">' +
+        '      <div class="player-profile-identity">' + photo + "</div>" +
+        '      <div class="player-profile-main">' +
+        "        <h2>" + escapeHtml(player.name || "Jugador") + "</h2>" +
+        '        <p class="player-profile-meta">' + escapeHtml(player.position || "Sin posición") + " · " + (player.age || "—") + " años · " + escapeHtml(player.height || "Altura —") + "</p>" +
+        '        <p class="player-profile-level">' + escapeHtml(player.level || "Nivel no definido") + "</p>" +
+        '        <div class="player-profile-actions">' +
+        '          <button type="button" class="toolbar-button" onclick="togglePlayerBasicForm()">Editar datos</button>' +
+        '          <button type="button" class="btn-borrar" onclick="deletePlayer(\'' + escapeHtml(player.id) + '\')">Eliminar jugador</button>' +
+        "        </div>" +
+        "      </div>" +
+        "    </div>" +
+        '    <form id="player-basic-form" class="player-basic-form is-hidden">' +
+        '      <div class="form-row"><label>Nombre</label><input type="text" name="name" value="' + escapeHtml(player.name || "") + '" required></div>' +
+        '      <div class="form-row form-row-inline">' +
+        '        <div><label>Posición</label><input type="text" name="position" value="' + escapeHtml(player.position || "") + '"></div>' +
+        '        <div><label>Edad</label><input type="number" min="6" max="55" name="age" value="' + escapeHtml(String(player.age || "")) + '"></div>' +
+        "      </div>" +
+        '      <div class="form-row form-row-inline">' +
+        '        <div><label>Altura</label><input type="text" name="height" value="' + escapeHtml(player.height || "") + '"></div>' +
+        '        <div><label>Nivel</label><input type="text" name="level" value="' + escapeHtml(player.level || "") + '"></div>' +
+        "      </div>" +
+        '      <div class="form-row"><label>Foto URL</label><input type="url" name="photo_url" value="' + escapeHtml(player.photo_url || "") + '"></div>' +
+        '      <div class="form-actions"><button type="submit" class="toolbar-button toolbar-button-accent">Guardar datos</button></div>' +
+        "    </form>" +
+        "  </div>" +
+        '  <div class="player-tabs">' +
+        '    <button class="player-tab-btn ' + (tab === "fundamentals" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'fundamentals\')">Fundamentos</button>' +
+        '    <button class="player-tab-btn ' + (tab === "stats" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'stats\')">Estadísticas</button>' +
+        '    <button class="player-tab-btn ' + (tab === "notes" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'notes\')">Notas</button>' +
+        '    <button class="player-tab-btn ' + (tab === "goals" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'goals\')">Objetivos</button>' +
+        '    <button class="player-tab-btn ' + (tab === "evolution" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'evolution\')">Evolución</button>' +
+        "  </div>" +
+        '  <div class="player-tab-content">' + tabContent + "</div>" +
+        "</section>"
+    );
+
+    var basicForm = document.getElementById("player-basic-form");
+    if (basicForm) {
+        basicForm.onsubmit = function (ev) {
+            ev.preventDefault();
+            savePlayerBasic(player.id);
+        };
+    }
+    var statsForm = document.getElementById("player-stats-form");
+    if (statsForm) {
+        statsForm.onsubmit = function (ev) {
+            ev.preventDefault();
+            savePlayerStats(player.id);
+        };
+    }
+}
+
+function togglePlayerBasicForm() {
+    var form = document.getElementById("player-basic-form");
+    if (!form) return;
+    form.classList.toggle("is-hidden");
+}
+
+function savePlayerBasic(playerId) {
+    var form = document.getElementById("player-basic-form");
+    if (!form) return;
+    var fd = new FormData(form);
+    var player = getPlayerById(playerId);
+    if (!player) return;
+    player = normalizePlayer(player);
+    player.name = String(fd.get("name") || "").trim();
+    player.position = String(fd.get("position") || "").trim();
+    player.age = fd.get("age") || "";
+    player.height = String(fd.get("height") || "").trim();
+    player.level = String(fd.get("level") || "").trim();
+    player.photo_url = String(fd.get("photo_url") || "").trim();
+    player.updated_at = nowIso();
+    pushPlayerEvolution(player, "Datos básicos actualizados");
+    upsertPlayer(player);
+    renderPlayerProfile(player.id, "fundamentals");
+}
+
+function deletePlayer(playerId) {
+    if (!confirm("¿Eliminar este jugador y todo su seguimiento?")) return;
+    removePlayer(playerId);
+    renderPlayerList();
+}
+
+function updatePlayerRating(playerId, ratingKey, value) {
+    var player = getPlayerById(playerId);
+    if (!player) return;
+    player = normalizePlayer(player);
+    var prev = Number(player.fundamentals[ratingKey] || 0);
+    player.fundamentals[ratingKey] = Number(value) || 1;
+    player.updated_at = nowIso();
+    if (prev !== player.fundamentals[ratingKey]) {
+        pushPlayerEvolution(player, "Fundamento actualizado: " + ratingKey + " → " + player.fundamentals[ratingKey] + "/5");
+    }
+    upsertPlayer(player);
+    renderPlayerProfile(playerId, "fundamentals");
+}
+
+function savePlayerStats(playerId) {
+    var form = document.getElementById("player-stats-form");
+    if (!form) return;
+    var fd = new FormData(form);
+    var player = getPlayerById(playerId);
+    if (!player) return;
+    player = normalizePlayer(player);
+    PLAYER_STATS_FIELDS.forEach(function (field) {
+        player.stats[field.key] = String(fd.get(field.key) || "").trim();
+    });
+    player.updated_at = nowIso();
+    pushPlayerEvolution(player, "Estadísticas actualizadas");
+    upsertPlayer(player);
+    renderPlayerProfile(playerId, "stats");
+}
+
+function addPlayerNote(playerId) {
+    var input = document.getElementById("player-note-input");
+    if (!input) return;
+    var text = String(input.value || "").trim();
+    if (!text) return;
+    var player = getPlayerById(playerId);
+    if (!player) return;
+    player = normalizePlayer(player);
+    if (!Array.isArray(player.notes_history)) player.notes_history = [];
+    player.notes_history.unshift({
+        id: "note_" + Date.now() + "_" + Math.round(Math.random() * 1000),
+        text: text,
+        created_at: nowIso()
+    });
+    if (player.notes_history.length > 200) player.notes_history = player.notes_history.slice(0, 200);
+    player.updated_at = nowIso();
+    pushPlayerEvolution(player, "Nueva nota del entrenador");
+    upsertPlayer(player);
+    renderPlayerProfile(playerId, "notes");
+}
+
+function addPlayerGoal(playerId) {
+    var input = document.getElementById("player-goal-input");
+    if (!input) return;
+    var text = String(input.value || "").trim();
+    if (!text) return;
+    var player = getPlayerById(playerId);
+    if (!player) return;
+    player = normalizePlayer(player);
+    if (!Array.isArray(player.goals)) player.goals = [];
+    player.goals.unshift({
+        id: "goal_" + Date.now() + "_" + Math.round(Math.random() * 1000),
+        text: text,
+        status: "pendiente",
+        created_at: nowIso()
+    });
+    if (player.goals.length > 160) player.goals = player.goals.slice(0, 160);
+    player.updated_at = nowIso();
+    pushPlayerEvolution(player, "Objetivo agregado: " + text);
+    upsertPlayer(player);
+    renderPlayerProfile(playerId, "goals");
+}
+
+function updatePlayerGoalStatus(playerId, goalId, status) {
+    var player = getPlayerById(playerId);
+    if (!player) return;
+    player = normalizePlayer(player);
+    var goal = (player.goals || []).find(function (g) { return String(g.id) === String(goalId); });
+    if (!goal) return;
+    goal.status = status;
+    player.updated_at = nowIso();
+    pushPlayerEvolution(player, "Objetivo actualizado: " + (goal.text || "Objetivo") + " (" + status + ")");
+    upsertPlayer(player);
+    renderPlayerProfile(playerId, "goals");
+}
+
+function deletePlayerGoal(playerId, goalId) {
+    var player = getPlayerById(playerId);
+    if (!player) return;
+    player = normalizePlayer(player);
+    player.goals = (player.goals || []).filter(function (g) { return String(g.id) !== String(goalId); });
+    player.updated_at = nowIso();
+    pushPlayerEvolution(player, "Objetivo eliminado");
+    upsertPlayer(player);
+    renderPlayerProfile(playerId, "goals");
 }
 
 // ===============================
@@ -2365,6 +3026,10 @@ function loadContent(sectionId) {
 
         case "planificacion":
             renderPlanificacionView();
+            break;
+
+        case "player_tracking":
+            renderPlayerList();
             break;
 
         case "dashboard":
