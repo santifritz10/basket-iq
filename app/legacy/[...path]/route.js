@@ -29,8 +29,14 @@ export async function GET(_req, context) {
 
   // Inject runtime env for legacy Supabase config on Vercel/Next.
   if (requested === "js/supabase-config.js") {
-    const supabaseUrl = String(process.env.SUPABASE_URL || "");
-    const supabaseAnonKey = String(process.env.SUPABASE_ANON_KEY || "");
+    const supabaseUrl = String(
+      process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+    );
+    const supabaseAnonKey = String(
+      process.env.SUPABASE_ANON_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+        ""
+    );
     const script = `(function initSupabaseConfig(){var SUPABASE_URL=${JSON.stringify(
       supabaseUrl
     )};var SUPABASE_ANON_KEY=${JSON.stringify(
