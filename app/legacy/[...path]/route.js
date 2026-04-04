@@ -24,7 +24,8 @@ function resolveLegacyPath(parts) {
 }
 
 export async function GET(_req, context) {
-  const parts = context.params.path || [];
+  const params = await context.params;
+  const parts = params?.path || [];
   const requested = parts.length ? parts.join("/") : "index.html";
 
   // Inject runtime env for legacy Supabase config on Vercel/Next.
