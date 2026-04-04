@@ -1,14 +1,15 @@
 import "./globals.css";
+import "../css/styles.css";
 
 export const metadata = {
-  title: "Basket IQ",
-  description: "Basket Lab migrated to secure Next.js architecture"
+  title: "Basket Lab",
+  description: "Basket Lab"
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body className="app-body">{children}</body>
     </html>
   );
 }

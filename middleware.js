@@ -5,11 +5,12 @@ const STATIC_FILE_REGEX = /\.[^/]+$/;
 export function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  // Keep API, Next internals and legacy static serving untouched.
+  // Keep API and static internals untouched.
   if (
+    pathname === "/" ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/legacy") ||
+    pathname.startsWith("/assets") ||
     pathname === "/favicon.ico" ||
     STATIC_FILE_REGEX.test(pathname)
   ) {
@@ -17,7 +18,7 @@ export function middleware(request) {
   }
 
   const url = request.nextUrl.clone();
-  url.pathname = "/legacy/index.html";
+  url.pathname = "/";
   return NextResponse.redirect(url);
 }
 
