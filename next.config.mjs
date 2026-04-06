@@ -2,6 +2,11 @@
 const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  outputFileTracingIncludes: {
+    "/": ["./index.html", "./css/**/*", "./js/**/*", "./images/**/*", "./favicon.svg"],
+    "/assets/[...path]": ["./css/**/*", "./js/**/*", "./images/**/*", "./favicon.svg"],
+    "/legacy/[...path]": ["./index.html", "./css/**/*", "./js/**/*", "./images/**/*", "./favicon.svg"]
+  },
   async headers() {
     return [
       {
