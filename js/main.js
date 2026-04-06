@@ -12,6 +12,28 @@ function getSupabaseClient() {
     return isSupabaseReady() ? window.basketLabSupabase.client : null;
 }
 
+async function forceClientSessionFromAuthResult(client, authResultData) {
+    if (!client || !authResultData || !authResultData.session) return null;
+    var session = authResultData.session;
+    if (!session.access_token || !session.refresh_token) return null;
+    try {
+        var setResult = await client.auth.setSession({
+            access_token: session.access_token,
+            refresh_token: session.refresh_token
+        });
+        if (setResult.error) {
+            console.error("[Auth][setSession] error", setResult.error);
+            return null;
+        }
+        return setResult.data && setResult.data.session && setResult.data.session.user
+            ? setResult.data.session.user
+            : null;
+    } catch (e) {
+        console.error("[Auth][setSession] unexpected error", e);
+        return null;
+    }
+}
+
 function normalizeUsername(value) {
     return String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 }
@@ -236,6 +258,9 @@ async function login(email, password) {
         if (!sessionUser && loginResult.data && loginResult.data.user) {
             sessionUser = loginResult.data.user;
         }
+        if (!sessionUser && loginResult.data && loginResult.data.session) {
+            sessionUser = await forceClientSessionFromAuthResult(client, loginResult.data);
+        }
         if (!sessionUser) {
             console.error("[Auth][signIn] No active session after successful signIn");
             return { ok: false, error: "Inicio de sesión incompleto: no se obtuvo una sesión válida." };
@@ -379,7 +404,7 @@ function initAuth() {
     attachAuthListeners();
     if (!isSupabaseReady()) {
         showAuthScreen();
-        var msg = "Supabase no está configurado. Completá js/supabase-config.js con URL y ANON KEY.";
+        var msg = "No pudimos conectar con el servicio de inicio de sesión. Probá de nuevo en unos segundos.";
         setAuthUiError(msg);
         return;
     }
