@@ -78,10 +78,16 @@ async function upsertProfile(authUser, profileInput) {
 async function getAuthenticatedSessionUser() {
     var client = getSupabaseClient();
     if (!client) return null;
-    var sessionResult = await client.auth.getSession();
-    if (sessionResult.error) throw sessionResult.error;
-    var session = sessionResult.data && sessionResult.data.session;
-    return session && session.user ? session.user : null;
+    for (var attempt = 0; attempt < 3; attempt++) {
+        var sessionResult = await client.auth.getSession();
+        if (sessionResult.error) throw sessionResult.error;
+        var session = sessionResult.data && sessionResult.data.session;
+        if (session && session.user) return session.user;
+        if (attempt < 2) {
+            await new Promise(function (resolve) { setTimeout(resolve, 180); });
+        }
+    }
+    return null;
 }
 
 async function loadCurrentUserFromSession() {
@@ -224,6 +230,12 @@ async function login(email, password) {
         }
 
         var sessionUser = await getAuthenticatedSessionUser();
+        if (!sessionUser && loginResult.data && loginResult.data.session && loginResult.data.session.user) {
+            sessionUser = loginResult.data.session.user;
+        }
+        if (!sessionUser && loginResult.data && loginResult.data.user) {
+            sessionUser = loginResult.data.user;
+        }
         if (!sessionUser) {
             console.error("[Auth][signIn] No active session after successful signIn");
             return { ok: false, error: "Inicio de sesión incompleto: no se obtuvo una sesión válida." };
