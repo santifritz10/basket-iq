@@ -967,40 +967,46 @@ function buildEditorEntrenamiento(ent) {
             <div class="planificacion-actions planificacion-actions-inline">
                 <button type="button" class="toolbar-button" onclick="printEntrenamiento(${ent.id})">Descargar PDF</button>
             </div>
-            <form id="form-entrenamiento" class="form-entrenamiento">
-                <input type="hidden" name="id" value="${ent.id || ""}">
-                <div class="form-row">
-                    <label>Nombre</label>
-                    <input type="text" name="nombre" value="${escapeHtml(ent.nombre || "")}" placeholder="Ej: Entrenamiento martes">
+            <div class="plan-editor-main">
+                <div class="plan-editor-form-col">
+                    <form id="form-entrenamiento" class="form-entrenamiento">
+                        <input type="hidden" name="id" value="${ent.id || ""}">
+                        <div class="form-row">
+                            <label>Nombre</label>
+                            <input type="text" name="nombre" value="${escapeHtml(ent.nombre || "")}" placeholder="Ej: Entrenamiento martes">
+                        </div>
+                        <div class="form-row form-row-inline">
+                            <div>
+                                <label>Fecha</label>
+                                <input type="date" name="fecha" value="${ent.fecha || ""}">
+                            </div>
+                            <div>
+                                <label>Categoría</label>
+                                <select name="categoria">${optionsCategoria}</select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <label>Ciclo (planificación anual)</label>
+                            <select name="ciclo_id">${cicloOptions}</select>
+                        </div>
+                        <div class="form-row">
+                            <label>Notas generales</label>
+                            <textarea name="notas_generales" rows="2" placeholder="Notas opcionales">${escapeHtml(ent.notas_generales || "")}</textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="toolbar-button toolbar-button-accent">Guardar entrenamiento</button>
+                        </div>
+                    </form>
                 </div>
-                <div class="form-row form-row-inline">
-                    <div>
-                        <label>Fecha</label>
-                        <input type="date" name="fecha" value="${ent.fecha || ""}">
+                <div class="plan-editor-blocks-col">
+                    <h3 class="section-title">Bloques de práctica</h3>
+                    <div class="bloques-list" id="bloques-list">
+                        ${bloquesHtml}
                     </div>
-                    <div>
-                        <label>Categoría</label>
-                        <select name="categoria">${optionsCategoria}</select>
+                    <div class="planificacion-actions">
+                        <button type="button" class="toolbar-button" onclick="mostrarModalBloque(${ent.id})">Agregar bloque</button>
                     </div>
                 </div>
-                <div class="form-row">
-                    <label>Ciclo (planificación anual)</label>
-                    <select name="ciclo_id">${cicloOptions}</select>
-                </div>
-                <div class="form-row">
-                    <label>Notas generales</label>
-                    <textarea name="notas_generales" rows="2" placeholder="Notas opcionales">${escapeHtml(ent.notas_generales || "")}</textarea>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="toolbar-button toolbar-button-accent">Guardar entrenamiento</button>
-                </div>
-            </form>
-            <h3 class="section-title">Bloques de práctica</h3>
-            <div class="bloques-list" id="bloques-list">
-                ${bloquesHtml}
-            </div>
-            <div class="planificacion-actions">
-                <button type="button" class="toolbar-button" onclick="mostrarModalBloque(${ent.id})">Agregar bloque</button>
             </div>
         </section>
         <div id="modal-bloque" class="modal" style="display:none;">
@@ -1268,7 +1274,7 @@ function buildEntrenamientoPrintHtml(ent) {
 <body>
   <div class="page">
     <div class="header">
-      <img class="logo" src="images/logo-basketlab.svg" alt="Basket Lab" />
+      <img class="logo" src="${window.location.origin}/assets/images/logo-basketlab.svg" alt="Basket Lab" />
       <div class="hgroup">
         <h1>${escapeHtml(ent.nombre || "Entrenamiento")}</h1>
         <p class="sub"><span class="badge">${escapeHtml(ent.categoria || "General")}</span> &nbsp;•&nbsp; Fecha: <strong>${formatFechaAR(ent.fecha)}</strong> &nbsp;•&nbsp; Duración total: <strong>${total} min</strong></p>
@@ -1423,7 +1429,7 @@ function buildPlayPrintHtml(play) {
 <body>
   <div class="page">
     <div class="header">
-      <img class="logo" src="images/logo-basketlab.svg" alt="Basket Lab" />
+      <img class="logo" src="${window.location.origin}/assets/images/logo-basketlab.svg" alt="Basket Lab" />
       <div>
         <h1>${name}</h1>
         <p class="sub"><span class="badge">Jugada · ${steps.length} paso(s)</span> &nbsp; Coach: <strong>${coachName}</strong></p>
@@ -1997,6 +2003,8 @@ function normalizePlayer(raw) {
         age: p.age == null ? "" : p.age,
         height: String(p.height || "").trim(),
         level: String(p.level || "").trim(),
+        team: String(p.team || "").trim(),
+        category: String(p.category || "").trim(),
         photo_url: String(p.photo_url || "").trim(),
         fundamentals: Object.assign(getDefaultPlayerFundamentals(), p.fundamentals || {}),
         stats: Object.assign(getDefaultPlayerStats(), p.stats || {}),
@@ -2032,6 +2040,32 @@ function playerInitials(name) {
     return chunks.map(function (c) { return c.charAt(0).toUpperCase(); }).join("");
 }
 
+function readImageFileAsDataUrl(file) {
+    return new Promise(function (resolve, reject) {
+        if (!file) {
+            resolve("");
+            return;
+        }
+        if (!file.type || file.type.indexOf("image/") !== 0) {
+            reject(new Error("Seleccioná un archivo de imagen válido."));
+            return;
+        }
+        // Limita payload para evitar problemas de almacenamiento/sincronización.
+        if (file.size > 2 * 1024 * 1024) {
+            reject(new Error("La imagen supera 2MB. Elegí una más liviana."));
+            return;
+        }
+        var reader = new FileReader();
+        reader.onload = function () {
+            resolve(String(reader.result || ""));
+        };
+        reader.onerror = function () {
+            reject(new Error("No se pudo leer la imagen seleccionada."));
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
 function pushPlayerEvolution(player, message) {
     if (!message) return;
     if (!Array.isArray(player.evolution)) player.evolution = [];
@@ -2044,11 +2078,14 @@ function pushPlayerEvolution(player, message) {
 }
 
 function renderPlayerCard(player) {
+    var teamLabel = escapeHtml(player.team || "Sin equipo");
+    var categoryLabel = escapeHtml(player.category || "Sin categoría");
     return (
         '<article class="player-card" data-id="' + escapeHtml(player.id) + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\')">' +
         '  <div class="player-card-main">' +
         '    <h3>' + escapeHtml(player.name || "Jugador sin nombre") + '</h3>' +
         '    <p class="player-card-meta">' + escapeHtml(player.position || "Sin posición") + " · " + (player.age || "—") + " años</p>" +
+        '    <p class="player-card-teamcat">Equipo: ' + teamLabel + " · " + categoryLabel + "</p>" +
         '    <p class="player-card-level">' + escapeHtml(player.level || "Nivel no definido") + "</p>" +
         "  </div>" +
         "</article>"
@@ -2060,19 +2097,56 @@ function renderPlayerList() {
     if (!contentDiv) return;
     var players = getPlayersTracking().map(normalizePlayer);
     players.sort(function (a, b) {
+        var teamCmp = String(a.team || "Sin equipo").localeCompare(String(b.team || "Sin equipo"), "es");
+        if (teamCmp !== 0) return teamCmp;
+        var categoryCmp = String(a.category || "Sin categoría").localeCompare(String(b.category || "Sin categoría"), "es");
+        if (categoryCmp !== 0) return categoryCmp;
         return String(a.name || "").localeCompare(String(b.name || ""), "es");
     });
-    var cards = players.map(renderPlayerCard).join("");
+    var grouped = {};
+    players.forEach(function (player) {
+        var teamKey = String(player.team || "").trim() || "Sin equipo";
+        var categoryKey = String(player.category || "").trim() || "Sin categoría";
+        if (!grouped[teamKey]) {
+            grouped[teamKey] = { total: 0, categories: {} };
+        }
+        if (!grouped[teamKey].categories[categoryKey]) {
+            grouped[teamKey].categories[categoryKey] = [];
+        }
+        grouped[teamKey].categories[categoryKey].push(player);
+        grouped[teamKey].total += 1;
+    });
+    var teamSections = Object.keys(grouped).sort(function (a, b) { return a.localeCompare(b, "es"); }).map(function (team) {
+        var block = grouped[team];
+        var categoriesHtml = Object.keys(block.categories).sort(function (a, b) { return a.localeCompare(b, "es"); }).map(function (category) {
+            var cards = block.categories[category].map(renderPlayerCard).join("");
+            return (
+                '<section class="players-team-category">' +
+                '  <h4 class="players-team-category-title">' + escapeHtml(category) + "</h4>" +
+                '  <div class="players-grid">' + cards + "</div>" +
+                "</section>"
+            );
+        }).join("");
+        return (
+            '<section class="players-team-group">' +
+            '  <header class="players-team-head">' +
+            "    <h3>" + escapeHtml(team) + "</h3>" +
+            '    <span>' + block.total + " jugador" + (block.total === 1 ? "" : "es") + "</span>" +
+            "  </header>" +
+            categoriesHtml +
+            "</section>"
+        );
+    }).join("");
     contentDiv.innerHTML = (
         '<section class="manual-section players-view">' +
         '  <div class="players-header">' +
         "    <h2>Seguimiento de Jugadores</h2>" +
-        "    <p>Registrá, evaluá y seguí la evolución individual de tus jugadores.</p>" +
+        "    <p>Registrá, evaluá y seguí la evolución individual de tus jugadores por equipo y categoría.</p>" +
         '    <div class="players-actions">' +
         '      <button type="button" class="toolbar-button toolbar-button-accent" onclick="renderPlayerCreateForm()">Agregar jugador</button>' +
         "    </div>" +
         "  </div>" +
-        '  <div class="players-grid">' + (cards || '<p class="text-muted">Todavía no hay jugadores cargados.</p>') + "</div>" +
+        (teamSections || '<p class="text-muted">Todavía no hay jugadores cargados.</p>') +
         "</section>"
     );
 }
@@ -2096,7 +2170,15 @@ function renderPlayerCreateForm() {
         '      <div><label>Altura</label><input type="text" name="height" placeholder="1.82 m"></div>' +
         '      <div><label>Nivel</label><input type="text" name="level" placeholder="Inicial / Intermedio / Avanzado"></div>' +
         "    </div>" +
-        '    <div class="form-row"><label>Foto URL (opcional)</label><input type="url" name="photo_url" placeholder="https://..."></div>' +
+        '    <div class="form-row form-row-inline">' +
+        '      <div><label>Equipo</label><input type="text" name="team" placeholder="Ej: CAB U17"></div>' +
+        '      <div><label>Categoría</label><input type="text" name="category" placeholder="Ej: U17"></div>' +
+        "    </div>" +
+        '    <div class="form-row">' +
+        '      <label>Foto (opcional)</label>' +
+        '      <input type="file" name="photo_file" accept="image/*">' +
+        '      <small class="text-muted">Formatos: JPG, PNG, WEBP · Máx 2MB</small>' +
+        "    </div>" +
         '    <div class="form-actions">' +
         '      <button type="submit" class="toolbar-button toolbar-button-accent">Guardar jugador</button>' +
         '      <button type="button" class="toolbar-button" onclick="renderPlayerList()">Cancelar</button>' +
@@ -2107,9 +2189,17 @@ function renderPlayerCreateForm() {
 
     var form = document.getElementById("player-create-form");
     if (!form) return;
-    form.onsubmit = function (ev) {
+    form.onsubmit = async function (ev) {
         ev.preventDefault();
         var fd = new FormData(form);
+        var photoFile = fd.get("photo_file");
+        var photoDataUrl = "";
+        try {
+            photoDataUrl = await readImageFileAsDataUrl(photoFile && photoFile.size ? photoFile : null);
+        } catch (photoErr) {
+            alert(photoErr.message || "No se pudo procesar la foto.");
+            return;
+        }
         var player = normalizePlayer({
             id: "player_" + Date.now() + "_" + Math.round(Math.random() * 1000),
             name: fd.get("name"),
@@ -2117,7 +2207,9 @@ function renderPlayerCreateForm() {
             age: fd.get("age"),
             height: fd.get("height"),
             level: fd.get("level"),
-            photo_url: fd.get("photo_url"),
+            team: fd.get("team"),
+            category: fd.get("category"),
+            photo_url: photoDataUrl,
             created_at: nowIso(),
             updated_at: nowIso()
         });
@@ -2262,6 +2354,7 @@ function renderPlayerProfile(playerId, activeTab) {
         '      <div class="player-profile-main">' +
         "        <h2>" + escapeHtml(player.name || "Jugador") + "</h2>" +
         '        <p class="player-profile-meta">' + escapeHtml(player.position || "Sin posición") + " · " + (player.age || "—") + " años · " + escapeHtml(player.height || "Altura —") + "</p>" +
+        '        <p class="player-profile-teamcat">Equipo: ' + escapeHtml(player.team || "Sin equipo") + " · " + escapeHtml(player.category || "Sin categoría") + "</p>" +
         '        <p class="player-profile-level">' + escapeHtml(player.level || "Nivel no definido") + "</p>" +
         '        <div class="player-profile-actions">' +
         '          <button type="button" class="toolbar-button" onclick="togglePlayerBasicForm()">Editar datos</button>' +
@@ -2279,7 +2372,15 @@ function renderPlayerProfile(playerId, activeTab) {
         '        <div><label>Altura</label><input type="text" name="height" value="' + escapeHtml(player.height || "") + '"></div>' +
         '        <div><label>Nivel</label><input type="text" name="level" value="' + escapeHtml(player.level || "") + '"></div>' +
         "      </div>" +
-        '      <div class="form-row"><label>Foto URL</label><input type="url" name="photo_url" value="' + escapeHtml(player.photo_url || "") + '"></div>' +
+        '      <div class="form-row form-row-inline">' +
+        '        <div><label>Equipo</label><input type="text" name="team" value="' + escapeHtml(player.team || "") + '"></div>' +
+        '        <div><label>Categoría</label><input type="text" name="category" value="' + escapeHtml(player.category || "") + '"></div>' +
+        "      </div>" +
+        '      <div class="form-row">' +
+        '        <label>Actualizar foto</label>' +
+        '        <input type="file" name="photo_file" accept="image/*">' +
+        '        <small class="text-muted">Si no adjuntás archivo, se mantiene la foto actual.</small>' +
+        "      </div>" +
         '      <div class="form-actions"><button type="submit" class="toolbar-button toolbar-button-accent">Guardar datos</button></div>' +
         "    </form>" +
         "  </div>" +
@@ -2316,7 +2417,7 @@ function togglePlayerBasicForm() {
     form.classList.toggle("is-hidden");
 }
 
-function savePlayerBasic(playerId) {
+async function savePlayerBasic(playerId) {
     var form = document.getElementById("player-basic-form");
     if (!form) return;
     var fd = new FormData(form);
@@ -2328,7 +2429,17 @@ function savePlayerBasic(playerId) {
     player.age = fd.get("age") || "";
     player.height = String(fd.get("height") || "").trim();
     player.level = String(fd.get("level") || "").trim();
-    player.photo_url = String(fd.get("photo_url") || "").trim();
+    player.team = String(fd.get("team") || "").trim();
+    player.category = String(fd.get("category") || "").trim();
+    var photoFile = fd.get("photo_file");
+    if (photoFile && photoFile.size) {
+        try {
+            player.photo_url = await readImageFileAsDataUrl(photoFile);
+        } catch (photoErr) {
+            alert(photoErr.message || "No se pudo procesar la foto.");
+            return;
+        }
+    }
     player.updated_at = nowIso();
     pushPlayerEvolution(player, "Datos básicos actualizados");
     upsertPlayer(player);
@@ -2442,10 +2553,591 @@ function deletePlayerGoal(playerId, goalId) {
 // CONTENIDO TEÓRICO / MANUALES
 // ===============================
 
+var FUNDAMENTOS_CATEGORY_VIEWS = {
+    fundamentos: {
+        title: "Fundamentos",
+        subtitle: "Elegí una categoría para ir directo al contenido técnico.",
+        layout: "cards",
+        items: [
+            { id: "fund_cat_dribbling", label: "Dribbling" },
+            { id: "fund_cat_pase", label: "Pase" },
+            { id: "fund_cat_tiro", label: "Tiro" },
+            { id: "fund_cat_finalizaciones", label: "Finalizaciones" },
+            { id: "fund_cat_juego_pies", label: "Juego de pies" },
+            { id: "fund_cat_posteo", label: "Posteo" },
+            { id: "fund_cat_defensa", label: "Defensa individual" },
+            { id: "fund_cat_rebote", label: "Rebote" }
+        ]
+    },
+    fund_cat_dribbling: {
+        title: "Dribbling",
+        subtitle: "Trabajá el manejo del balón por bloques específicos.",
+        layout: "cards",
+        items: [
+            { id: "fund_cat_dribbling_control", label: "Drible de control" },
+            { id: "fund_cat_dribbling_cambios", label: "Cambios de dirección" },
+            { id: "fund_cat_dribbling_creacion", label: "Drible de creación" }
+        ]
+    },
+    fund_cat_dribbling_control: {
+        title: "Drible de control",
+        subtitle: "Fundamentos para proteger y dominar el balón.",
+        items: [
+            { id: "fund_drible_estatico", label: "Drible estático" },
+            { id: "fund_drible_bajo_proteccion", label: "Drible bajo de protección" },
+            { id: "fund_drible_alto_avance", label: "Drible alto de avance" }
+        ]
+    },
+    fund_cat_dribbling_cambios: {
+        title: "Cambios de dirección",
+        subtitle: "Recursos para romper líneas defensivas y ganar ventaja.",
+        items: [
+            { id: "fund_crossover", label: "Crossover" },
+            { id: "fund_between_legs", label: "Between the legs" },
+            { id: "fund_behind_back", label: "Behind the back" },
+            { id: "fund_spin_move", label: "Spin move" },
+            { id: "fund_hesitation_crossover", label: "Hesitation crossover" }
+        ]
+    },
+    fund_cat_dribbling_creacion: {
+        title: "Drible de creación",
+        subtitle: "Movimientos para crear espacio y generar opciones ofensivas.",
+        items: [
+            { id: "fund_hesitation", label: "Hesitation" },
+            { id: "fund_in_out", label: "In & out" },
+            { id: "fund_double_crossover", label: "Double crossover" },
+            { id: "fund_shamgod", label: "Shamgod" }
+        ]
+    },
+    fund_cat_pase: {
+        title: "Pase",
+        subtitle: "Seleccioná un bloque para trabajar cada tipo de pase.",
+        layout: "cards",
+        items: [
+            { id: "fund_cat_pase_basicos", label: "Pases básicos" },
+            { id: "fund_cat_pase_movimiento", label: "Pases en movimiento" },
+            { id: "fund_cat_pase_creativos", label: "Pases creativos" },
+            { id: "fund_cat_pase_presion", label: "Pases bajo presión" },
+            { id: "fund_cat_pase_pickroll", label: "Pases en pick and roll" }
+        ]
+    },
+    fund_cat_pase_basicos: {
+        title: "Pases básicos",
+        subtitle: "Fundamentos esenciales para precisión y control.",
+        items: [
+            { id: "fund_pase_pecho", label: "Pase de pecho" },
+            { id: "fund_pase_picado", label: "Pase picado" },
+            { id: "fund_pase_encima_cabeza", label: "Pase por encima de la cabeza" },
+            { id: "fund_pase_beisbol", label: "Pase de béisbol" }
+        ]
+    },
+    fund_cat_pase_movimiento: {
+        title: "Pases en movimiento",
+        subtitle: "Lectura y timing en transición ofensiva.",
+        items: [
+            { id: "fund_pase_transicion", label: "Pase en transición" },
+            { id: "fund_pase_adelantado", label: "Pase adelantado" },
+            { id: "fund_pase_carrera", label: "Pase en carrera" }
+        ]
+    },
+    fund_cat_pase_creativos: {
+        title: "Pases creativos",
+        subtitle: "Recursos para generar ventajas en ataque.",
+        items: [
+            { id: "fund_no_look_pass", label: "No-look pass" },
+            { id: "fund_hook_pass", label: "Hook pass" },
+            { id: "fund_behind_back_pass", label: "Behind the back pass" },
+            { id: "fund_bounce_wrap_pass", label: "Bounce wrap pass" }
+        ]
+    },
+    fund_cat_pase_presion: {
+        title: "Pases bajo presión",
+        subtitle: "Opciones seguras cuando la defensa aprieta.",
+        items: [
+            { id: "fund_skip_pass", label: "Skip pass" },
+            { id: "fund_kick_out_pass", label: "Kick out pass" },
+            { id: "fund_pocket_pass", label: "Pocket pass" },
+            { id: "fund_drop_pass", label: "Drop pass" }
+        ]
+    },
+    fund_cat_pase_pickroll: {
+        title: "Pases en pick and roll",
+        subtitle: "Lecturas clave en situaciones de bloqueo directo.",
+        items: [
+            { id: "fund_pocket_pass", label: "Pocket pass" },
+            { id: "fund_lob_pass", label: "Lob pass" },
+            { id: "fund_bounce_pass_roll", label: "Bounce pass al roll" },
+            { id: "fund_skip_lado_debil", label: "Skip al lado débil" }
+        ]
+    },
+    fund_cat_tiro: {
+        title: "Tiro",
+        subtitle: "Elegí el bloque de tiro que querés trabajar.",
+        layout: "cards",
+        items: [
+            { id: "fund_cat_tiro_basico", label: "Tiro básico" },
+            { id: "fund_cat_tiro_movimiento", label: "Tiro en movimiento" },
+            { id: "fund_cat_tiro_exterior", label: "Tiro exterior" },
+            { id: "fund_cat_tiro_avanzado", label: "Tiro avanzado" },
+            { id: "fund_cat_tiro_penetracion", label: "Tiro en penetración" }
+        ]
+    },
+    fund_cat_tiro_basico: {
+        title: "Tiro básico",
+        subtitle: "Base técnica para construir eficacia de tiro.",
+        items: [
+            { id: "fund_set_shot", label: "Set shot" },
+            { id: "fund_tiro_suspension", label: "Tiro en suspensión" },
+            { id: "fund_tiro_libre", label: "Tiro libre" }
+        ]
+    },
+    fund_cat_tiro_movimiento: {
+        title: "Tiro en movimiento",
+        subtitle: "Finalización tras bote y desplazamiento.",
+        items: [
+            { id: "fund_pull_up", label: "Pull up" },
+            { id: "fund_one_dribble_pull_up", label: "One dribble pull up" },
+            { id: "fund_step_in_shot", label: "Step in shot" }
+        ]
+    },
+    fund_cat_tiro_exterior: {
+        title: "Tiro exterior",
+        subtitle: "Lecturas y ejecución desde perímetro.",
+        items: [
+            { id: "fund_catch_shoot", label: "Catch and shoot" },
+            { id: "fund_spot_up", label: "Spot up" },
+            { id: "fund_off_screen_shot", label: "Off screen shot" }
+        ]
+    },
+    fund_cat_tiro_avanzado: {
+        title: "Tiro avanzado",
+        subtitle: "Recursos para crear tiro propio.",
+        items: [
+            { id: "fund_step_back", label: "Step back" },
+            { id: "fund_side_step", label: "Side step" },
+            { id: "fund_fadeaway", label: "Fadeaway" },
+            { id: "fund_turnaround_jumper", label: "Turnaround jumper" }
+        ]
+    },
+    fund_cat_tiro_penetracion: {
+        title: "Tiro en penetración",
+        subtitle: "Opciones cortas y flotadas cerca del aro.",
+        items: [
+            { id: "fund_floater", label: "Floater" },
+            { id: "fund_runner", label: "Runner" },
+            { id: "fund_tear_drop", label: "Tear drop" }
+        ]
+    },
+    fund_cat_finalizaciones: {
+        title: "Finalizaciones",
+        subtitle: "Elegí el tipo de finalización que querés entrenar.",
+        layout: "cards",
+        items: [
+            { id: "fund_cat_finalizaciones_bandejas", label: "Bandejas" },
+            { id: "fund_cat_finalizaciones_contacto", label: "Finalizaciones con contacto" },
+            { id: "fund_cat_finalizaciones_avanzadas", label: "Finalizaciones avanzadas" },
+            { id: "fund_cat_finalizaciones_defensores", label: "Finalizaciones sobre defensores" }
+        ]
+    },
+    fund_cat_finalizaciones_bandejas: {
+        title: "Bandejas",
+        subtitle: "Terminaciones básicas con control del cuerpo.",
+        items: [
+            { id: "fund_bandeja_derecha", label: "Bandeja derecha" },
+            { id: "fund_bandeja_izquierda", label: "Bandeja izquierda" },
+            { id: "fund_reverse_layup", label: "Reverse layup" },
+            { id: "fund_power_layup", label: "Power layup" }
+        ]
+    },
+    fund_cat_finalizaciones_contacto: {
+        title: "Finalizaciones con contacto",
+        subtitle: "Recursos para anotar con oposición física.",
+        items: [
+            { id: "fund_inside_hand_finish", label: "Inside hand finish" },
+            { id: "fund_outside_hand_finish", label: "Outside hand finish" },
+            { id: "fund_pro_hop_finish", label: "Pro hop finish" },
+            { id: "fund_eurostep", label: "Eurostep" }
+        ]
+    },
+    fund_cat_finalizaciones_avanzadas: {
+        title: "Finalizaciones avanzadas",
+        subtitle: "Opciones técnicas para definir con creatividad.",
+        items: [
+            { id: "fund_spin_finish", label: "Spin finish" },
+            { id: "fund_floater_finish", label: "Floater finish" },
+            { id: "fund_high_glass_finish", label: "High glass finish" },
+            { id: "fund_reverse_finish", label: "Reverse finish" }
+        ]
+    },
+    fund_cat_finalizaciones_defensores: {
+        title: "Finalizaciones sobre defensores",
+        subtitle: "Lecturas y amagues para ganar ventaja cerca del aro.",
+        items: [
+            { id: "fund_up_under", label: "Up and under" },
+            { id: "fund_pump_fake_finish", label: "Pump fake finish" },
+            { id: "fund_step_through", label: "Step through" }
+        ]
+    },
+    fund_cat_juego_pies: {
+        title: "Juego de pies",
+        subtitle: "Dominá la base corporal del ataque.",
+        layout: "cards",
+        items: [
+            { id: "fund_cat_juego_pies_paradas", label: "Paradas" },
+            { id: "fund_cat_juego_pies_pivotes", label: "Pivotes" },
+            { id: "fund_cat_juego_pies_arranques", label: "Arranques" },
+            { id: "fund_cat_juego_pies_movimientos", label: "Movimientos ofensivos" }
+        ]
+    },
+    fund_cat_juego_pies_paradas: {
+        title: "Paradas",
+        subtitle: "Control de equilibrio para decidir mejor.",
+        items: [
+            { id: "fund_jump_stop", label: "Jump stop" },
+            { id: "fund_stride_stop", label: "Stride stop" }
+        ]
+    },
+    fund_cat_juego_pies_pivotes: {
+        title: "Pivotes",
+        subtitle: "Protección de balón y creación de ángulos.",
+        items: [
+            { id: "fund_pivote_frontal", label: "Pivote frontal" },
+            { id: "fund_pivote_reverso", label: "Pivote reverso" }
+        ]
+    },
+    fund_cat_juego_pies_arranques: {
+        title: "Arranques",
+        subtitle: "Primer paso para atacar ventaja.",
+        items: [
+            { id: "fund_salida_abierta", label: "Salida abierta" },
+            { id: "fund_salida_cruzada", label: "Salida cruzada" },
+            { id: "fund_salida_directa", label: "Salida directa" }
+        ]
+    },
+    fund_cat_juego_pies_movimientos: {
+        title: "Movimientos ofensivos",
+        subtitle: "Amenazas y engaños para atacar mejor.",
+        items: [
+            { id: "fund_jab_step", label: "Jab step" },
+            { id: "fund_shot_fake", label: "Shot fake" },
+            { id: "fund_triple_threat", label: "Triple threat moves" }
+        ]
+    },
+    fund_cat_posteo: {
+        title: "Posteo",
+        subtitle: "Trabajo de poste por etapas de aprendizaje.",
+        layout: "cards",
+        items: [
+            { id: "fund_cat_posteo_posicion", label: "Posición" },
+            { id: "fund_cat_posteo_basicos", label: "Movimientos básicos" },
+            { id: "fund_cat_posteo_avanzados", label: "Movimientos avanzados" }
+        ]
+    },
+    fund_cat_posteo_posicion: {
+        title: "Posición en el posteo",
+        subtitle: "Sellado y recepción para ganar ventaja.",
+        items: [
+            { id: "fund_sellar_defensor", label: "Sellar defensor" },
+            { id: "fund_recepcion_poste", label: "Recepción en el poste" }
+        ]
+    },
+    fund_cat_posteo_basicos: {
+        title: "Movimientos básicos de posteo",
+        subtitle: "Recursos iniciales de espaldas al aro.",
+        items: [
+            { id: "fund_drop_step", label: "Drop step" },
+            { id: "fund_hook_shot", label: "Hook shot" },
+            { id: "fund_up_under_post", label: "Up and under" }
+        ]
+    },
+    fund_cat_posteo_avanzados: {
+        title: "Movimientos avanzados de posteo",
+        subtitle: "Finalizaciones técnicas para poste dominante.",
+        items: [
+            { id: "fund_spin_move_post", label: "Spin move" },
+            { id: "fund_fadeaway_post", label: "Fadeaway" },
+            { id: "fund_dream_shake", label: "Dream shake" }
+        ]
+    },
+    fund_cat_defensa: {
+        title: "Defensa individual",
+        subtitle: "Elegí el foco defensivo para entrenar.",
+        layout: "cards",
+        items: [
+            { id: "fund_cat_defensa_posicion", label: "Posición defensiva" },
+            { id: "fund_cat_defensa_balon", label: "Defensa al balón" },
+            { id: "fund_cat_defensa_sin_balon", label: "Defensa sin balón" }
+        ]
+    },
+    fund_cat_defensa_posicion: {
+        title: "Posición defensiva",
+        subtitle: "Base corporal y desplazamientos defensivos.",
+        items: [
+            { id: "fund_stance", label: "Stance" },
+            { id: "fund_slide_defensivo", label: "Slide defensivo" }
+        ]
+    },
+    fund_cat_defensa_balon: {
+        title: "Defensa al balón",
+        subtitle: "Contención del 1c1 y protección de línea de penetración.",
+        items: [
+            { id: "fund_contener_drible", label: "Contener drible" },
+            { id: "fund_cortar_penetracion", label: "Cortar penetración" }
+        ]
+    },
+    fund_cat_defensa_sin_balon: {
+        title: "Defensa sin balón",
+        subtitle: "Ayudas, negación y cierre al tiro.",
+        items: [
+            { id: "fund_deny", label: "Deny" },
+            { id: "fund_help_defense", label: "Help defense" },
+            { id: "fund_closeout", label: "Closeout" }
+        ]
+    },
+    fund_cat_rebote: {
+        title: "Rebote",
+        subtitle: "Separá el trabajo de rebote según rol ofensivo/defensivo.",
+        layout: "cards",
+        items: [
+            { id: "fund_cat_rebote_defensivo", label: "Rebote defensivo" },
+            { id: "fund_cat_rebote_ofensivo", label: "Rebote ofensivo" }
+        ]
+    },
+    fund_cat_rebote_defensivo: {
+        title: "Rebote defensivo",
+        subtitle: "Cierre, bloqueo y captura segura.",
+        items: [
+            { id: "fund_box_out", label: "Box out" },
+            { id: "fund_captura", label: "Captura" }
+        ]
+    },
+    fund_cat_rebote_ofensivo: {
+        title: "Rebote ofensivo",
+        subtitle: "Segundas oportunidades cerca del aro.",
+        items: [
+            { id: "fund_tip", label: "Tip" },
+            { id: "fund_segundo_salto", label: "Segundo salto" }
+        ]
+    },
+    ataques_hub: {
+        title: "Ataques",
+        subtitle: "Seleccioná el bloque de ataque según el tipo de defensa rival.",
+        items: [
+            { id: "ataques_hub_zona", label: "Ataques vs zona" },
+            { id: "ataques_hub_hombre", label: "Ataques hombre a hombre" }
+        ]
+    },
+    ataques_hub_zona: {
+        title: "Ataques vs zona",
+        subtitle: "Sistemas y conceptos para romper defensas zonales.",
+        items: [
+            { id: "vs23", label: "vs 2-3" },
+            { id: "vs131", label: "vs 1-3-1" },
+            { id: "vs32", label: "vs 3-2" },
+            { id: "vs41", label: "vs 4-1" }
+        ]
+    },
+    ataques_hub_hombre: {
+        title: "Ataques hombre a hombre",
+        subtitle: "Alternativas de ejecución frente a defensa individual.",
+        items: [
+            { id: "abierto", label: "Sistema Abierto" },
+            { id: "cerrado", label: "Sistema Cerrado" }
+        ]
+    },
+    defensas_zona_hub: {
+        title: "Defensas en Zona",
+        subtitle: "Modelos zonales para controlar ritmo y espacios.",
+        items: [
+            { id: "defensas_zona_hub_principales", label: "Defensas principales" }
+        ]
+    },
+    defensas_zona_hub_principales: {
+        title: "Defensas principales",
+        subtitle: "Conceptos base por estructura zonal.",
+        items: [
+            { id: "zone23_defense", label: "Zona 2-3" },
+            { id: "zone32_defense", label: "Zona 3-2" },
+            { id: "zone131_defense", label: "Zona 1-3-1" }
+        ]
+    },
+    presion_hub: {
+        title: "Presión",
+        subtitle: "Sistemas de presión para acelerar decisiones del rival.",
+        items: [
+            { id: "presion_hub_sistemas", label: "Sistemas de presión" }
+        ]
+    },
+    presion_hub_sistemas: {
+        title: "Sistemas de presión",
+        subtitle: "Aplicaciones por contexto y objetivo táctico.",
+        items: [
+            { id: "fullcourt", label: "Full Court" },
+            { id: "press221", label: "2-2-1" },
+            { id: "doubleteam", label: "Double Team" }
+        ]
+    },
+    planilla_hub: {
+        title: "Planilla",
+        subtitle: "Acceso directo a herramientas de trabajo en cancha.",
+        items: [
+            { id: "planilla_hub_herramientas", label: "Herramientas" }
+        ]
+    },
+    planilla_hub_herramientas: {
+        title: "Herramientas",
+        subtitle: "Usá recursos visuales y control de tiro.",
+        items: [
+            { id: "pizarra_virtual", label: "Pizarra virtual" },
+            { id: "shooting_training", label: "Entrenamiento de tiro" }
+        ]
+    },
+    planificacion_hub: {
+        title: "Planificación de Entrenamientos",
+        subtitle: "Organizá sesiones y ciclos de temporada.",
+        items: [
+            { id: "planificacion_hub_general", label: "Planificación" }
+        ]
+    },
+    planificacion_hub_general: {
+        title: "Planificación",
+        subtitle: "Entrenamientos de equipo y planificación anual.",
+        items: [
+            { id: "planificacion", label: "Planificar entrenamientos" },
+            { id: "planificacion_anual", label: "Planificación anual" }
+        ]
+    },
+    player_tracking_hub: {
+        title: "Seguimiento de Jugadores",
+        subtitle: "Perfiles, evaluación y evolución del plantel.",
+        items: [
+            { id: "player_tracking_hub_general", label: "Gestión de jugadores" }
+        ]
+    },
+    player_tracking_hub_general: {
+        title: "Gestión de jugadores",
+        subtitle: "Acceso directo a perfiles y evolución.",
+        items: [
+            { id: "player_tracking", label: "Perfiles y evolución" }
+        ]
+    },
+    jugadas_hub: {
+        title: "Jugadas Guardadas",
+        subtitle: "Biblioteca de recursos tácticos del equipo.",
+        items: [
+            { id: "jugadas_hub_general", label: "Biblioteca de jugadas" }
+        ]
+    },
+    jugadas_hub_general: {
+        title: "Biblioteca de jugadas",
+        subtitle: "Consulta y gestión de jugadas guardadas.",
+        items: [
+            { id: "plays_library", label: "Ver jugadas guardadas" }
+        ]
+    }
+};
+
+function renderFundamentosCategoryView(sectionId) {
+    var contentDiv = document.getElementById("content");
+    if (!contentDiv) return;
+    var config = FUNDAMENTOS_CATEGORY_VIEWS[sectionId];
+    if (!config) return;
+
+    var megaGroups = (function () {
+        if (!config || !Array.isArray(config.items) || !config.items.length) return null;
+        var valid = true;
+        var groups = config.items.map(function (item) {
+            var subConfig = FUNDAMENTOS_CATEGORY_VIEWS[item.id];
+            if (!subConfig || !Array.isArray(subConfig.items) || !subConfig.items.length) {
+                valid = false;
+                return null;
+            }
+            var leafItems = subConfig.items.filter(function (leaf) {
+                return leaf && typeof leaf.id === "string" && !FUNDAMENTOS_CATEGORY_VIEWS[leaf.id];
+            });
+            if (leafItems.length !== subConfig.items.length) {
+                valid = false;
+                return null;
+            }
+            return {
+                title: subConfig.title || item.label,
+                subtitle: subConfig.subtitle || "",
+                items: leafItems
+            };
+        }).filter(Boolean);
+        if (!valid || !groups.length) return null;
+        return groups;
+    })();
+
+    if (megaGroups) {
+        var megaHtml = megaGroups.map(function (group) {
+            var links = (group.items || []).map(function (leaf) {
+                return (
+                    '<button type="button" class="fundamentos-mega-link" onclick="loadContent(\'' + escapeHtml(leaf.id) + '\')">' +
+                    escapeHtml(leaf.label || leaf.id) +
+                    "</button>"
+                );
+            }).join("");
+            return (
+                '<article class="fundamentos-mega-col">' +
+                '  <h3 class="fundamentos-mega-title">' + escapeHtml(group.title || "") + "</h3>" +
+                (group.subtitle ? ('  <p class="fundamentos-mega-subtitle">' + escapeHtml(group.subtitle) + "</p>") : "") +
+                '  <div class="fundamentos-mega-list">' + links + "</div>" +
+                "</article>"
+            );
+        }).join("");
+
+        contentDiv.innerHTML = (
+            '<section class="manual-section">' +
+            "  <h2>" + escapeHtml(config.title) + "</h2>" +
+            '  <p class="text-muted">' + escapeHtml(config.subtitle || "") + "</p>" +
+            '  <div class="fundamentos-mega-grid" style="margin-top:12px;">' + megaHtml + "</div>" +
+            "</section>"
+        );
+        return;
+    }
+
+    var cards = (config.items || []).map(function (item) {
+        if (config.layout === "cards") {
+            return (
+                '<article class="fundamentos-subcat-card" onclick="loadContent(\'' + escapeHtml(item.id) + '\')">' +
+                '  <h3>' + escapeHtml(item.label) + "</h3>" +
+                "</article>"
+            );
+        }
+        return (
+            '<button type="button" class="quick-action-btn" onclick="loadContent(\'' + escapeHtml(item.id) + '\')">' +
+            '  <span class="quick-action-icon">•</span>' +
+            '  <span class="quick-action-copy"><strong>' + escapeHtml(item.label) + '</strong></span>' +
+            "</button>"
+        );
+    }).join("");
+
+    contentDiv.innerHTML = (
+        '<section class="manual-section">' +
+        "  <h2>" + escapeHtml(config.title) + "</h2>" +
+        '  <p class="text-muted">' + escapeHtml(config.subtitle || "") + "</p>" +
+        '  <div class="dashboard-card dashboard-card-actions" style="margin-top:12px;">' +
+        '    <div class="' + (config.layout === "cards" ? "fundamentos-subcat-grid" : "dashboard-quick-actions") + '">' + cards + "</div>" +
+        "  </div>" +
+        "</section>"
+    );
+}
+
 function loadContent(sectionId) {
     const contentDiv = document.getElementById("content");
 
     if (!contentDiv) return;
+
+    if (sectionId === "pizarra_virtual") {
+        loadBoard();
+        return;
+    }
+
+    if (FUNDAMENTOS_CATEGORY_VIEWS[sectionId]) {
+        renderFundamentosCategoryView(sectionId);
+        return;
+    }
 
     // Fundamentos: ventajas, desventajas, momentos
     if (sectionId.startsWith("fund_") && typeof window.FUNDAMENTOS_CONTENIDO !== "undefined" && window.FUNDAMENTOS_CONTENIDO[sectionId]) {
@@ -3121,39 +3813,97 @@ function getNextEntrenamiento() {
     return next;
 }
 
+function formatDashboardUserName(user) {
+    var raw = String((user && (user.name || user.username || user.email)) || "Entrenador").trim();
+    if (!raw) return "Entrenador";
+    return raw
+        .split(/\s+/)
+        .map(function (part) {
+            if (!part) return "";
+            return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+        })
+        .join(" ");
+}
+
+function getDashboardAvatarInitials(name) {
+    var cleaned = String(name || "").trim();
+    if (!cleaned) return "CO";
+    var chunks = cleaned.split(/\s+/).slice(0, 2);
+    return chunks.map(function (c) { return c.charAt(0).toUpperCase(); }).join("") || "CO";
+}
+
+function resolveDashboardSearchTarget(query) {
+    var q = String(query || "").toLowerCase().trim();
+    if (!q) return null;
+
+    var routes = [
+        { keys: ["fundamentos", "dribbling", "pase", "tiro", "defensa", "rebote"], action: "content", value: "fundamentos", label: "Fundamentos" },
+        { keys: ["entrenamiento", "entrenamientos", "planificacion", "planificar"], action: "content", value: "planificacion", label: "Planificación de entrenamientos" },
+        { keys: ["anual", "temporada", "ciclos", "bimestral"], action: "content", value: "planificacion_anual", label: "Planificación anual" },
+        { keys: ["jugadas", "biblioteca", "playbook"], action: "content", value: "plays_library", label: "Biblioteca de jugadas" },
+        { keys: ["jugadores", "seguimiento", "player"], action: "content", value: "player_tracking", label: "Seguimiento de jugadores" },
+        { keys: ["pizarra", "dibujar", "diagramar"], action: "board", value: "pizarra", label: "Pizarra virtual" },
+        { keys: ["tiro", "heatmap", "lanzamientos"], action: "content", value: "shooting_training", label: "Entrenamiento de tiro" }
+    ];
+
+    for (var i = 0; i < routes.length; i++) {
+        var route = routes[i];
+        for (var j = 0; j < route.keys.length; j++) {
+            if (q.indexOf(route.keys[j]) >= 0) return route;
+        }
+    }
+    return null;
+}
+
 function renderDashboard() {
     var contentDiv = document.getElementById("content");
     if (!contentDiv) return;
 
     loadSavedPlaysFromStorage();
     var user = getCurrentUser();
-    var userName = (user && (user.name || user.username)) ? user.name || user.username : "Entrenador";
+    var userName = formatDashboardUserName(user);
+    var safeUserName = escapeHtml(userName);
+    var userAvatar = escapeHtml(getDashboardAvatarInitials(userName));
     var entrenamientos = getEntrenamientos();
     var nextEnt = getNextEntrenamiento();
     var tip = COACHING_TIPS[Math.floor(Math.random() * COACHING_TIPS.length)];
 
     contentDiv.innerHTML = (
         '<div class="dashboard">' +
+        '  <div class="dashboard-topbar">' +
+        '    <div class="dashboard-search-wrap">' +
+        '      <input id="dashboard-global-search" class="dashboard-search-input" type="search" placeholder="Buscar en la app (ej: jugadores, pizarra, jugadas...)">' +
+        '      <button type="button" id="dashboard-global-search-btn" class="dashboard-search-btn">Buscar</button>' +
+        "    </div>" +
+        '    <div class="dashboard-userbox">' +
+        '      <div class="dashboard-avatar">' + userAvatar + "</div>" +
+        '      <div class="dashboard-user-meta">' +
+        '        <span class="dashboard-user-role">Coach</span>' +
+        "        <strong>" + safeUserName + "</strong>" +
+        "      </div>" +
+        "    </div>" +
+        "  </div>" +
+        '  <p id="dashboard-search-hint" class="dashboard-search-hint" aria-live="polite"></p>' +
         '  <header class="dashboard-header">' +
-        '    <h1 class="dashboard-title">Bienvenido ' + userName + ' 👋</h1>' +
+        '    <h1 class="dashboard-title">Bienvenido ' + safeUserName + ' 👋</h1>' +
         '    <p class="dashboard-subtitle">Panel del entrenador</p>' +
         '  </header>' +
         '  <div class="dashboard-grid">' +
-        '    <div class="dashboard-card stat-card">' +
+        '    <div class="dashboard-card dashboard-card--stat stat-card">' +
         '      <div class="stat-card-icon">📅</div>' +
         '      <div class="stat-card-content">' +
         '        <span class="stat-card-value">' + entrenamientos.length + '</span>' +
         '        <span class="stat-card-label">Entrenamientos creados</span>' +
         '      </div>' +
         '    </div>' +
-        '    <div class="dashboard-card stat-card">' +
+        '    <div class="dashboard-card dashboard-card--stat stat-card">' +
         '      <div class="stat-card-icon">🏀</div>' +
         '      <div class="stat-card-content">' +
         '        <span class="stat-card-value">0</span>' +
         '        <span class="stat-card-label">Ejercicios guardados</span>' +
         '      </div>' +
         '    </div>' +
-        '    <div class="dashboard-card stat-card">' +
+        '    <div class="dashboard-card dashboard-card--stat stat-card">' +
         '      <div class="stat-card-icon">📋</div>' +
         '      <div class="stat-card-content">' +
         '        <span class="stat-card-value">' + savedPlays.length + '</span>' +
@@ -3177,26 +3927,38 @@ function renderDashboard() {
         '    <div class="dashboard-card dashboard-card-actions">' +
         '      <h3 class="dashboard-card-title">Acciones rápidas</h3>' +
         '      <div class="dashboard-quick-actions">' +
-        '        <button type="button" class="quick-action-btn" onclick="loadContent(\'planificacion\')"><span class="quick-action-icon">📅</span><span>Crear entrenamiento</span></button>' +
-        '        <button type="button" class="quick-action-btn" onclick="loadContent(\'fundamentos\')"><span class="quick-action-icon">🏀</span><span>Ver fundamentos</span></button>' +
-        '        <button type="button" class="quick-action-btn" onclick="loadContent(\'pizarra\')"><span class="quick-action-icon">✏️</span><span>Dibujar jugada</span></button>' +
-        '        <button type="button" class="quick-action-btn" onclick="loadContent(\'plays_library\')"><span class="quick-action-icon">📚</span><span>Ver biblioteca de jugadas</span></button>' +
+        '        <button type="button" class="quick-action-btn" onclick="loadContent(\'planificacion\')">' +
+        '          <span class="quick-action-icon">📅</span>' +
+        '          <span class="quick-action-copy"><strong>Planificar entrenamiento</strong><small>Crear sesión del equipo</small></span>' +
+        "        </button>" +
+        '        <button type="button" class="quick-action-btn" onclick="loadContent(\'fundamentos\')">' +
+        '          <span class="quick-action-icon">🏀</span>' +
+        '          <span class="quick-action-copy"><strong>Abrir fundamentos</strong><small>Ver recursos técnicos</small></span>' +
+        "        </button>" +
+        '        <button type="button" class="quick-action-btn" onclick="loadContent(\'pizarra\')">' +
+        '          <span class="quick-action-icon">✏️</span>' +
+        '          <span class="quick-action-copy"><strong>Abrir pizarra</strong><small>Dibujar jugadas rápido</small></span>' +
+        "        </button>" +
+        '        <button type="button" class="quick-action-btn" onclick="loadContent(\'plays_library\')">' +
+        '          <span class="quick-action-icon">📚</span>' +
+        '          <span class="quick-action-copy"><strong>Ir a jugadas</strong><small>Gestionar biblioteca</small></span>' +
+        "        </button>" +
         '      </div>' +
         '    </div>' +
-        '    <div class="dashboard-card dashboard-card-tip">' +
+        '    <div class="dashboard-card dashboard-card-tip dashboard-card--support">' +
         '      <h3 class="dashboard-card-title">Tip de coaching</h3>' +
         '      <p class="dashboard-tip-text">"' + tip + '"</p>' +
         '    </div>' +
-        '    <div class="dashboard-card dashboard-card-social">' +
+        '    <div class="dashboard-card dashboard-card-social dashboard-card--support">' +
         '      <h3 class="dashboard-card-title">Redes Basket Lab</h3>' +
         '      <p class="dashboard-social-subtitle">Seguinos para ver contenido, ideas de entrenamiento y jugadas.</p>' +
         '      <div class="dashboard-social-links">' +
         '        <a class="dashboard-social-link dashboard-social-link-youtube" href="https://www.youtube.com/@BasketLab8" target="_blank" rel="noopener noreferrer">' +
-        '          <span class="dashboard-social-icon">▶</span>' +
+        '          <img class="dashboard-social-logo" src="/assets/images/logo-youtube.svg" alt="Logo YouTube">' +
         '          <span class="dashboard-social-text">YouTube</span>' +
         '        </a>' +
         '        <a class="dashboard-social-link dashboard-social-link-instagram" href="https://www.instagram.com/basketlab8/" target="_blank" rel="noopener noreferrer">' +
-        '          <span class="dashboard-social-icon">◎</span>' +
+        '          <img class="dashboard-social-logo" src="/assets/images/instagram.svg" alt="Logo Instagram">' +
         '          <span class="dashboard-social-text">Instagram</span>' +
         '        </a>' +
         '      </div>' +
@@ -3204,6 +3966,37 @@ function renderDashboard() {
         '  </div>' +
         '</div>'
     );
+
+    function runDashboardSearch() {
+        var input = document.getElementById("dashboard-global-search");
+        var hint = document.getElementById("dashboard-search-hint");
+        if (!input) return;
+
+        var target = resolveDashboardSearchTarget(input.value);
+        if (!target) {
+            if (hint) hint.textContent = "No encontré una sección para esa búsqueda.";
+            return;
+        }
+        if (hint) hint.textContent = "Abriendo: " + target.label;
+
+        if (target.action === "board") {
+            loadBoard();
+            return;
+        }
+        loadContent(target.value);
+    }
+
+    var searchBtn = document.getElementById("dashboard-global-search-btn");
+    var searchInput = document.getElementById("dashboard-global-search");
+    if (searchBtn) searchBtn.onclick = runDashboardSearch;
+    if (searchInput) {
+        searchInput.onkeydown = function (ev) {
+            if (ev.key === "Enter") {
+                ev.preventDefault();
+                runDashboardSearch();
+            }
+        };
+    }
 }
 
 

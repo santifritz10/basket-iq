@@ -9,6 +9,16 @@ body {
   font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
+/* Tailwind palette base (progressive adoption) */
+:root {
+  --app-background: #0B0B0B;
+  --app-card: #111111;
+  --app-border: #27272A;
+  --app-text-primary: #FFFFFF;
+  --app-text-secondary: #A1A1AA;
+  --app-accent: #F97316;
+}
+
 * {
   box-sizing: border-box;
 }

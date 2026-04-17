@@ -37,7 +37,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--bg-dark);
+    background: #0b0b0b;
     padding: 20px;
     overflow-y: auto;
     overflow-x: hidden;
@@ -663,7 +663,7 @@ body {
 .dashboard-social-link {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     padding: 12px 14px;
     border-radius: var(--radius-sm);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -679,12 +679,12 @@ body {
     background: rgba(255, 152, 0, 0.12);
 }
 
-.dashboard-social-link-youtube .dashboard-social-icon {
-    color: #ff4d4d;
-}
-
-.dashboard-social-link-instagram .dashboard-social-icon {
-    color: #ff7a59;
+.dashboard-social-link-youtube .dashboard-social-logo,
+.dashboard-social-link-instagram .dashboard-social-logo {
+    width: 22px;
+    height: 22px;
+    display: inline-block;
+    flex-shrink: 0;
 }
 
 .dashboard-social-link-disabled {
@@ -698,10 +698,18 @@ body {
     background: rgba(255, 255, 255, 0.04);
 }
 
-.dashboard-social-icon {
-    font-size: 1.05rem;
-    width: 18px;
-    text-align: center;
+.dashboard-social-logo {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.dashboard-social-link-instagram .dashboard-social-logo {
+    filter: none !important;
+    width: 20px;
+    height: 20px;
 }
 
 .dashboard-social-text {
@@ -757,6 +765,620 @@ body {
     .stat-card-value {
         font-size: 1.35rem;
     }
+}
+
+/* ===== Restored UI baseline (post-migration stable look) ===== */
+:root {
+    --bg-dark: #090e18;
+    --bg-content: #0e1524;
+    --sidebar-bg: rgba(12, 18, 32, 0.82);
+    --sidebar-border: rgba(89, 111, 160, 0.25);
+    --card-bg: rgba(17, 27, 44, 0.78);
+    --card-border: rgba(123, 148, 201, 0.2);
+    --text: #e8eefb;
+    --text-muted: #a4b2cf;
+    --accent: #ff8b2b;
+    --accent-soft: #ffb067;
+    --accent-deep: #ff6b1a;
+}
+
+body.app-body {
+    background:
+        radial-gradient(1100px 600px at -10% -20%, rgba(255, 139, 43, 0.13), transparent 60%),
+        radial-gradient(1200px 700px at 110% 120%, rgba(74, 118, 255, 0.16), transparent 62%),
+        linear-gradient(180deg, #090e18 0%, #070b14 100%);
+}
+
+.container {
+    gap: 14px;
+    padding: 14px;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 278px;
+    min-width: 278px;
+    border-radius: 18px;
+    height: calc(100vh - 28px);
+    max-height: calc(100vh - 28px);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--sidebar-border);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.38);
+    background: linear-gradient(180deg, rgba(14, 23, 42, 0.94) 0%, rgba(9, 17, 33, 0.9) 100%);
+}
+
+.sidebar-brand {
+    margin: 0 14px 12px;
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(123, 148, 201, 0.18);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.sidebar-nav {
+    padding: 0 10px 10px;
+    gap: 8px;
+}
+
+.sidebar-section-title {
+    margin: 12px 8px 6px;
+    padding: 0 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(164, 178, 207, 0.72);
+}
+
+.sidebar-lucide {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    margin-right: 8px;
+    color: rgba(196, 209, 237, 0.8);
+}
+
+.sidebar-label-wrap {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sidebar-toggle {
+    gap: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
+}
+
+.sidebar-toggle:hover .sidebar-lucide {
+    color: #ffd7ad;
+}
+
+.sidebar-toggle.is-active {
+    background: linear-gradient(130deg, rgba(255, 139, 43, 0.22), rgba(255, 107, 26, 0.18));
+    border-color: rgba(255, 176, 103, 0.42);
+    color: #fff4e8;
+}
+
+.sidebar-toggle-flat .sidebar-toggle-icon {
+    display: none;
+}
+
+.sidebar-toggle-flat.sidebar-toggle-collapsible .sidebar-toggle-icon {
+    display: inline-flex;
+}
+
+.sidebar-submenu li {
+    margin: 4px 0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.18s ease;
+}
+
+.sidebar-submenu li:hover {
+    background: rgba(255, 139, 43, 0.15);
+    color: #fff4e8;
+    transform: translateX(2px);
+}
+
+.sidebar-submenu li.is-active {
+    background: linear-gradient(130deg, rgba(255, 139, 43, 0.2), rgba(255, 107, 26, 0.16));
+    color: #fff4e8;
+    border: 1px solid rgba(255, 176, 103, 0.35);
+}
+
+.content {
+    border-radius: 18px;
+    border: 1px solid rgba(123, 148, 201, 0.18);
+    background:
+        radial-gradient(900px 500px at 100% -10%, rgba(255, 139, 43, 0.08), transparent 62%),
+        radial-gradient(800px 500px at -10% 120%, rgba(91, 124, 255, 0.1), transparent 62%),
+        linear-gradient(165deg, rgba(11, 20, 36, 0.95), rgba(7, 14, 27, 0.92));
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.32);
+    padding: 24px;
+    position: relative;
+}
+
+.content::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 34px 34px;
+    opacity: 0.35;
+}
+
+.dashboard {
+    max-width: none;
+    width: 100%;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: 16px;
+}
+
+.dashboard::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: url("/assets/images/cancha.svg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.13;
+    filter: blur(2px);
+    transform: scale(1.03);
+}
+
+.dashboard::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(8, 12, 21, 0.62) 0%, rgba(7, 11, 20, 0.78) 100%),
+        radial-gradient(120% 120% at 50% 0%, rgba(255, 139, 43, 0.08), rgba(7, 11, 20, 0.1) 55%, rgba(7, 11, 20, 0.22) 100%);
+}
+
+.dashboard > * {
+    position: relative;
+    z-index: 1;
+}
+
+.dashboard-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.dashboard-search-wrap {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dashboard-search-input {
+    flex: 1;
+    min-width: 0;
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(123, 148, 201, 0.26);
+    background: rgba(9, 15, 27, 0.75);
+    color: var(--text);
+}
+
+.dashboard-search-input::placeholder {
+    color: rgba(164, 178, 207, 0.76);
+}
+
+.dashboard-search-btn {
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 176, 103, 0.35);
+    background: linear-gradient(125deg, var(--accent), var(--accent-deep));
+    color: #1b0f05;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.dashboard-userbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border: 1px solid rgba(123, 148, 201, 0.24);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.dashboard-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fff4e8;
+    background: linear-gradient(130deg, rgba(255, 139, 43, 0.92), rgba(255, 107, 26, 0.88));
+}
+
+.dashboard-user-meta {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.dashboard-user-label {
+    font-size: 0.64rem;
+    color: rgba(164, 178, 207, 0.82);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.dashboard-user-name {
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #eef4ff;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 14px;
+    align-items: stretch;
+}
+
+.dashboard-grid > .dashboard-card--stat {
+    grid-column: span 4;
+}
+
+.dashboard-grid > .dashboard-card-next {
+    grid-column: span 7;
+    grid-row: span 2;
+}
+
+.dashboard-grid > .dashboard-card-actions {
+    grid-column: span 5;
+    grid-row: span 2;
+}
+
+.dashboard-grid > .dashboard-card-tip,
+.dashboard-grid > .dashboard-card-social {
+    grid-column: span 6;
+}
+
+.dashboard-card--support {
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+    border-color: rgba(123, 148, 201, 0.14);
+}
+
+.quick-action-btn {
+    min-height: 52px;
+    border-radius: 10px;
+}
+
+.quick-action-copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.quick-action-copy strong {
+    font-size: 0.9rem;
+    line-height: 1.2;
+    color: #f2f6ff;
+}
+
+.quick-action-copy small {
+    margin-top: 2px;
+    font-size: 0.74rem;
+    color: rgba(164, 178, 207, 0.92);
+}
+
+@media (max-width: 980px) {
+    .container {
+        flex-direction: column;
+        padding: 10px;
+        gap: 10px;
+        border-radius: 0;
+        border: none;
+        overflow: visible;
+    }
+
+    .sidebar {
+        width: 100%;
+        min-width: 0;
+        height: auto;
+        max-height: 44vh;
+        border-radius: 14px;
+    }
+
+    .content {
+        border-radius: 14px;
+        padding: 16px;
+    }
+
+    .dashboard-topbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .dashboard-userbox {
+        align-self: flex-end;
+    }
+}
+
+@media (max-width: 899px) and (min-width: 641px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .dashboard-grid > .dashboard-card--stat,
+    .dashboard-grid > .dashboard-card-next,
+    .dashboard-grid > .dashboard-card-actions,
+    .dashboard-grid > .dashboard-card-tip,
+    .dashboard-grid > .dashboard-card-social {
+        grid-column: span 1;
+        grid-row: auto;
+    }
+}
+
+@media (max-width: 640px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard::before {
+        filter: none;
+        opacity: 0.12;
+        transform: none;
+    }
+}
+
+/* ===== Fundamentos: buttons/chips fix ===== */
+.fundamentos-mega-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(220px, 1fr));
+    gap: 18px;
+}
+
+.fundamentos-mega-col {
+    padding: 14px 14px 12px;
+    border: 1px solid rgba(123, 148, 201, 0.2);
+    border-radius: 12px;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.03), rgba(255, 139, 43, 0.05));
+}
+
+.fundamentos-mega-title {
+    margin: 0;
+    font-size: 1.03rem;
+    font-weight: 700;
+    color: #f2f6ff;
+}
+
+.fundamentos-mega-subtitle {
+    margin: 8px 0 0;
+    font-size: 0.84rem;
+    color: rgba(164, 178, 207, 0.88);
+    line-height: 1.35;
+}
+
+.fundamentos-mega-list {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.fundamentos-mega-link {
+    appearance: none;
+    border: 1px solid rgba(123, 148, 201, 0.28);
+    background: rgba(12, 20, 35, 0.8);
+    color: #eaf1ff;
+    border-radius: 999px;
+    padding: 7px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.fundamentos-mega-link:hover {
+    background: rgba(255, 139, 43, 0.16);
+    border-color: rgba(255, 176, 103, 0.42);
+    color: #fff6ea;
+    transform: translateY(-1px);
+}
+
+.fundamentos-mega-link:focus-visible {
+    outline: 2px solid rgba(255, 176, 103, 0.65);
+    outline-offset: 2px;
+}
+
+.fundamentos-subcat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 12px;
+}
+
+.fundamentos-subcat-card {
+    border: 1px solid rgba(123, 148, 201, 0.24);
+    border-radius: 12px;
+    padding: 14px 12px;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.03), rgba(255, 139, 43, 0.06));
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.fundamentos-subcat-card:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 176, 103, 0.42);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 139, 43, 0.1));
+}
+
+.fundamentos-subcat-card h3 {
+    margin: 0;
+    font-size: 0.96rem;
+    color: #f2f6ff;
+    line-height: 1.3;
+}
+
+@media (max-width: 1100px) {
+    .fundamentos-mega-grid {
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+    }
+}
+
+@media (max-width: 720px) {
+    .fundamentos-mega-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Button polish pass (brand colors) ===== */
+:root {
+    --btn-text-dark: #1d1206;
+    --btn-secondary-bg: rgba(255, 255, 255, 0.06);
+    --btn-secondary-border: rgba(123, 148, 201, 0.3);
+    --btn-secondary-hover: rgba(255, 255, 255, 0.1);
+    --btn-danger-bg: linear-gradient(130deg, rgba(255, 87, 87, 0.24), rgba(255, 60, 60, 0.2));
+    --btn-danger-border: rgba(255, 108, 108, 0.4);
+}
+
+.auth-btn,
+.dashboard-btn-accent,
+.toolbar-button-accent,
+.dashboard-search-btn {
+    background: linear-gradient(130deg, var(--accent), var(--accent-deep));
+    color: var(--btn-text-dark);
+    border: 1px solid rgba(255, 176, 103, 0.38);
+    box-shadow: 0 8px 18px rgba(255, 107, 26, 0.22);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.auth-btn:hover,
+.dashboard-btn-accent:hover,
+.toolbar-button-accent:hover,
+.dashboard-search-btn:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px rgba(255, 107, 26, 0.26);
+}
+
+.auth-btn:active,
+.dashboard-btn-accent:active,
+.toolbar-button-accent:active,
+.dashboard-search-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 6px 14px rgba(255, 107, 26, 0.2);
+}
+
+.dashboard-btn,
+.toolbar-button:not(.toolbar-button-accent),
+.btn-back,
+.btn-editar,
+.btn-editar-small,
+.play-edit-button,
+.player-tab-btn,
+.sidebar-logout {
+    background: var(--btn-secondary-bg);
+    border: 1px solid var(--btn-secondary-border);
+    color: #edf3ff;
+    border-radius: 10px;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.dashboard-btn:hover,
+.toolbar-button:not(.toolbar-button-accent):hover,
+.btn-back:hover,
+.btn-editar:hover,
+.btn-editar-small:hover,
+.play-edit-button:hover,
+.player-tab-btn:hover,
+.sidebar-logout:hover {
+    background: var(--btn-secondary-hover);
+    border-color: rgba(255, 176, 103, 0.34);
+    color: #fff6ea;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+
+.btn-borrar,
+.btn-borrar-small,
+.play-delete-button {
+    background: var(--btn-danger-bg);
+    border: 1px solid var(--btn-danger-border);
+    color: #ffdede;
+    border-radius: 10px;
+}
+
+.btn-borrar:hover,
+.btn-borrar-small:hover,
+.play-delete-button:hover {
+    background: linear-gradient(130deg, rgba(255, 87, 87, 0.36), rgba(255, 60, 60, 0.3));
+    border-color: rgba(255, 132, 132, 0.55);
+    color: #fff3f3;
+    transform: translateY(-1px);
+}
+
+.quick-action-btn {
+    border-radius: 10px;
+    border: 1px solid rgba(123, 148, 201, 0.24);
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.055), rgba(255, 139, 43, 0.09));
+}
+
+.quick-action-btn:hover {
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.09), rgba(255, 139, 43, 0.16));
+    border-color: rgba(255, 176, 103, 0.4);
+}
+
+button:focus-visible,
+.toolbar-button:focus-visible,
+.dashboard-btn:focus-visible,
+.quick-action-btn:focus-visible,
+.auth-btn:focus-visible,
+.dashboard-search-btn:focus-visible,
+.btn-editar:focus-visible,
+.btn-borrar:focus-visible,
+.btn-editar-small:focus-visible,
+.btn-borrar-small:focus-visible,
+.play-edit-button:focus-visible,
+.play-delete-button:focus-visible,
+.sidebar-logout:focus-visible,
+.player-tab-btn:focus-visible {
+    outline: 2px solid rgba(255, 176, 103, 0.65);
+    outline-offset: 2px;
 }
 
 /* ===== Manual / Articles ===== */
@@ -3078,4 +3700,1399 @@ table th {
     .entrenamientos-folder-meta {
         text-align: left;
     }
+}
+
+/* ===== Global UI refresh: clean structure without heavy cards ===== */
+:root {
+    --surface-soft: rgba(255, 255, 255, 0.02);
+    --surface-soft-strong: rgba(255, 255, 255, 0.035);
+    --divider-soft: rgba(123, 148, 201, 0.16);
+    --divider-faint: rgba(123, 148, 201, 0.1);
+}
+
+/* Keep visual structure with spacing + subtle surfaces */
+.dashboard,
+.manual-section,
+.planificacion-view,
+.players-view,
+.sh-wrap,
+.shx-wrap {
+    max-width: 1220px;
+    margin: 0 auto;
+}
+
+.manual-section,
+.planificacion-view,
+.players-view,
+.sh-wrap,
+.shx-wrap {
+    padding: 8px 2px;
+}
+
+.manual-section > * + *,
+.planificacion-view > * + *,
+.players-view > * + *,
+.sh-wrap > * + *,
+.shx-wrap > * + * {
+    margin-top: 16px;
+}
+
+/* Typography hierarchy */
+.content h2,
+.dashboard-title,
+.players-header h2,
+.planificacion-header h2 {
+    font-size: clamp(1.32rem, 1.08rem + 0.55vw, 1.72rem);
+    margin-bottom: 6px;
+    letter-spacing: 0;
+    color: #eef4ff;
+}
+
+.dashboard-subtitle,
+.content > p,
+.manual-section > p,
+.players-header p,
+.planificacion-header p {
+    color: rgba(171, 186, 216, 0.92);
+    font-size: 0.94rem;
+    line-height: 1.5;
+}
+
+/* Replace heavy cards with subtle sections */
+.dashboard-card,
+.entrenamiento-card,
+.planificacion-anual-card,
+.player-card,
+.player-profile-header,
+.player-tab-card,
+.players-team-group,
+.sh-card,
+.shx-card,
+.entrenamientos-folder {
+    background: linear-gradient(180deg, var(--surface-soft), rgba(255, 255, 255, 0.008));
+    border: 1px solid var(--divider-faint);
+    box-shadow: none;
+    border-radius: 12px;
+}
+
+.dashboard-card:hover,
+.entrenamiento-card:hover,
+.planificacion-anual-card:hover,
+.player-card:hover,
+.player-profile-header:hover,
+.player-tab-card:hover,
+.players-team-group:hover,
+.sh-card:hover,
+.shx-card:hover,
+.entrenamientos-folder:hover {
+    border-color: var(--divider-soft);
+    box-shadow: none;
+    transform: none;
+}
+
+/* Subtle section separators for better scanning */
+.dashboard-header,
+.players-header,
+.planificacion-header,
+.sh-header,
+.shx-header {
+    border-bottom: 1px solid var(--divider-soft);
+    padding-bottom: 12px;
+    margin-bottom: 18px;
+}
+
+/* Background image less dominant for readability */
+.dashboard::before {
+    opacity: 0.06;
+    filter: blur(1.6px);
+}
+
+.dashboard::after {
+    background:
+        linear-gradient(180deg, rgba(6, 10, 18, 0.72) 0%, rgba(6, 10, 18, 0.82) 100%),
+        radial-gradient(120% 120% at 50% 0%, rgba(255, 139, 43, 0.04), rgba(7, 11, 20, 0.09) 55%, rgba(7, 11, 20, 0.24) 100%);
+}
+
+/* Dashboard structure: clear left/right balance */
+@media (min-width: 1100px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .dashboard-grid > .dashboard-card--stat {
+        grid-column: span 4;
+    }
+
+    .dashboard-grid > .dashboard-card-next {
+        grid-column: 1 / span 8;
+        grid-row: span 2;
+        min-height: 240px;
+    }
+
+    .dashboard-grid > .dashboard-card-actions {
+        grid-column: 9 / span 4;
+        grid-row: span 2;
+    }
+
+    .dashboard-grid > .dashboard-card-tip,
+    .dashboard-grid > .dashboard-card-social {
+        grid-column: span 6;
+    }
+}
+
+/* Quick actions as a clear list, not heavy boxed buttons */
+.dashboard-card-actions .dashboard-quick-actions {
+    gap: 0;
+}
+
+.dashboard-card-actions .quick-action-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--divider-faint);
+    border-radius: 0;
+    min-height: 50px;
+    padding: 10px 0;
+}
+
+.dashboard-card-actions .quick-action-btn:last-child {
+    border-bottom: none;
+}
+
+.dashboard-card-actions .quick-action-btn:hover {
+    background: rgba(255, 255, 255, 0.03);
+    color: #fff6ea;
+    transform: none;
+}
+
+/* Secondary containers in fundamentals */
+.fundamentos-mega-col,
+.fundamentos-subcat-card {
+    background: linear-gradient(160deg, var(--surface-soft), rgba(255, 139, 43, 0.035));
+    border: 1px solid var(--divider-faint);
+    box-shadow: none;
+}
+
+@media (max-width: 1099px) and (min-width: 700px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .dashboard-grid > .dashboard-card--stat,
+    .dashboard-grid > .dashboard-card-next,
+    .dashboard-grid > .dashboard-card-actions,
+    .dashboard-grid > .dashboard-card-tip,
+    .dashboard-grid > .dashboard-card-social {
+        grid-column: span 1;
+        grid-row: auto;
+        min-height: 0;
+    }
+}
+
+@media (max-width: 699px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .dashboard-card {
+        padding: 16px 14px;
+    }
+}
+
+/* ===== Alignment pass: ordered layout, no floating elements ===== */
+:root {
+    --section-gap: 18px;
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.content > * {
+    width: 100%;
+    max-width: 1220px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.manual-section,
+.planificacion-view,
+.players-view,
+.sh-wrap,
+.shx-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--section-gap);
+    padding: 10px 2px;
+}
+
+.manual-section > *,
+.planificacion-view > *,
+.players-view > *,
+.sh-wrap > *,
+.shx-wrap > * {
+    margin-top: 0 !important;
+    margin-bottom: 0;
+}
+
+.dashboard-header,
+.players-header,
+.planificacion-header,
+.sh-header,
+.shx-header {
+    margin-bottom: 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--divider-soft);
+}
+
+.dashboard-title,
+.content h2 {
+    margin: 0;
+}
+
+.dashboard-subtitle,
+.manual-section > p,
+.players-header p,
+.planificacion-header p,
+.sh-header p,
+.shx-header p {
+    margin-top: 6px;
+}
+
+/* Common action rows aligned and wrapped */
+.form-actions,
+.planificacion-actions,
+.planificacion-actions-inline,
+.player-profile-tabs,
+.dashboard-quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Dashboard: clear, stable grid */
+@media (min-width: 1024px) {
+    .dashboard {
+        max-width: 1180px;
+    }
+
+    .dashboard-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 16px;
+        align-items: stretch;
+    }
+
+    .dashboard-grid > .dashboard-card--stat {
+        grid-column: span 2;
+    }
+
+    .dashboard-grid > .dashboard-card-next {
+        grid-column: span 4;
+        grid-row: span 2;
+        min-height: 220px;
+    }
+
+    .dashboard-grid > .dashboard-card-actions {
+        grid-column: span 2;
+        grid-row: span 2;
+    }
+
+    .dashboard-grid > .dashboard-card-tip,
+    .dashboard-grid > .dashboard-card-social {
+        grid-column: span 3;
+    }
+}
+
+@media (max-width: 1023px) and (min-width: 700px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .dashboard-grid > .dashboard-card--stat,
+    .dashboard-grid > .dashboard-card-next,
+    .dashboard-grid > .dashboard-card-actions,
+    .dashboard-grid > .dashboard-card-tip,
+    .dashboard-grid > .dashboard-card-social {
+        grid-column: span 1;
+        grid-row: auto;
+        min-height: 0;
+    }
+}
+
+@media (max-width: 699px) {
+    .manual-section,
+    .planificacion-view,
+    .players-view,
+    .sh-wrap,
+    .shx-wrap {
+        row-gap: 14px;
+    }
+}
+
+/* ===== Nike-inspired clean system (final override) ===== */
+:root {
+    --nike-divider: rgba(201, 214, 239, 0.14);
+    --nike-divider-strong: rgba(201, 214, 239, 0.2);
+    --nike-text-soft: rgba(198, 210, 234, 0.9);
+}
+
+/* Global: remove heavy card feeling */
+.dashboard-card,
+.entrenamiento-card,
+.planificacion-anual-card,
+.player-card,
+.player-profile-header,
+.player-tab-card,
+.players-team-group,
+.sh-card,
+.shx-card,
+.entrenamientos-folder {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+/* Build structure with separators + spacing */
+.dashboard-card,
+.entrenamiento-card,
+.planificacion-anual-card,
+.player-card,
+.player-tab-card,
+.players-team-group,
+.sh-card,
+.shx-card,
+.entrenamientos-folder {
+    padding: 12px 0 !important;
+    border-bottom: 1px solid var(--nike-divider);
+}
+
+.dashboard-grid > .dashboard-card:nth-last-child(-n+2),
+.entrenamiento-card:last-child,
+.planificacion-anual-card:last-child,
+.player-card:last-child,
+.player-tab-card:last-child,
+.players-team-group:last-child,
+.sh-card:last-child,
+.shx-card:last-child,
+.entrenamientos-folder:last-child {
+    border-bottom: none;
+}
+
+/* Dashboard ordering and visual hierarchy */
+.dashboard {
+    max-width: 1160px !important;
+}
+
+.dashboard-topbar {
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--nike-divider);
+}
+
+.dashboard-header {
+    margin-bottom: 16px !important;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--nike-divider-strong);
+}
+
+.dashboard-title {
+    font-size: clamp(1.38rem, 1.12rem + 0.6vw, 1.82rem);
+    font-weight: 700;
+}
+
+.dashboard-subtitle {
+    color: var(--nike-text-soft);
+    font-size: 0.92rem;
+}
+
+.dashboard-grid {
+    gap: 14px !important;
+}
+
+@media (min-width: 1080px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+    }
+
+    .dashboard-grid > .dashboard-card--stat {
+        grid-column: span 4 !important;
+    }
+
+    .dashboard-grid > .dashboard-card-next {
+        grid-column: 1 / span 8 !important;
+        grid-row: span 2 !important;
+        min-height: 200px !important;
+    }
+
+    .dashboard-grid > .dashboard-card-actions {
+        grid-column: 9 / span 4 !important;
+        grid-row: span 2 !important;
+    }
+
+    .dashboard-grid > .dashboard-card-tip,
+    .dashboard-grid > .dashboard-card-social {
+        grid-column: span 6 !important;
+    }
+}
+
+/* Make key sections readable without boxed cards */
+.dashboard-card-next,
+.dashboard-card-actions,
+.dashboard-card-tip,
+.dashboard-card-social {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.008)) !important;
+    border: 1px solid var(--nike-divider) !important;
+    border-radius: 10px !important;
+    padding: 14px 12px !important;
+}
+
+.dashboard-card-next .dashboard-card-title,
+.dashboard-card-actions .dashboard-card-title,
+.dashboard-card-tip .dashboard-card-title,
+.dashboard-card-social .dashboard-card-title {
+    font-size: 1.02rem;
+    margin-bottom: 10px;
+}
+
+.stat-card {
+    align-items: center;
+}
+
+.stat-card-value {
+    font-size: 1.52rem;
+    font-weight: 700;
+}
+
+/* Quick actions: clean list style */
+.dashboard-card-actions .dashboard-quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.dashboard-card-actions .quick-action-btn {
+    border: none !important;
+    border-bottom: 1px solid var(--nike-divider);
+    border-radius: 0 !important;
+    background: transparent !important;
+    min-height: 50px;
+    padding: 10px 0 !important;
+}
+
+.dashboard-card-actions .quick-action-btn:last-child {
+    border-bottom: none;
+}
+
+.dashboard-card-actions .quick-action-btn:hover {
+    background: rgba(255, 255, 255, 0.03) !important;
+    transform: none !important;
+}
+
+/* Fundamentos: menu-like columns, less card */
+.fundamentos-mega-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(220px, 1fr));
+    gap: 18px 24px;
+    align-items: start;
+}
+
+.fundamentos-mega-col {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 0 10px !important;
+}
+
+.fundamentos-mega-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.fundamentos-mega-subtitle {
+    margin: 6px 0 10px;
+    font-size: 0.84rem;
+    color: var(--nike-text-soft);
+}
+
+.fundamentos-mega-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.fundamentos-mega-link {
+    border: 1px solid var(--nike-divider);
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 999px;
+    color: #edf3ff;
+    padding: 7px 10px;
+    font-size: 0.77rem;
+    font-weight: 600;
+}
+
+.fundamentos-mega-link:hover {
+    border-color: rgba(255, 176, 103, 0.45);
+    background: rgba(255, 139, 43, 0.12);
+    color: #fff6ea;
+    transform: translateY(-1px);
+}
+
+@media (max-width: 980px) {
+    .fundamentos-mega-grid {
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .fundamentos-mega-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+}
+
+/* ===== Hard mode: no cards anywhere ===== */
+.dashboard-card,
+.dashboard-card--stat,
+.dashboard-card-next,
+.dashboard-card-actions,
+.dashboard-card-tip,
+.dashboard-card-social,
+.entrenamiento-card,
+.planificacion-anual-card,
+.player-card,
+.player-profile-header,
+.player-tab-card,
+.players-team-group,
+.sh-card,
+.shx-card,
+.entrenamientos-folder,
+.entrenamientos-folder-head,
+.entrenamientos-folder-body,
+.fundamentos-subcat-card,
+.fundamentos-mega-col {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.dashboard-card,
+.entrenamiento-card,
+.planificacion-anual-card,
+.player-card,
+.player-tab-card,
+.players-team-group,
+.sh-card,
+.shx-card,
+.entrenamientos-folder,
+.fundamentos-subcat-card,
+.fundamentos-mega-col {
+    padding: 12px 0 !important;
+    border-bottom: 1px solid rgba(201, 214, 239, 0.14) !important;
+}
+
+.dashboard-grid > .dashboard-card:nth-last-child(-n+2),
+.entrenamiento-card:last-child,
+.planificacion-anual-card:last-child,
+.player-card:last-child,
+.player-tab-card:last-child,
+.players-team-group:last-child,
+.sh-card:last-child,
+.shx-card:last-child,
+.entrenamientos-folder:last-child,
+.fundamentos-subcat-card:last-child,
+.fundamentos-mega-col:last-child {
+    border-bottom: none !important;
+}
+
+/* ===== Inset fix: separación del contenido respecto al fondo azul ===== */
+.content {
+    padding-left: 28px !important;
+    padding-right: 28px !important;
+}
+
+.content > .dashboard,
+.content > .manual-section,
+.content > .planificacion-view,
+.content > .players-view,
+.content > .sh-wrap,
+.content > .shx-wrap {
+    max-width: none !important;
+    width: 100% !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+}
+
+@media (max-width: 980px) {
+    .content {
+        padding-left: 18px !important;
+        padding-right: 18px !important;
+    }
+
+    .content > .dashboard,
+    .content > .manual-section,
+    .content > .planificacion-view,
+    .content > .players-view,
+    .content > .sh-wrap,
+    .content > .shx-wrap {
+        max-width: none !important;
+        width: 100% !important;
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+}
+
+/* Fill full available panel width (keep inset only) */
+.dashboard,
+.manual-section,
+.planificacion-view,
+.players-view,
+.sh-wrap,
+.shx-wrap,
+.content > * {
+    max-width: none !important;
+    width: 100% !important;
+}
+
+/* ===== Sidebar pages polish (keep dashboard untouched) ===== */
+#content > .manual-section,
+#content > .planificacion-view,
+#content > .players-view,
+#content > .sh-wrap,
+#content > .shx-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 16px;
+}
+
+#content > .manual-section h2,
+#content > .planificacion-view h2,
+#content > .players-view h2,
+#content > .sh-wrap h2,
+#content > .shx-wrap h2 {
+    font-size: clamp(1.28rem, 1.06rem + 0.52vw, 1.66rem);
+    margin: 0;
+    color: #f0f5ff;
+}
+
+#content > .manual-section > p,
+#content > .planificacion-view > p,
+#content > .players-view > p,
+#content > .sh-wrap > p,
+#content > .shx-wrap > p {
+    margin: 0;
+    color: rgba(182, 197, 226, 0.9);
+    line-height: 1.5;
+}
+
+/* Remove heavy card blocks only in sidebar-loaded pages */
+#content > .manual-section .dashboard-card,
+#content > .manual-section .entrenamiento-card,
+#content > .manual-section .planificacion-anual-card,
+#content > .manual-section .player-card,
+#content > .manual-section .player-tab-card,
+#content > .manual-section .players-team-group,
+#content > .manual-section .sh-card,
+#content > .manual-section .shx-card,
+#content > .manual-section .entrenamientos-folder,
+#content > .planificacion-view .dashboard-card,
+#content > .planificacion-view .entrenamiento-card,
+#content > .planificacion-view .planificacion-anual-card,
+#content > .players-view .player-card,
+#content > .players-view .player-tab-card,
+#content > .players-view .players-team-group,
+#content > .sh-wrap .sh-card,
+#content > .shx-wrap .shx-card {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 12px 0 !important;
+    border-bottom: 1px solid rgba(201, 214, 239, 0.14) !important;
+}
+
+#content > .manual-section .dashboard-card:last-child,
+#content > .manual-section .entrenamiento-card:last-child,
+#content > .manual-section .planificacion-anual-card:last-child,
+#content > .manual-section .player-card:last-child,
+#content > .manual-section .player-tab-card:last-child,
+#content > .manual-section .players-team-group:last-child,
+#content > .manual-section .sh-card:last-child,
+#content > .manual-section .shx-card:last-child,
+#content > .manual-section .entrenamientos-folder:last-child,
+#content > .planificacion-view .dashboard-card:last-child,
+#content > .planificacion-view .entrenamiento-card:last-child,
+#content > .planificacion-view .planificacion-anual-card:last-child,
+#content > .players-view .player-card:last-child,
+#content > .players-view .player-tab-card:last-child,
+#content > .players-view .players-team-group:last-child,
+#content > .sh-wrap .sh-card:last-child,
+#content > .shx-wrap .shx-card:last-child {
+    border-bottom: none !important;
+}
+
+/* Better buttons for sidebar pages */
+#content > .manual-section .quick-action-btn,
+#content > .manual-section .toolbar-button,
+#content > .manual-section .btn-editar,
+#content > .manual-section .btn-editar-small,
+#content > .manual-section .btn-back,
+#content > .manual-section .player-tab-btn,
+#content > .planificacion-view .toolbar-button,
+#content > .planificacion-view .btn-editar,
+#content > .planificacion-view .btn-editar-small,
+#content > .planificacion-view .btn-back,
+#content > .players-view .toolbar-button,
+#content > .players-view .btn-editar,
+#content > .players-view .btn-editar-small,
+#content > .players-view .btn-back,
+#content > .players-view .player-tab-btn,
+#content > .sh-wrap .toolbar-button,
+#content > .shx-wrap .toolbar-button {
+    border-radius: 10px !important;
+    border: 1px solid rgba(123, 148, 201, 0.28) !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    color: #edf3ff !important;
+    box-shadow: none !important;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease !important;
+}
+
+#content > .manual-section .quick-action-btn:hover,
+#content > .manual-section .toolbar-button:hover,
+#content > .manual-section .btn-editar:hover,
+#content > .manual-section .btn-editar-small:hover,
+#content > .manual-section .btn-back:hover,
+#content > .manual-section .player-tab-btn:hover,
+#content > .planificacion-view .toolbar-button:hover,
+#content > .planificacion-view .btn-editar:hover,
+#content > .planificacion-view .btn-editar-small:hover,
+#content > .planificacion-view .btn-back:hover,
+#content > .players-view .toolbar-button:hover,
+#content > .players-view .btn-editar:hover,
+#content > .players-view .btn-editar-small:hover,
+#content > .players-view .btn-back:hover,
+#content > .players-view .player-tab-btn:hover,
+#content > .sh-wrap .toolbar-button:hover,
+#content > .shx-wrap .toolbar-button:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 176, 103, 0.4) !important;
+    color: #fff6ea !important;
+    transform: translateY(-1px);
+}
+
+#content > .manual-section .btn-borrar,
+#content > .manual-section .btn-borrar-small,
+#content > .planificacion-view .btn-borrar,
+#content > .planificacion-view .btn-borrar-small,
+#content > .players-view .btn-borrar,
+#content > .players-view .btn-borrar-small,
+#content > .sh-wrap .btn-borrar,
+#content > .shx-wrap .btn-borrar {
+    border: 1px solid rgba(255, 108, 108, 0.45) !important;
+    background: rgba(255, 80, 80, 0.14) !important;
+    color: #ffe5e5 !important;
+}
+
+#content > .manual-section .btn-borrar:hover,
+#content > .manual-section .btn-borrar-small:hover,
+#content > .planificacion-view .btn-borrar:hover,
+#content > .planificacion-view .btn-borrar-small:hover,
+#content > .players-view .btn-borrar:hover,
+#content > .players-view .btn-borrar-small:hover,
+#content > .sh-wrap .btn-borrar:hover,
+#content > .shx-wrap .btn-borrar:hover {
+    background: rgba(255, 80, 80, 0.24) !important;
+    border-color: rgba(255, 132, 132, 0.62) !important;
+}
+
+/* ===== Fundamentos: Nike-style columns (final) ===== */
+#content > .manual-section .fundamentos-mega-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(240px, 1fr)) !important;
+    gap: 28px 26px !important;
+    margin-top: 14px !important;
+    align-items: start !important;
+}
+
+#content > .manual-section .fundamentos-mega-col {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    border-bottom: none !important;
+}
+
+#content > .manual-section .fundamentos-mega-title {
+    margin: 0 0 8px !important;
+    font-size: 1.04rem !important;
+    font-weight: 700 !important;
+    color: rgba(242, 246, 255, 0.98) !important;
+    letter-spacing: 0.01em;
+    line-height: 1.25 !important;
+}
+
+#content > .manual-section .fundamentos-mega-subtitle {
+    margin: 0 0 12px !important;
+    font-size: 0.82rem !important;
+    line-height: 1.45 !important;
+    color: rgba(182, 197, 226, 0.68) !important;
+}
+
+/* Sub-subfundamentos: one below the other */
+#content > .manual-section .fundamentos-mega-list {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0 !important;
+}
+
+#content > .manual-section .fundamentos-mega-link {
+    width: 100% !important;
+    text-align: left !important;
+    padding: 10px 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    border-bottom: 1px solid rgba(201, 214, 239, 0.14) !important;
+    background: transparent !important;
+    color: rgba(237, 243, 255, 0.93) !important;
+    font-size: 0.95rem !important;
+    font-weight: 400 !important;
+    line-height: 1.3 !important;
+    opacity: 0.96;
+}
+
+#content > .manual-section .fundamentos-mega-link:last-child {
+    border-bottom: none !important;
+}
+
+#content > .manual-section .fundamentos-mega-link:hover {
+    background: rgba(255, 255, 255, 0.03) !important;
+    color: #fff6ea !important;
+    border-bottom-color: rgba(255, 176, 103, 0.42) !important;
+    transform: none !important;
+}
+
+@media (max-width: 1080px) {
+    #content > .manual-section .fundamentos-mega-grid {
+        grid-template-columns: repeat(2, minmax(220px, 1fr)) !important;
+        gap: 22px 20px !important;
+    }
+}
+
+@media (max-width: 760px) {
+    #content > .manual-section .fundamentos-mega-grid {
+        grid-template-columns: 1fr !important;
+        gap: 18px !important;
+    }
+}
+
+/* ===== Planificación editor: compact + adaptive blocks area ===== */
+#content > .planificacion-view[data-editing-id] {
+    display: grid;
+    grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+    gap: 14px 22px;
+    align-items: start;
+}
+
+#content > .planificacion-view[data-editing-id] .planificacion-header,
+#content > .planificacion-view[data-editing-id] .planificacion-total,
+#content > .planificacion-view[data-editing-id] .planificacion-actions-inline {
+    grid-column: 1 / -1;
+}
+
+#content > .planificacion-view[data-editing-id] .planificacion-header {
+    margin-bottom: 0 !important;
+}
+
+#content > .planificacion-view[data-editing-id] .planificacion-total {
+    margin-bottom: 0 !important;
+    padding: 10px 14px;
+}
+
+#content > .planificacion-view[data-editing-id] .planificacion-actions-inline {
+    margin: 0 0 2px !important;
+}
+
+#content > .planificacion-view[data-editing-id] .form-entrenamiento {
+    grid-column: 1;
+    margin-bottom: 0 !important;
+    position: sticky;
+    top: 14px;
+    align-self: start;
+}
+
+#content > .planificacion-view[data-editing-id] .section-title {
+    grid-column: 2;
+    margin: 0 0 2px !important;
+}
+
+#content > .planificacion-view[data-editing-id] .bloques-list {
+    grid-column: 2;
+    margin-bottom: 0 !important;
+    max-height: calc(100dvh - 300px);
+    overflow: auto;
+    padding-right: 6px;
+}
+
+#content > .planificacion-view[data-editing-id] .bloques-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#content > .planificacion-view[data-editing-id] .bloques-list::-webkit-scrollbar-thumb {
+    background: rgba(123, 148, 201, 0.35);
+    border-radius: 999px;
+}
+
+#content > .planificacion-view[data-editing-id] > .planificacion-actions:not(.planificacion-actions-inline) {
+    grid-column: 2;
+    margin: 0 !important;
+}
+
+#content > .planificacion-view[data-editing-id] .bloque-card {
+    padding: 10px 12px !important;
+}
+
+#content > .planificacion-view[data-editing-id] .bloque-card-body h4 {
+    margin-bottom: 2px;
+}
+
+#content > .planificacion-view[data-editing-id] .bloque-card-body p {
+    line-height: 1.35;
+}
+
+@media (max-width: 980px) {
+    #content > .planificacion-view[data-editing-id] {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    #content > .planificacion-view[data-editing-id] .form-entrenamiento,
+    #content > .planificacion-view[data-editing-id] .section-title,
+    #content > .planificacion-view[data-editing-id] .bloques-list,
+    #content > .planificacion-view[data-editing-id] > .planificacion-actions:not(.planificacion-actions-inline) {
+        grid-column: 1;
+    }
+
+    #content > .planificacion-view[data-editing-id] .form-entrenamiento {
+        position: static;
+    }
+
+    #content > .planificacion-view[data-editing-id] .bloques-list {
+        max-height: none;
+        overflow: visible;
+        padding-right: 0;
+    }
+}
+
+/* ===== Plan editor layout v2 (fix adaptation gaps) ===== */
+#content > .planificacion-view[data-editing-id] {
+    display: block !important;
+}
+
+#content > .planificacion-view[data-editing-id] .plan-editor-main {
+    display: grid;
+    grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+    gap: 18px 24px;
+    align-items: start;
+}
+
+#content > .planificacion-view[data-editing-id] .plan-editor-form-col {
+    min-width: 0;
+}
+
+#content > .planificacion-view[data-editing-id] .plan-editor-form-col .form-entrenamiento {
+    margin: 0 !important;
+    position: sticky;
+    top: 14px;
+}
+
+#content > .planificacion-view[data-editing-id] .plan-editor-blocks-col {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#content > .planificacion-view[data-editing-id] .plan-editor-blocks-col .section-title {
+    margin: 0 !important;
+}
+
+#content > .planificacion-view[data-editing-id] .plan-editor-blocks-col .bloques-list {
+    margin: 0 !important;
+    max-height: calc(100dvh - 300px);
+    overflow: auto;
+    padding-right: 6px;
+}
+
+#content > .planificacion-view[data-editing-id] .plan-editor-blocks-col .planificacion-actions {
+    margin: 0 !important;
+}
+
+@media (max-width: 980px) {
+    #content > .planificacion-view[data-editing-id] .plan-editor-main {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    #content > .planificacion-view[data-editing-id] .plan-editor-form-col .form-entrenamiento {
+        position: static;
+    }
+
+    #content > .planificacion-view[data-editing-id] .plan-editor-blocks-col .bloques-list {
+        max-height: none;
+        overflow: visible;
+        padding-right: 0;
+    }
+}
+
+/* ===== Sidebar only: dark minimal dashboard style ===== */
+.sidebar {
+    background: #0b0b0b !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.sidebar-brand {
+    background: transparent !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.sidebar h1,
+.sidebar-brand-title,
+.sidebar-user,
+.sidebar-credit,
+.sidebar-label-wrap {
+    color: #a1a1aa !important;
+}
+
+.sidebar-section-title {
+    color: #71717a !important;
+    opacity: 0.9;
+}
+
+.sidebar-toggle,
+.sidebar-submenu li,
+.sidebar-logout {
+    color: #a1a1aa !important;
+    border-left: 2px solid transparent !important;
+    transition: all 0.2s ease !important;
+}
+
+.sidebar-toggle:hover,
+.sidebar-submenu li:hover,
+.sidebar-logout:hover {
+    background: #1f1f23 !important;
+    color: #ffffff !important;
+}
+
+.sidebar-toggle.is-active,
+.sidebar-submenu li.is-active,
+.sidebar-toggle.open {
+    background: rgba(249, 115, 22, 0.14) !important;
+    color: #ffffff !important;
+    border-left-color: #f97316 !important;
+}
+
+.sidebar-toggle.is-active .sidebar-lucide,
+.sidebar-toggle.open .sidebar-lucide,
+.sidebar-submenu li.is-active .sidebar-lucide {
+    color: #f97316 !important;
+}
+
+.sidebar-lucide,
+.sidebar-toggle-icon {
+    color: #a1a1aa !important;
+    transition: all 0.2s ease !important;
+}
+
+/* ===== Global background: dark blurred court ===== */
+body.app-body {
+    position: relative;
+    min-height: 100dvh;
+    background: #0b0b0b !important;
+}
+
+body.app-body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: url("/assets/images/cancha.svg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: blur(10px);
+    transform: scale(1.04);
+    opacity: 0.18;
+}
+
+body.app-body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+body.app-body > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* Login card breathing room on black background */
+.auth-screen {
+    padding: 32px !important;
+}
+
+.auth-card {
+    margin: 24px auto !important;
+}
+
+@media (max-width: 768px) {
+    .auth-screen {
+        padding: 16px !important;
+    }
+
+    .auth-card {
+        margin: 10px auto 18px !important;
+    }
+}
+
+/* ===== Layout shell flat (no floating cards) ===== */
+.container {
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    min-height: 100dvh !important;
+}
+
+.sidebar {
+    background: #0b0b0b !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    border-right: 1px solid #27272a !important; /* subtle divider */
+    box-shadow: none !important;
+}
+
+.content {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow-y: auto !important;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.content::before {
+    display: none !important;
+}
+
+.content > *:last-child {
+    margin-bottom: 0 !important;
+}
+
+@media (max-width: 980px) {
+    .container {
+        padding: 0 !important;
+        gap: 0 !important;
+    }
+
+    .sidebar {
+        width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        border-right: none !important;
+        border-bottom: 1px solid #27272a !important;
+    }
+}
+
+/* ===== Neutralize remaining blue tones (black/zinc) ===== */
+:root {
+    --bg-content: #0b0b0b !important;
+    --card-bg: #111111 !important;
+    --card-border: #27272a !important;
+    --sidebar-border: #27272a !important;
+}
+
+body.app-body::before {
+    filter: grayscale(1) saturate(0) brightness(0.34) blur(10px) !important;
+    opacity: 0.16 !important;
+}
+
+body.app-body::after {
+    background: rgba(0, 0, 0, 0.86) !important;
+}
+
+.dashboard::after {
+    background: linear-gradient(180deg, rgba(8, 8, 8, 0.78) 0%, rgba(8, 8, 8, 0.9) 100%) !important;
+}
+
+.content,
+.sidebar,
+.sidebar-brand,
+.dashboard-userbox,
+.dashboard-search-input,
+.dashboard-card,
+.entrenamiento-card,
+.planificacion-anual-card,
+.player-card,
+.player-profile-header,
+.player-tab-card,
+.players-team-group,
+.sh-card,
+.shx-card,
+.entrenamientos-folder,
+.bloque-card,
+.ciclo-card,
+.plan-method-option,
+.quick-action-btn,
+.dashboard-social-link {
+    background-color: #111111 !important;
+    border-color: #27272a !important;
+}
+
+.form-row input[type="text"],
+.form-row input[type="date"],
+.form-row input[type="number"],
+.form-row select,
+.form-row textarea,
+input,
+select,
+textarea {
+    background: #111111 !important;
+    border-color: #27272a !important;
+}
+
+/* ===== Quick actions block alignment fix ===== */
+.dashboard-card-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+    text-align: left !important;
+    place-items: normal !important;
+}
+
+.dashboard-card-actions .dashboard-card-title {
+    margin: 0 0 12px !important;
+}
+
+.dashboard-card-actions .dashboard-quick-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    align-self: flex-start !important;
+    text-align: left !important;
+    place-items: normal !important;
+}
+
+.dashboard-card-actions .quick-action-btn {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    width: 100% !important;
+    text-align: left !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+.dashboard-card-actions .quick-action-copy {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    text-align: left !important;
+}
+
+/* Main dashboard spacing: small and symmetrical */
+.content > .dashboard {
+    padding-top: 0.9rem !important;
+    padding-bottom: 0.9rem !important;
+}
+
+@media (max-width: 1023px) {
+    .dashboard-card-actions .dashboard-quick-actions {
+        max-width: none;
+    }
+}
+
+/* ===== Card/container refactor only (dark clean) ===== */
+.dashboard-card,
+.entrenamiento-card,
+.planificacion-anual-card,
+.player-card,
+.player-profile-header,
+.player-tab-card,
+.players-team-group,
+.sh-card,
+.shx-card,
+.entrenamientos-folder,
+.entrenamientos-folder-head,
+.entrenamientos-folder-body,
+.fundamentos-subcat-card,
+.fundamentos-mega-col,
+.modal-content,
+.ciclo-card,
+.plan-method-option {
+    background: #18181b !important;
+    border: 1px solid #27272a !important;
+    border-radius: 1rem !important; /* rounded-2xl */
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24) !important;
+}
+
+.dashboard-card,
+.entrenamiento-card,
+.planificacion-anual-card,
+.player-card,
+.player-profile-header,
+.player-tab-card,
+.players-team-group,
+.sh-card,
+.shx-card,
+.entrenamientos-folder,
+.fundamentos-subcat-card,
+.fundamentos-mega-col,
+.ciclo-card,
+.plan-method-option {
+    padding: 1.25rem !important; /* p-5 */
+}
+
+.modal-content,
+.entrenamientos-folder-head,
+.entrenamientos-folder-body {
+    padding: 1.5rem !important; /* p-6 */
 }
