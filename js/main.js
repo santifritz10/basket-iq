@@ -4057,42 +4057,23 @@ function formatWeekRangeLabel(weekRange) {
 
 function buildDashboardWeekSectionHtml(summary) {
     var weekLabel = formatWeekRangeLabel(summary.weekRange);
-    var statsHtml =
-        '<div class="dashboard-week-stats">' +
-        '  <div class="dashboard-week-stat">' +
-        '    <span class="dashboard-week-stat-value">' + summary.meta + "</span>" +
-        '    <span class="dashboard-week-stat-label">Objetivo semanal</span>' +
-        "  </div>" +
-        '  <div class="dashboard-week-stat">' +
-        '    <span class="dashboard-week-stat-value">' + summary.enSemanaCount + "</span>" +
-        '    <span class="dashboard-week-stat-label">En calendario</span>' +
-        "  </div>" +
-        '  <div class="dashboard-week-stat">' +
-        '    <span class="dashboard-week-stat-value">' + summary.planificadosCount + "</span>" +
-        '    <span class="dashboard-week-stat-label">Planificados</span>' +
-        "  </div>" +
-        '  <div class="dashboard-week-stat dashboard-week-stat--pending">' +
-        '    <span class="dashboard-week-stat-value">' + summary.faltanPlanificar + "</span>" +
-        '    <span class="dashboard-week-stat-label">Por planificar</span>' +
-        "  </div>" +
-        "</div>";
+    var pendingCount = summary.noPlanificados.length + summary.huecosSinCrear;
+    var listScrollClass = pendingCount > 3 ? " dashboard-week-list--scroll" : "";
 
     var listHtml = "";
     if (!summary.faltanPlanificar && !summary.noPlanificados.length) {
         listHtml = '<p class="dashboard-week-empty">¡Semana al día! Todos tus entrenamientos de esta semana están planificados.</p>';
     } else {
-        listHtml = '<ul class="dashboard-week-list">';
+        listHtml = '<ul class="dashboard-week-list' + listScrollClass + '">';
         summary.noPlanificados.forEach(function (ent) {
             var nombre = escapeHtml(ent.nombre || "Sin nombre");
             var fecha = formatEntrenamientoFecha(ent);
             var cat = escapeHtml(ent.categoria || "General");
-            var mins = calcularDuracionTotal(ent.bloques);
-            var estado = mins > 0 ? "Incompleto" : "Sin bloques";
             listHtml +=
                 '<li class="dashboard-week-item">' +
                 '  <div class="dashboard-week-item-main">' +
                 '    <strong>' + nombre + "</strong>" +
-                '    <span class="dashboard-week-item-meta">' + fecha + " · " + cat + " · " + escapeHtml(estado) + "</span>" +
+                '    <span class="dashboard-week-item-meta">' + fecha + " · " + cat + "</span>" +
                 "  </div>" +
                 '  <button type="button" class="dashboard-week-item-btn" onclick="openEntrenamientoFromDashboard(' + ent.id + ')">Planificar</button>' +
                 "</li>";
@@ -4102,7 +4083,7 @@ function buildDashboardWeekSectionHtml(summary) {
                 '<li class="dashboard-week-item dashboard-week-item--ghost">' +
                 '  <div class="dashboard-week-item-main">' +
                 '    <strong>Entrenamiento por crear</strong>' +
-                '    <span class="dashboard-week-item-meta">Asigná fecha dentro de esta semana</span>' +
+                '    <span class="dashboard-week-item-meta">Asigná fecha en esta semana</span>' +
                 "  </div>" +
                 '  <button type="button" class="dashboard-week-item-btn" onclick="crearEntrenamientoDesdeDashboard()">Crear</button>' +
                 "</li>";
@@ -4111,32 +4092,27 @@ function buildDashboardWeekSectionHtml(summary) {
     }
 
     var progressPct = summary.meta > 0 ? Math.min(100, Math.round((summary.planificadosCount / summary.meta) * 100)) : 0;
+    var summaryLine = summary.faltanPlanificar
+        ? "Faltan <strong>" + summary.faltanPlanificar + "</strong> de <strong>" + summary.meta + "</strong> · En calendario: <strong>" + summary.enSemanaCount + "</strong> · Planificados: <strong>" + summary.planificadosCount + "</strong>"
+        : "Objetivo semanal cumplido · <strong>" + summary.planificadosCount + "</strong>/" + summary.meta + " planificados";
 
     return (
         '<div class="dashboard-card dashboard-card-week">' +
         '  <div class="dashboard-week-head">' +
-        '    <div>' +
+        '    <div class="dashboard-week-head-text">' +
         '      <h3 class="dashboard-card-title">Esta semana</h3>' +
         '      <p class="dashboard-week-range">' + escapeHtml(weekLabel) + "</p>" +
         "    </div>" +
         '    <label class="dashboard-week-target">' +
-        '      <span>Objetivo</span>' +
+        '      <span class="dashboard-week-target-label">Objetivo / semana</span>' +
         '      <input type="number" id="dashboard-week-target" min="1" max="14" value="' + summary.meta + '" aria-label="Entrenamientos por semana">' +
         "    </label>" +
         "  </div>" +
-        statsHtml +
-        '  <div class="dashboard-week-progress" role="progressbar" aria-valuenow="' + progressPct + '" aria-valuemin="0" aria-valuemax="100">' +
+        '  <div class="dashboard-week-progress" role="progressbar" aria-valuenow="' + progressPct + '" aria-valuemin="0" aria-valuemax="100" aria-label="Progreso semanal">' +
         '    <div class="dashboard-week-progress-bar" style="width:' + progressPct + '%"></div>' +
         "  </div>" +
-        '  <p class="dashboard-week-summary-text">' +
-        (summary.faltanPlanificar
-            ? "Te faltan planificar <strong>" + summary.faltanPlanificar + "</strong> de <strong>" + summary.meta + "</strong> entrenamientos esta semana."
-            : "Completaste el objetivo semanal de planificación.") +
-        (summary.enSemanaCount
-            ? " Tenés <strong>" + summary.enSemanaCount + "</strong> en el calendario de la semana."
-            : " Todavía no hay entrenamientos con fecha en esta semana.") +
-        "</p>" +
-        '  <h4 class="dashboard-week-subtitle">Pendientes de planificar</h4>' +
+        '  <p class="dashboard-week-summary-text">' + summaryLine + "</p>" +
+        (pendingCount ? '<h4 class="dashboard-week-subtitle">Pendientes</h4>' : "") +
         listHtml +
         '  <div class="dashboard-week-actions">' +
         '    <button type="button" class="dashboard-btn dashboard-btn-accent" onclick="loadContent(\'planificacion\')">Ir a planificación</button>' +
@@ -4250,7 +4226,13 @@ function renderDashboard() {
         '        <span class="stat-card-label">Entrenamientos creados</span>' +
         '      </div>' +
         '    </div>' +
-        weekSectionHtml +
+        '    <div class="dashboard-card dashboard-card--stat stat-card">' +
+        '      <div class="stat-card-icon">⏳</div>' +
+        '      <div class="stat-card-content">' +
+        '        <span class="stat-card-value">' + weekSummary.faltanPlanificar + '</span>' +
+        '        <span class="stat-card-label">Por planificar esta semana</span>' +
+        '      </div>' +
+        '    </div>' +
         '    <div class="dashboard-card dashboard-card--stat stat-card">' +
         '      <div class="stat-card-icon">📋</div>' +
         '      <div class="stat-card-content">' +
@@ -4258,6 +4240,7 @@ function renderDashboard() {
         '        <span class="stat-card-label">Jugadas guardadas</span>' +
         '      </div>' +
         '    </div>' +
+        weekSectionHtml +
         '    <div class="dashboard-card dashboard-card--wide dashboard-card-next">' +
         '      <h3 class="dashboard-card-title">Próximo entrenamiento</h3>' +
         (nextEnt
