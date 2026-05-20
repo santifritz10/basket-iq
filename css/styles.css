@@ -515,59 +515,22 @@ body {
     color: var(--text-muted);
 }
 
-/* Semana — entrenamientos pendientes (fila completa bajo stats) */
+/* Semana — sesiones concretas a planificar */
 .dashboard-card-week {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 20px 22px;
-}
-
-.dashboard-week-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
+    gap: 14px;
+    padding: 22px 24px !important;
 }
 
 .dashboard-week-head-text .dashboard-card-title {
-    margin-bottom: 2px;
+    margin-bottom: 4px;
 }
 
 .dashboard-week-range {
     margin: 0;
-    font-size: 0.82rem;
+    font-size: 0.84rem;
     color: var(--text-muted);
-}
-
-.dashboard-week-target {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--card-border);
-    border-radius: var(--radius-sm);
-    flex-shrink: 0;
-}
-
-.dashboard-week-target-label {
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-}
-
-.dashboard-week-target input {
-    width: 48px;
-    padding: 4px 6px;
-    border-radius: 6px;
-    border: 1px solid var(--card-border);
-    background: rgba(0, 0, 0, 0.2);
-    color: var(--accent);
-    font-size: 0.95rem;
-    font-weight: 700;
-    text-align: center;
 }
 
 .dashboard-week-progress {
@@ -586,67 +549,131 @@ body {
 
 .dashboard-week-summary-text {
     margin: 0;
-    font-size: 0.86rem;
-    line-height: 1.4;
+    font-size: 0.88rem;
+    line-height: 1.45;
     color: var(--text-muted);
 }
 
 .dashboard-week-summary-text strong {
     color: var(--text);
-    font-weight: 600;
 }
 
-.dashboard-week-subtitle {
-    margin: 2px 0 0;
-    font-size: 0.75rem;
+.dashboard-week-add-form {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.dashboard-week-add-input {
+    min-width: 0;
+    padding: 10px 12px;
+    font-family: var(--font-sans);
+    font-size: 0.88rem;
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+}
+
+.dashboard-week-add-select {
+    padding: 10px 10px;
+    font-family: var(--font-sans);
+    font-size: 0.84rem;
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.dashboard-week-add-select--cat {
+    min-width: 72px;
+}
+
+.dashboard-week-add-btn {
+    padding: 10px 16px;
+    font-family: var(--font-sans);
+    font-size: 0.84rem;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--accent);
+    color: #0d0d0f;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter 0.15s ease;
+}
+
+.dashboard-week-add-btn:hover {
+    filter: brightness(1.08);
 }
 
 .dashboard-week-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    list-style: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
 }
 
 .dashboard-week-list--scroll {
-    max-height: 156px;
+    max-height: 220px;
     overflow-y: auto;
     padding-right: 4px;
 }
 
 .dashboard-week-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 8px 12px;
-    background: rgba(255, 152, 0, 0.06);
-    border: 1px solid rgba(255, 152, 0, 0.18);
-    border-radius: var(--radius-sm);
+    display: grid !important;
+    grid-template-columns: 72px 1fr auto auto 28px;
+    align-items: center !important;
+    gap: 10px 12px !important;
+    width: 100% !important;
+    min-height: 56px !important;
+    padding: 10px 12px !important;
+    box-sizing: border-box !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid var(--card-border) !important;
+    border-radius: var(--radius-sm) !important;
+    border-bottom: 1px solid var(--card-border) !important;
 }
 
-.dashboard-week-item--ghost {
-    background: rgba(255, 255, 255, 0.02);
-    border-style: dashed;
-    border-color: var(--card-border);
+.dashboard-week-item--planificado {
+    border-color: rgba(76, 175, 80, 0.35) !important;
+    background: rgba(76, 175, 80, 0.06) !important;
+}
+
+.dashboard-week-item--borrador {
+    border-color: rgba(255, 152, 0, 0.35) !important;
+    background: rgba(255, 152, 0, 0.06) !important;
+}
+
+.dashboard-week-item--pendiente {
+    border-color: rgba(255, 152, 0, 0.22) !important;
+    background: rgba(255, 152, 0, 0.04) !important;
+}
+
+.dashboard-week-item-day {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--accent);
 }
 
 .dashboard-week-item-main {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    min-width: 0;
-    flex: 1;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    min-width: 0 !important;
+    flex: none !important;
 }
 
 .dashboard-week-item-main strong {
-    font-size: 0.86rem;
+    display: block;
+    font-size: 0.9rem;
     color: var(--text);
     white-space: nowrap;
     overflow: hidden;
@@ -654,47 +681,179 @@ body {
 }
 
 .dashboard-week-item-meta {
-    font-size: 0.74rem;
+    display: block;
+    font-size: 0.76rem;
     color: var(--text-muted);
 }
 
+.dashboard-week-status {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.dashboard-week-status--planificado {
+    color: #81c784;
+    background: rgba(76, 175, 80, 0.15);
+}
+
+.dashboard-week-status--borrador {
+    color: #ffb74d;
+    background: rgba(255, 152, 0, 0.12);
+}
+
+.dashboard-week-status--pendiente {
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.06);
+}
+
 .dashboard-week-item-btn {
-    flex-shrink: 0;
-    padding: 7px 14px;
-    font-size: 0.8rem;
+    justify-self: end;
+    padding: 8px 14px !important;
+    font-size: 0.8rem !important;
     font-weight: 600;
     font-family: var(--font-sans);
     color: var(--accent);
     background: rgba(255, 152, 0, 0.1);
-    border: 1px solid rgba(255, 152, 0, 0.3);
+    border: 1px solid rgba(255, 152, 0, 0.35);
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.dashboard-week-item-btn--accent {
+    color: #0d0d0f;
+    background: var(--accent);
+    border-color: var(--accent);
 }
 
 .dashboard-week-item-btn:hover {
-    background: var(--accent);
-    color: #0d0d0f;
-    border-color: var(--accent);
+    filter: brightness(1.06);
+}
+
+.dashboard-week-item-remove {
+    justify-self: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    font-size: 1.1rem;
+    line-height: 1;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.dashboard-week-item-remove:hover {
+    color: #ef5350;
+    background: rgba(244, 67, 54, 0.12);
 }
 
 .dashboard-week-empty {
     margin: 0;
-    font-size: 0.86rem;
+    padding: 12px 14px;
+    font-size: 0.88rem;
     color: var(--text-muted);
-    line-height: 1.45;
+    line-height: 1.5;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed var(--card-border);
+    border-radius: var(--radius-sm);
+}
+
+.dashboard-week-extras {
+    margin-top: 4px;
+    padding-top: 12px;
+    border-top: 1px solid var(--card-border);
+}
+
+.dashboard-week-extras-title {
+    margin: 0 0 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.dashboard-week-extras-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.dashboard-week-extras-link {
+    padding: 6px 10px;
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    color: var(--accent);
+    background: rgba(255, 152, 0, 0.08);
+    border: 1px solid rgba(255, 152, 0, 0.2);
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.dashboard-week-extras-link:hover {
+    background: rgba(255, 152, 0, 0.16);
 }
 
 .dashboard-week-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-top: 2px;
     padding-top: 4px;
+    border-top: 1px solid var(--card-border);
 }
 
 .dashboard-week-actions .dashboard-btn {
     margin-top: 0;
+}
+
+@media (max-width: 720px) {
+    .dashboard-week-add-form {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .dashboard-week-add-input {
+        grid-column: 1 / -1;
+    }
+
+    .dashboard-week-add-btn {
+        grid-column: 1 / -1;
+    }
+
+    .dashboard-week-item {
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto auto;
+    }
+
+    .dashboard-week-item-day {
+        grid-column: 1;
+    }
+
+    .dashboard-week-item-main {
+        grid-column: 1;
+    }
+
+    .dashboard-week-status {
+        grid-column: 2;
+        grid-row: 1;
+        align-self: start;
+    }
+
+    .dashboard-week-item-btn {
+        grid-column: 1;
+    }
+
+    .dashboard-week-item-remove {
+        grid-column: 2;
+        grid-row: 3;
+    }
 }
 
 /* Wide card (próximo entrenamiento) */
@@ -4488,7 +4647,15 @@ table th {
     border: 1px solid var(--card-border) !important;
     border-radius: var(--radius) !important;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+}
+
+.dashboard-card--stat.stat-card {
     padding: 20px 22px !important;
+}
+
+.dashboard-card-week .dashboard-week-list,
+.dashboard-card-week .dashboard-week-item {
+    border-bottom: none !important;
 }
 
 .dashboard-card--stat.stat-card {

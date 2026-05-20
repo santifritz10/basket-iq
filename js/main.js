@@ -454,7 +454,16 @@ const PLANIFICACION_ANUAL_STORAGE_KEY = "basketLab_planificacion_anual";
 const SHOOTING_HEATMAP_STORAGE_KEY = "basketLab_shootingHeatmap7";
 const PLAYERS_TRACKING_STORAGE_KEY = "basketLab_playersTracking";
 const COACH_SETTINGS_STORAGE_KEY = "basketLab_coach_settings";
-const DEFAULT_ENTRENAMIENTOS_POR_SEMANA = 3;
+
+const DIAS_SEMANA_OPCIONES = [
+    { value: 1, label: "Lunes" },
+    { value: 2, label: "Martes" },
+    { value: 3, label: "Miércoles" },
+    { value: 4, label: "Jueves" },
+    { value: 5, label: "Viernes" },
+    { value: 6, label: "Sábado" },
+    { value: 0, label: "Domingo" }
+];
 
 const APP_DATA_TYPES = {
     plays: "plays",
@@ -3962,25 +3971,92 @@ function getNextEntrenamiento() {
     return next;
 }
 
-function getCoachSettings() {
+function getCoachSettingsRaw() {
     var key = getStorageKeyForCurrentUser(COACH_SETTINGS_STORAGE_KEY);
-    var raw = readJsonStorageValue(key, {});
-    var meta = parseInt(raw.entrenamientos_por_semana, 10);
-    if (isNaN(meta) || meta < 1) meta = DEFAULT_ENTRENAMIENTOS_POR_SEMANA;
-    if (meta > 14) meta = 14;
-    return { entrenamientos_por_semana: meta };
+    return readJsonStorageValue(key, {});
 }
 
-function saveCoachSettings(settings) {
+function getSesionesSemanales() {
+    var raw = getCoachSettingsRaw();
+    var list = Array.isArray(raw.sesiones_semanales) ? raw.sesiones_semanales : [];
+    return list
+        .map(function (s) {
+            return {
+                id: s.id,
+                nombre: String(s.nombre || "").trim(),
+                dia_semana: typeof s.dia_semana === "number" ? s.dia_semana : parseInt(s.dia_semana, 10),
+                categoria: String(s.categoria || "").trim() || "U15"
+            };
+        })
+        .filter(function (s) { return s.nombre && s.dia_semana >= 0 && s.dia_semana <= 6; });
+}
+
+function saveSesionesSemanales(sesiones) {
     var key = getStorageKeyForCurrentUser(COACH_SETTINGS_STORAGE_KEY);
-    var current = getCoachSettings();
-    var next = Object.assign({}, current, settings || {});
-    var meta = parseInt(next.entrenamientos_por_semana, 10);
-    if (isNaN(meta) || meta < 1) meta = DEFAULT_ENTRENAMIENTOS_POR_SEMANA;
-    if (meta > 14) meta = 14;
-    next.entrenamientos_por_semana = meta;
-    localStorage.setItem(key, JSON.stringify(next));
-    return next;
+    var raw = getCoachSettingsRaw();
+    raw.sesiones_semanales = sesiones;
+    localStorage.setItem(key, JSON.stringify(raw));
+}
+
+function getDiaSemanaLabel(dia) {
+    var found = DIAS_SEMANA_OPCIONES.find(function (d) { return d.value === dia; });
+    return found ? found.label : "—";
+}
+
+function toIsoDateLocal(date) {
+    var y = date.getFullYear();
+    var m = String(date.getMonth() + 1).padStart(2, "0");
+    var day = String(date.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+}
+
+function getWeekDateForDayOfWeek(weekRange, diaSemana) {
+    var monday = new Date(weekRange.start);
+    var offset = diaSemana === 0 ? 6 : diaSemana - 1;
+    var d = new Date(monday);
+    d.setDate(monday.getDate() + offset);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function findEntrenamientoOnDate(entrenamientos, isoDate) {
+    if (!isoDate) return null;
+    return entrenamientos.find(function (e) {
+        return getEntrenamientoFechaKey(e) === isoDate;
+    }) || null;
+}
+
+function resolveSesionSemanalEstado(slot, weekRange, entrenamientos) {
+    var fechaIso = toIsoDateLocal(getWeekDateForDayOfWeek(weekRange, slot.dia_semana));
+    var ent = findEntrenamientoOnDate(entrenamientos, fechaIso);
+    if (!ent) {
+        return {
+            fechaIso: fechaIso,
+            fechaLabel: formatFechaAR(fechaIso),
+            diaLabel: getDiaSemanaLabel(slot.dia_semana),
+            entrenamiento: null,
+            status: "pendiente",
+            statusLabel: "Sin crear"
+        };
+    }
+    if (isEntrenamientoPlanificado(ent)) {
+        return {
+            fechaIso: fechaIso,
+            fechaLabel: formatFechaAR(fechaIso),
+            diaLabel: getDiaSemanaLabel(slot.dia_semana),
+            entrenamiento: ent,
+            status: "planificado",
+            statusLabel: "Planificado"
+        };
+    }
+    return {
+        fechaIso: fechaIso,
+        fechaLabel: formatFechaAR(fechaIso),
+        diaLabel: getDiaSemanaLabel(slot.dia_semana),
+        entrenamiento: ent,
+        status: "borrador",
+        statusLabel: "Falta armar bloques"
+    };
 }
 
 function getCurrentWeekRange(refDate) {
@@ -4018,34 +4094,81 @@ function isEntrenamientoPlanificado(ent) {
 
 function getDashboardWeekSummary() {
     var weekRange = getCurrentWeekRange();
-    var meta = getCoachSettings().entrenamientos_por_semana;
+    var sesiones = getSesionesSemanales();
     var all = getEntrenamientos();
-    var enSemana = all.filter(function (e) { return isEntrenamientoInWeek(e, weekRange); });
-    var planificados = enSemana.filter(isEntrenamientoPlanificado);
-    var noPlanificados = enSemana.filter(function (e) { return !isEntrenamientoPlanificado(e); });
-    noPlanificados.sort(function (a, b) {
-        var da = parseEntrenamientoDate(a.fecha);
-        var db = parseEntrenamientoDate(b.fecha);
-        if (!da && !db) return 0;
-        if (!da) return 1;
-        if (!db) return -1;
+    var filas = sesiones.map(function (slot) {
+        var estado = resolveSesionSemanalEstado(slot, weekRange, all);
+        return { slot: slot, estado: estado };
+    });
+    filas.sort(function (a, b) {
+        var da = a.slot.dia_semana === 0 ? 7 : a.slot.dia_semana;
+        var db = b.slot.dia_semana === 0 ? 7 : b.slot.dia_semana;
         return da - db;
     });
-    var planificadosCount = planificados.length;
-    var faltanPlanificar = Math.max(0, meta - planificadosCount);
-    var huecosSinCrear = Math.max(0, faltanPlanificar - noPlanificados.length);
+
+    var planificadosCount = filas.filter(function (f) { return f.estado.status === "planificado"; }).length;
+    var faltanPlanificar = filas.filter(function (f) { return f.estado.status !== "planificado"; }).length;
+    var fechasOcupadas = {};
+    filas.forEach(function (f) {
+        if (f.estado.entrenamiento) fechasOcupadas[f.estado.fechaIso] = true;
+    });
+    var extras = all.filter(function (e) {
+        if (!isEntrenamientoInWeek(e, weekRange)) return false;
+        var key = getEntrenamientoFechaKey(e);
+        return key && !fechasOcupadas[key];
+    });
 
     return {
         weekRange: weekRange,
-        meta: meta,
-        enSemana: enSemana,
-        enSemanaCount: enSemana.length,
+        filas: filas,
+        totalSesiones: filas.length,
         planificadosCount: planificadosCount,
-        noPlanificados: noPlanificados,
         faltanPlanificar: faltanPlanificar,
-        huecosSinCrear: huecosSinCrear,
-        pendientesTotal: faltanPlanificar
+        extras: extras
     };
+}
+
+function addSesionSemanal(nombre, diaSemana, categoria) {
+    var list = getSesionesSemanales();
+    list.push({
+        id: Date.now() + Math.random(),
+        nombre: String(nombre || "").trim(),
+        dia_semana: diaSemana,
+        categoria: categoria || "U15"
+    });
+    saveSesionesSemanales(list);
+}
+
+function removeSesionSemanal(slotId) {
+    var list = getSesionesSemanales().filter(function (s) { return String(s.id) !== String(slotId); });
+    saveSesionesSemanales(list);
+}
+
+function crearEntrenamientoParaSlot(slotId) {
+    var slot = getSesionesSemanales().find(function (s) { return String(s.id) === String(slotId); });
+    if (!slot) return;
+    var weekRange = getCurrentWeekRange();
+    var fechaIso = toIsoDateLocal(getWeekDateForDayOfWeek(weekRange, slot.dia_semana));
+    var existing = findEntrenamientoOnDate(getEntrenamientos(), fechaIso);
+    if (existing) {
+        openEntrenamientoFromDashboard(existing.id);
+        return;
+    }
+    var id = Date.now();
+    var ent = {
+        id: id,
+        nombre: slot.nombre,
+        fecha: fechaIso,
+        categoria: slot.categoria || "U15",
+        ciclo_id: null,
+        notas_generales: "",
+        bloques: []
+    };
+    entrenamientos = getEntrenamientos();
+    entrenamientos.push(ent);
+    saveEntrenamientos();
+    loadContent("planificacion");
+    renderPlanificacionView(id);
 }
 
 function formatWeekRangeLabel(weekRange) {
@@ -4057,69 +4180,135 @@ function formatWeekRangeLabel(weekRange) {
 
 function buildDashboardWeekSectionHtml(summary) {
     var weekLabel = formatWeekRangeLabel(summary.weekRange);
-    var pendingCount = summary.noPlanificados.length + summary.huecosSinCrear;
-    var listScrollClass = pendingCount > 3 ? " dashboard-week-list--scroll" : "";
+    var diaOptions = DIAS_SEMANA_OPCIONES.map(function (d) {
+        return '<option value="' + d.value + '">' + d.label + "</option>";
+    }).join("");
+
+    var progressPct = summary.totalSesiones > 0
+        ? Math.min(100, Math.round((summary.planificadosCount / summary.totalSesiones) * 100))
+        : 0;
+
+    var summaryLine = summary.totalSesiones
+        ? "<strong>" + summary.planificadosCount + "</strong> de <strong>" + summary.totalSesiones + "</strong> entrenamientos listos esta semana."
+        : "Definí abajo qué entrenamientos tenés que armar (día y nombre).";
 
     var listHtml = "";
-    if (!summary.faltanPlanificar && !summary.noPlanificados.length) {
-        listHtml = '<p class="dashboard-week-empty">¡Semana al día! Todos tus entrenamientos de esta semana están planificados.</p>';
+    if (!summary.filas.length) {
+        listHtml =
+            '<p class="dashboard-week-empty">Todavía no cargaste entrenamientos para esta semana. Usá el formulario para agregar cada sesión (ej: <em>Martes — Táctica U15</em>).</p>';
     } else {
+        var listScrollClass = summary.filas.length > 4 ? " dashboard-week-list--scroll" : "";
         listHtml = '<ul class="dashboard-week-list' + listScrollClass + '">';
-        summary.noPlanificados.forEach(function (ent) {
-            var nombre = escapeHtml(ent.nombre || "Sin nombre");
-            var fecha = formatEntrenamientoFecha(ent);
-            var cat = escapeHtml(ent.categoria || "General");
+        summary.filas.forEach(function (fila) {
+            var slot = fila.slot;
+            var est = fila.estado;
+            var statusClass = "dashboard-week-status--" + est.status;
+            var actionBtn = "";
+            if (est.status === "planificado") {
+                actionBtn =
+                    '<button type="button" class="dashboard-week-item-btn" onclick="openEntrenamientoFromDashboard(' +
+                    est.entrenamiento.id +
+                    ')">Ver</button>';
+            } else if (est.status === "borrador") {
+                actionBtn =
+                    '<button type="button" class="dashboard-week-item-btn dashboard-week-item-btn--accent" onclick="openEntrenamientoFromDashboard(' +
+                    est.entrenamiento.id +
+                    ')">Armar</button>';
+            } else {
+                actionBtn =
+                    '<button type="button" class="dashboard-week-item-btn dashboard-week-item-btn--accent" onclick="crearEntrenamientoParaSlot(' +
+                    slot.id +
+                    ')">Crear</button>';
+            }
             listHtml +=
-                '<li class="dashboard-week-item">' +
+                '<li class="dashboard-week-item dashboard-week-item--' +
+                est.status +
+                '">' +
+                '  <div class="dashboard-week-item-day">' +
+                escapeHtml(est.diaLabel) +
+                "</div>" +
                 '  <div class="dashboard-week-item-main">' +
-                '    <strong>' + nombre + "</strong>" +
-                '    <span class="dashboard-week-item-meta">' + fecha + " · " + cat + "</span>" +
+                '    <strong>' +
+                escapeHtml(slot.nombre) +
+                "</strong>" +
+                '    <span class="dashboard-week-item-meta">' +
+                escapeHtml(est.fechaLabel) +
+                " · " +
+                escapeHtml(slot.categoria) +
+                "</span>" +
                 "  </div>" +
-                '  <button type="button" class="dashboard-week-item-btn" onclick="openEntrenamientoFromDashboard(' + ent.id + ')">Planificar</button>' +
+                '  <span class="dashboard-week-status ' +
+                statusClass +
+                '">' +
+                escapeHtml(est.statusLabel) +
+                "</span>" +
+                actionBtn +
+                '  <button type="button" class="dashboard-week-item-remove" onclick="removeSesionSemanalAndRefresh(' +
+                slot.id +
+                ')" title="Quitar de la lista" aria-label="Quitar">×</button>' +
                 "</li>";
         });
-        for (var i = 0; i < summary.huecosSinCrear; i++) {
-            listHtml +=
-                '<li class="dashboard-week-item dashboard-week-item--ghost">' +
-                '  <div class="dashboard-week-item-main">' +
-                '    <strong>Entrenamiento por crear</strong>' +
-                '    <span class="dashboard-week-item-meta">Asigná fecha en esta semana</span>' +
-                "  </div>" +
-                '  <button type="button" class="dashboard-week-item-btn" onclick="crearEntrenamientoDesdeDashboard()">Crear</button>' +
-                "</li>";
-        }
         listHtml += "</ul>";
     }
 
-    var progressPct = summary.meta > 0 ? Math.min(100, Math.round((summary.planificadosCount / summary.meta) * 100)) : 0;
-    var summaryLine = summary.faltanPlanificar
-        ? "Faltan <strong>" + summary.faltanPlanificar + "</strong> de <strong>" + summary.meta + "</strong> · En calendario: <strong>" + summary.enSemanaCount + "</strong> · Planificados: <strong>" + summary.planificadosCount + "</strong>"
-        : "Objetivo semanal cumplido · <strong>" + summary.planificadosCount + "</strong>/" + summary.meta + " planificados";
+    var extrasHtml = "";
+    if (summary.extras && summary.extras.length) {
+        extrasHtml = '<div class="dashboard-week-extras"><p class="dashboard-week-extras-title">En calendario (sin slot asignado)</p><ul class="dashboard-week-extras-list">';
+        summary.extras.forEach(function (ent) {
+            extrasHtml +=
+                '<li><button type="button" class="dashboard-week-extras-link" onclick="openEntrenamientoFromDashboard(' +
+                ent.id +
+                ')">' +
+                escapeHtml(ent.nombre || "Sin nombre") +
+                " · " +
+                escapeHtml(formatEntrenamientoFecha(ent)) +
+                "</button></li>";
+        });
+        extrasHtml += "</ul></div>";
+    }
 
     return (
         '<div class="dashboard-card dashboard-card-week">' +
         '  <div class="dashboard-week-head">' +
         '    <div class="dashboard-week-head-text">' +
-        '      <h3 class="dashboard-card-title">Esta semana</h3>' +
+        '      <h3 class="dashboard-card-title">Entrenamientos de esta semana</h3>' +
         '      <p class="dashboard-week-range">' + escapeHtml(weekLabel) + "</p>" +
         "    </div>" +
-        '    <label class="dashboard-week-target">' +
-        '      <span class="dashboard-week-target-label">Objetivo / semana</span>' +
-        '      <input type="number" id="dashboard-week-target" min="1" max="14" value="' + summary.meta + '" aria-label="Entrenamientos por semana">' +
-        "    </label>" +
         "  </div>" +
-        '  <div class="dashboard-week-progress" role="progressbar" aria-valuenow="' + progressPct + '" aria-valuemin="0" aria-valuemax="100" aria-label="Progreso semanal">' +
-        '    <div class="dashboard-week-progress-bar" style="width:' + progressPct + '%"></div>' +
-        "  </div>" +
+        (summary.totalSesiones
+            ? (
+                '  <div class="dashboard-week-progress" role="progressbar" aria-valuenow="' +
+                progressPct +
+                '" aria-valuemin="0" aria-valuemax="100">' +
+                '    <div class="dashboard-week-progress-bar" style="width:' +
+                progressPct +
+                '%"></div>' +
+                "  </div>"
+            )
+            : "") +
         '  <p class="dashboard-week-summary-text">' + summaryLine + "</p>" +
-        (pendingCount ? '<h4 class="dashboard-week-subtitle">Pendientes</h4>' : "") +
+        '  <form id="dashboard-week-add-form" class="dashboard-week-add-form">' +
+        '    <input type="text" id="dashboard-week-add-nombre" class="dashboard-week-add-input" placeholder="Ej: Táctica presión" required maxlength="80">' +
+        '    <select id="dashboard-week-add-dia" class="dashboard-week-add-select" aria-label="Día">' +
+        diaOptions +
+        "</select>" +
+        '    <select id="dashboard-week-add-cat" class="dashboard-week-add-select dashboard-week-add-select--cat" aria-label="Categoría">' +
+        '      <option value="U13">U13</option><option value="U15" selected>U15</option><option value="U17">U17</option><option value="Primera">Primera</option><option value="Otro">Otro</option>' +
+        "</select>" +
+        '    <button type="submit" class="dashboard-week-add-btn">+ Agregar</button>' +
+        "  </form>" +
         listHtml +
+        extrasHtml +
         '  <div class="dashboard-week-actions">' +
         '    <button type="button" class="dashboard-btn dashboard-btn-accent" onclick="loadContent(\'planificacion\')">Ir a planificación</button>' +
-        '    <button type="button" class="dashboard-btn" onclick="crearEntrenamientoDesdeDashboard()">Nuevo entrenamiento</button>' +
         "  </div>" +
         "</div>"
     );
+}
+
+function removeSesionSemanalAndRefresh(slotId) {
+    removeSesionSemanal(slotId);
+    renderDashboard();
 }
 
 function openEntrenamientoFromDashboard(entrenamientoId) {
@@ -4133,10 +4322,15 @@ function crearEntrenamientoDesdeDashboard() {
 }
 
 function attachDashboardWeekEvents() {
-    var targetInput = document.getElementById("dashboard-week-target");
-    if (!targetInput) return;
-    targetInput.onchange = function () {
-        saveCoachSettings({ entrenamientos_por_semana: parseInt(targetInput.value, 10) });
+    var form = document.getElementById("dashboard-week-add-form");
+    if (!form) return;
+    form.onsubmit = function (ev) {
+        ev.preventDefault();
+        var nombre = document.getElementById("dashboard-week-add-nombre").value.trim();
+        var dia = parseInt(document.getElementById("dashboard-week-add-dia").value, 10);
+        var cat = document.getElementById("dashboard-week-add-cat").value;
+        if (!nombre) return;
+        addSesionSemanal(nombre, dia, cat);
         renderDashboard();
     };
 }
