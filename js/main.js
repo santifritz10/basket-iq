@@ -786,6 +786,122 @@ const TIPOS_BLOQUE = [
     { value: "notas", label: "Notas" }
 ];
 
+function getBloquePlayIds(bloque) {
+    return Array.isArray(bloque && bloque.play_ids) ? bloque.play_ids : [];
+}
+
+function getPlaybookPlaysForBlock(bloque) {
+    return getBloquePlayIds(bloque)
+        .map(function (id) {
+            loadSavedPlaysFromStorage();
+            return savedPlays.find(function (p) { return String(p.id) === String(id); });
+        })
+        .filter(Boolean);
+}
+
+function buildBloquePlaybookPickerHtml(selectedIds) {
+    loadSavedPlaysFromStorage();
+    const selected = new Set((selectedIds || []).map(String));
+    if (!savedPlays.length) {
+        return (
+            '<div class="bloque-playbook-picker bloque-playbook-empty">' +
+            '<p class="bloque-playbook-hint">No tenés jugadas en el playbook. Creá una en la ' +
+            '<button type="button" class="link-btn" onclick="loadBoard(); cerrarModalBloque();">pizarra virtual</button> ' +
+            'y guardala con <strong>Guardar jugada</strong>.</p>' +
+            "</div>"
+        );
+    }
+    let html =
+        '<div class="form-row bloque-playbook-picker">' +
+        '<label>Pizarras del playbook</label>' +
+        '<p class="bloque-playbook-hint">Elegí jugadas guardadas de tu biblioteca para este bloque.</p>' +
+        '<div class="bloque-playbook-list">';
+    savedPlays.forEach(function (play) {
+        const pid = String(play.id);
+        const checked = selected.has(pid) ? " checked" : "";
+        const thumb = play.steps && play.steps[0] ? play.steps[0] : "";
+        const stepCount = (play.steps || []).length;
+        html +=
+            '<label class="bloque-playbook-option">' +
+            '<input type="checkbox" name="bloque_play_ids" value="' + pid + '"' + checked + ">" +
+            '<span class="bloque-playbook-option-body">' +
+            (thumb
+                ? '<img src="' + thumb + '" alt="" class="bloque-playbook-thumb">'
+                : '<span class="bloque-playbook-thumb bloque-playbook-thumb--empty">?</span>') +
+            '<span class="bloque-playbook-option-text">' +
+            "<strong>" + escapeHtml(play.name || "Sin nombre") + "</strong>" +
+            "<small>" + stepCount + " paso" + (stepCount !== 1 ? "s" : "") + "</small>" +
+            "</span></span></label>";
+    });
+    html += "</div></div>";
+    return html;
+}
+
+function buildBloquePlaybookPreviewHtml(bloque) {
+    const plays = getPlaybookPlaysForBlock(bloque);
+    if (!plays.length) return "";
+    let html = '<div class="bloque-playbook-preview">';
+    plays.forEach(function (play) {
+        const thumb = play.steps && play.steps[0] ? play.steps[0] : "";
+        html +=
+            '<span class="bloque-playbook-chip" title="' + escapeHtml(play.name || "") + '">' +
+            (thumb ? '<img src="' + thumb + '" alt="">' : "") +
+            "<span>" + escapeHtml(play.name || "Jugada") + "</span></span>";
+    });
+    html += "</div>";
+    return html;
+}
+
+function buildBloquePlaysPrintHtml(playIds) {
+    if (!playIds || !playIds.length) return "";
+    loadSavedPlaysFromStorage();
+    const plays = playIds
+        .map(function (id) {
+            return savedPlays.find(function (p) { return String(p.id) === String(id); });
+        })
+        .filter(Boolean);
+    if (!plays.length) return "";
+
+    return plays
+        .map(function (play) {
+            const steps = Array.isArray(play.steps) ? play.steps : [];
+            const stepsHtml = steps.length
+                ? steps
+                      .map(function (stepUrl, idx) {
+                          const src = typeof stepUrl === "string" ? stepUrl : "";
+                          return (
+                              '<div class="bloquePdfPlayStep">' +
+                              '<span class="bloquePdfPlayStepNum">Paso ' +
+                              (idx + 1) +
+                              "</span>" +
+                              '<img src="' +
+                              src +
+                              '" alt="Paso ' +
+                              (idx + 1) +
+                              '" />' +
+                              "</div>"
+                          );
+                      })
+                      .join("")
+                : '<p class="bloquePdfPlayEmpty">Sin pasos en esta jugada.</p>';
+            const desc = String(play.description || "").trim();
+            return (
+                '<div class="bloquePdfPlay">' +
+                '<div class="bloquePdfPlayHead">' +
+                "<strong>" +
+                escapeHtml(play.name || "Jugada") +
+                "</strong>" +
+                (steps.length ? '<span class="bloquePdfPlayMeta">' + steps.length + " paso(s)</span>" : "") +
+                "</div>" +
+                (desc ? '<p class="bloquePdfPlayDesc">' + escapeHtml(desc) + "</p>" : "") +
+                '<div class="bloquePdfPlaySteps">' +
+                stepsHtml +
+                "</div></div>"
+            );
+        })
+        .join("");
+}
+
 function getEntrenamientos() {
     const parsed = getLocalDataByType(APP_DATA_TYPES.trainings);
     return Array.isArray(parsed) ? parsed : [];
@@ -923,6 +1039,7 @@ function buildEditorEntrenamiento(ent) {
                     <span class="bloque-tipo">${escapeHtml(tipoLabel)}</span>
                     <h4>${escapeHtml(b.titulo || "Sin título")}</h4>
                     ${b.descripcion ? `<p>${escapeHtml(b.descripcion)}</p>` : ""}
+                    ${buildBloquePlaybookPreviewHtml(b)}
                     <span class="bloque-duracion">${Number(b.duracion_minutos) || 0} min</span>
                 </div>
                 <div class="bloque-card-actions">
@@ -1010,7 +1127,7 @@ function buildEditorEntrenamiento(ent) {
             </div>
         </section>
         <div id="modal-bloque" class="modal" style="display:none;">
-            <div class="modal-content">
+            <div class="modal-content modal-content--bloque">
                 <h3>Agregar / Editar bloque</h3>
                 <form id="form-bloque">
                     <input type="hidden" name="bloque_id" id="bloque-id-input">
@@ -1026,6 +1143,7 @@ function buildEditorEntrenamiento(ent) {
                         <label>Descripción</label>
                         <textarea name="descripcion" id="bloque-descripcion" rows="3" placeholder="Descripción del bloque (opcional)"></textarea>
                     </div>
+                    <div id="bloque-playbook-picker-wrap"></div>
                     <div class="form-row">
                         <label>Duración (minutos)</label>
                         <input type="number" name="duracion_minutos" id="bloque-duracion" min="1" value="10">
@@ -1073,6 +1191,7 @@ function buildEntrenamientoPrintHtml(ent) {
         const desc = b.descripcion ? escapeHtml(b.descripcion) : "";
         const fundamento = escapeHtml(getTipoBloqueLabel(b.tipo_bloque));
         const dur = Number(b.duracion_minutos) || 0;
+        const playsHtml = buildBloquePlaysPrintHtml(getBloquePlayIds(b));
         return `
             <div class="bloquePdf">
               <div class="bloquePdfBar">
@@ -1083,6 +1202,7 @@ function buildEntrenamientoPrintHtml(ent) {
               <div class="bloquePdfBody">
                 <h3 class="bloquePdfTitulo">${titulo}</h3>
                 ${desc ? `<div class="bloquePdfDesc">${desc}</div>` : `<div class="bloquePdfDesc muted">Sin descripción.</div>`}
+                ${playsHtml ? `<div class="bloquePdfPlays">${playsHtml}</div>` : ""}
               </div>
             </div>
         `;
@@ -1240,6 +1360,17 @@ function buildEntrenamientoPrintHtml(ent) {
     .bloquePdfTitulo{ margin:0 0 8px; font-size:16px; color:#111; }
     .bloquePdfDesc{ font-size:13px; line-height:1.5; color:#374151; }
     .bloquePdfDesc.muted{ color:var(--muted); font-style:italic; }
+    .bloquePdfPlays{ margin-top:14px; padding-top:12px; border-top:1px dashed var(--border); }
+    .bloquePdfPlay{ margin-bottom:14px; page-break-inside:avoid; }
+    .bloquePdfPlay:last-child{ margin-bottom:0; }
+    .bloquePdfPlayHead{ display:flex; align-items:center; gap:10px; margin-bottom:6px; font-size:14px; color:#1e3a5f; }
+    .bloquePdfPlayMeta{ font-size:12px; color:var(--muted); font-weight:600; }
+    .bloquePdfPlayDesc{ margin:0 0 8px; font-size:12px; line-height:1.45; color:#374151; white-space:pre-wrap; }
+    .bloquePdfPlaySteps{ display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
+    .bloquePdfPlayStep{ border:1px solid var(--border); border-radius:10px; overflow:hidden; background:#f8fafc; }
+    .bloquePdfPlayStepNum{ display:block; padding:6px 10px; font-size:11px; font-weight:700; background:#1e3a5f; color:#fff; }
+    .bloquePdfPlayStep img{ width:100%; height:auto; display:block; }
+    .bloquePdfPlayEmpty{ margin:0; padding:10px; font-size:12px; color:var(--muted); font-style:italic; }
     .notas{
       padding:12px 14px;
       font-size:13px;
@@ -1586,20 +1717,26 @@ function mostrarModalBloque(entrenamientoId, bloqueId) {
     if (!modal) return;
     document.getElementById("form-bloque").setAttribute("data-entrenamiento-id", String(entrenamientoId));
     document.getElementById("bloque-id-input").value = bloqueId || "";
+    var selectedPlayIds = [];
     if (bloqueId) {
         const ent = getEntrenamientos().find(e => e.id === entrenamientoId);
-        const b = ent?.bloques?.find(bl => bl.id === bloqueId);
+        const b = ent?.bloques?.find(bl => String(bl.id) === String(bloqueId));
         if (b) {
             document.getElementById("bloque-tipo").value = b.tipo_bloque || "fundamentos";
             document.getElementById("bloque-titulo").value = b.titulo || "";
             document.getElementById("bloque-descripcion").value = b.descripcion || "";
             document.getElementById("bloque-duracion").value = b.duracion_minutos ?? 10;
+            selectedPlayIds = getBloquePlayIds(b);
         }
     } else {
         document.getElementById("bloque-tipo").value = "fundamentos";
         document.getElementById("bloque-titulo").value = "";
         document.getElementById("bloque-descripcion").value = "";
         document.getElementById("bloque-duracion").value = "10";
+    }
+    var pickerWrap = document.getElementById("bloque-playbook-picker-wrap");
+    if (pickerWrap) {
+        pickerWrap.innerHTML = buildBloquePlaybookPickerHtml(selectedPlayIds);
     }
     modal.style.display = "flex";
 }
@@ -1609,6 +1746,13 @@ function cerrarModalBloque() {
     if (modal) modal.style.display = "none";
 }
 
+function collectBloquePlayIdsFromForm(form) {
+    return Array.from(form.querySelectorAll('input[name="bloque_play_ids"]:checked')).map(function (el) {
+        var n = parseInt(el.value, 10);
+        return isNaN(n) ? el.value : n;
+    });
+}
+
 function guardarBloqueDesdeModal(entrenamientoId) {
     const form = document.getElementById("form-bloque");
     const bloqueId = form.querySelector("#bloque-id-input").value;
@@ -1616,6 +1760,7 @@ function guardarBloqueDesdeModal(entrenamientoId) {
     const titulo = form.querySelector("#bloque-titulo").value.trim();
     const descripcion = form.querySelector("#bloque-descripcion").value.trim();
     const duracion = parseInt(form.querySelector("#bloque-duracion").value, 10) || 10;
+    const playIds = collectBloquePlayIdsFromForm(form);
 
     entrenamientos = getEntrenamientos();
     const ent = entrenamientos.find(e => e.id === entrenamientoId);
@@ -1629,6 +1774,7 @@ function guardarBloqueDesdeModal(entrenamientoId) {
             b.titulo = titulo;
             b.descripcion = descripcion;
             b.duracion_minutos = duracion;
+            b.play_ids = playIds;
         }
     } else {
         const orden = ent.bloques.length;
@@ -1639,6 +1785,7 @@ function guardarBloqueDesdeModal(entrenamientoId) {
             titulo: titulo || "Sin título",
             descripcion,
             duracion_minutos: duracion,
+            play_ids: playIds,
             orden
         });
     }

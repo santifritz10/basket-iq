@@ -14,10 +14,18 @@ export async function POST(req) {
   try {
     const parsed = bodySchema.parse(await req.json());
     const supabase = createSupabaseAnonServerClient();
+    const configuredAppUrl =
+      process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "";
+    const fallbackOrigin = req.headers.get("origin") || req.nextUrl?.origin || "";
+    const redirectBaseUrl = configuredAppUrl || fallbackOrigin;
+    const emailRedirectTo = redirectBaseUrl
+      ? new URL("/", redirectBaseUrl).toString()
+      : undefined;
     const signUp = await supabase.auth.signUp({
       email: parsed.email.trim(),
       password: parsed.password,
       options: {
+        emailRedirectTo,
         data: {
           username: parsed.username.trim().toLowerCase(),
           full_name: String(parsed.name || "").trim()
