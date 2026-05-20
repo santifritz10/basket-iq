@@ -453,6 +453,8 @@ const ENTRENAMIENTOS_STORAGE_KEY = "basketLab_entrenamientos";
 const PLANIFICACION_ANUAL_STORAGE_KEY = "basketLab_planificacion_anual";
 const SHOOTING_HEATMAP_STORAGE_KEY = "basketLab_shootingHeatmap7";
 const PLAYERS_TRACKING_STORAGE_KEY = "basketLab_playersTracking";
+const COACH_SETTINGS_STORAGE_KEY = "basketLab_coach_settings";
+const DEFAULT_ENTRENAMIENTOS_POR_SEMANA = 3;
 
 const APP_DATA_TYPES = {
     plays: "plays",
@@ -3960,6 +3962,209 @@ function getNextEntrenamiento() {
     return next;
 }
 
+function getCoachSettings() {
+    var key = getStorageKeyForCurrentUser(COACH_SETTINGS_STORAGE_KEY);
+    var raw = readJsonStorageValue(key, {});
+    var meta = parseInt(raw.entrenamientos_por_semana, 10);
+    if (isNaN(meta) || meta < 1) meta = DEFAULT_ENTRENAMIENTOS_POR_SEMANA;
+    if (meta > 14) meta = 14;
+    return { entrenamientos_por_semana: meta };
+}
+
+function saveCoachSettings(settings) {
+    var key = getStorageKeyForCurrentUser(COACH_SETTINGS_STORAGE_KEY);
+    var current = getCoachSettings();
+    var next = Object.assign({}, current, settings || {});
+    var meta = parseInt(next.entrenamientos_por_semana, 10);
+    if (isNaN(meta) || meta < 1) meta = DEFAULT_ENTRENAMIENTOS_POR_SEMANA;
+    if (meta > 14) meta = 14;
+    next.entrenamientos_por_semana = meta;
+    localStorage.setItem(key, JSON.stringify(next));
+    return next;
+}
+
+function getCurrentWeekRange(refDate) {
+    var d = refDate ? new Date(refDate) : new Date();
+    d.setHours(0, 0, 0, 0);
+    var day = d.getDay();
+    var diffToMonday = day === 0 ? -6 : 1 - day;
+    var start = new Date(d);
+    start.setDate(d.getDate() + diffToMonday);
+    var end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    return { start: start, end: end };
+}
+
+function parseEntrenamientoDate(isoDate) {
+    if (!isoDate) return null;
+    var d = new Date(isoDate);
+    if (isNaN(d.getTime())) return null;
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function isEntrenamientoInWeek(ent, weekRange) {
+    var d = parseEntrenamientoDate(ent && ent.fecha);
+    if (!d) return false;
+    return d >= weekRange.start && d <= weekRange.end;
+}
+
+function isEntrenamientoPlanificado(ent) {
+    var bloques = ent && ent.bloques;
+    if (!Array.isArray(bloques) || !bloques.length) return false;
+    return calcularDuracionTotal(bloques) > 0;
+}
+
+function getDashboardWeekSummary() {
+    var weekRange = getCurrentWeekRange();
+    var meta = getCoachSettings().entrenamientos_por_semana;
+    var all = getEntrenamientos();
+    var enSemana = all.filter(function (e) { return isEntrenamientoInWeek(e, weekRange); });
+    var planificados = enSemana.filter(isEntrenamientoPlanificado);
+    var noPlanificados = enSemana.filter(function (e) { return !isEntrenamientoPlanificado(e); });
+    noPlanificados.sort(function (a, b) {
+        var da = parseEntrenamientoDate(a.fecha);
+        var db = parseEntrenamientoDate(b.fecha);
+        if (!da && !db) return 0;
+        if (!da) return 1;
+        if (!db) return -1;
+        return da - db;
+    });
+    var planificadosCount = planificados.length;
+    var faltanPlanificar = Math.max(0, meta - planificadosCount);
+    var huecosSinCrear = Math.max(0, faltanPlanificar - noPlanificados.length);
+
+    return {
+        weekRange: weekRange,
+        meta: meta,
+        enSemana: enSemana,
+        enSemanaCount: enSemana.length,
+        planificadosCount: planificadosCount,
+        noPlanificados: noPlanificados,
+        faltanPlanificar: faltanPlanificar,
+        huecosSinCrear: huecosSinCrear,
+        pendientesTotal: faltanPlanificar
+    };
+}
+
+function formatWeekRangeLabel(weekRange) {
+    var opts = { day: "numeric", month: "short" };
+    var startLabel = weekRange.start.toLocaleDateString("es-AR", opts);
+    var endLabel = weekRange.end.toLocaleDateString("es-AR", opts);
+    return startLabel + " – " + endLabel;
+}
+
+function buildDashboardWeekSectionHtml(summary) {
+    var weekLabel = formatWeekRangeLabel(summary.weekRange);
+    var statsHtml =
+        '<div class="dashboard-week-stats">' +
+        '  <div class="dashboard-week-stat">' +
+        '    <span class="dashboard-week-stat-value">' + summary.meta + "</span>" +
+        '    <span class="dashboard-week-stat-label">Objetivo semanal</span>' +
+        "  </div>" +
+        '  <div class="dashboard-week-stat">' +
+        '    <span class="dashboard-week-stat-value">' + summary.enSemanaCount + "</span>" +
+        '    <span class="dashboard-week-stat-label">En calendario</span>' +
+        "  </div>" +
+        '  <div class="dashboard-week-stat">' +
+        '    <span class="dashboard-week-stat-value">' + summary.planificadosCount + "</span>" +
+        '    <span class="dashboard-week-stat-label">Planificados</span>' +
+        "  </div>" +
+        '  <div class="dashboard-week-stat dashboard-week-stat--pending">' +
+        '    <span class="dashboard-week-stat-value">' + summary.faltanPlanificar + "</span>" +
+        '    <span class="dashboard-week-stat-label">Por planificar</span>' +
+        "  </div>" +
+        "</div>";
+
+    var listHtml = "";
+    if (!summary.faltanPlanificar && !summary.noPlanificados.length) {
+        listHtml = '<p class="dashboard-week-empty">¡Semana al día! Todos tus entrenamientos de esta semana están planificados.</p>';
+    } else {
+        listHtml = '<ul class="dashboard-week-list">';
+        summary.noPlanificados.forEach(function (ent) {
+            var nombre = escapeHtml(ent.nombre || "Sin nombre");
+            var fecha = formatEntrenamientoFecha(ent);
+            var cat = escapeHtml(ent.categoria || "General");
+            var mins = calcularDuracionTotal(ent.bloques);
+            var estado = mins > 0 ? "Incompleto" : "Sin bloques";
+            listHtml +=
+                '<li class="dashboard-week-item">' +
+                '  <div class="dashboard-week-item-main">' +
+                '    <strong>' + nombre + "</strong>" +
+                '    <span class="dashboard-week-item-meta">' + fecha + " · " + cat + " · " + escapeHtml(estado) + "</span>" +
+                "  </div>" +
+                '  <button type="button" class="dashboard-week-item-btn" onclick="openEntrenamientoFromDashboard(' + ent.id + ')">Planificar</button>' +
+                "</li>";
+        });
+        for (var i = 0; i < summary.huecosSinCrear; i++) {
+            listHtml +=
+                '<li class="dashboard-week-item dashboard-week-item--ghost">' +
+                '  <div class="dashboard-week-item-main">' +
+                '    <strong>Entrenamiento por crear</strong>' +
+                '    <span class="dashboard-week-item-meta">Asigná fecha dentro de esta semana</span>' +
+                "  </div>" +
+                '  <button type="button" class="dashboard-week-item-btn" onclick="crearEntrenamientoDesdeDashboard()">Crear</button>' +
+                "</li>";
+        }
+        listHtml += "</ul>";
+    }
+
+    var progressPct = summary.meta > 0 ? Math.min(100, Math.round((summary.planificadosCount / summary.meta) * 100)) : 0;
+
+    return (
+        '<div class="dashboard-card dashboard-card-week">' +
+        '  <div class="dashboard-week-head">' +
+        '    <div>' +
+        '      <h3 class="dashboard-card-title">Esta semana</h3>' +
+        '      <p class="dashboard-week-range">' + escapeHtml(weekLabel) + "</p>" +
+        "    </div>" +
+        '    <label class="dashboard-week-target">' +
+        '      <span>Objetivo</span>' +
+        '      <input type="number" id="dashboard-week-target" min="1" max="14" value="' + summary.meta + '" aria-label="Entrenamientos por semana">' +
+        "    </label>" +
+        "  </div>" +
+        statsHtml +
+        '  <div class="dashboard-week-progress" role="progressbar" aria-valuenow="' + progressPct + '" aria-valuemin="0" aria-valuemax="100">' +
+        '    <div class="dashboard-week-progress-bar" style="width:' + progressPct + '%"></div>' +
+        "  </div>" +
+        '  <p class="dashboard-week-summary-text">' +
+        (summary.faltanPlanificar
+            ? "Te faltan planificar <strong>" + summary.faltanPlanificar + "</strong> de <strong>" + summary.meta + "</strong> entrenamientos esta semana."
+            : "Completaste el objetivo semanal de planificación.") +
+        (summary.enSemanaCount
+            ? " Tenés <strong>" + summary.enSemanaCount + "</strong> en el calendario de la semana."
+            : " Todavía no hay entrenamientos con fecha en esta semana.") +
+        "</p>" +
+        '  <h4 class="dashboard-week-subtitle">Pendientes de planificar</h4>' +
+        listHtml +
+        '  <div class="dashboard-week-actions">' +
+        '    <button type="button" class="dashboard-btn dashboard-btn-accent" onclick="loadContent(\'planificacion\')">Ir a planificación</button>' +
+        '    <button type="button" class="dashboard-btn" onclick="crearEntrenamientoDesdeDashboard()">Nuevo entrenamiento</button>' +
+        "  </div>" +
+        "</div>"
+    );
+}
+
+function openEntrenamientoFromDashboard(entrenamientoId) {
+    loadContent("planificacion");
+    renderPlanificacionView(entrenamientoId);
+}
+
+function crearEntrenamientoDesdeDashboard() {
+    loadContent("planificacion");
+    nuevoEntrenamiento();
+}
+
+function attachDashboardWeekEvents() {
+    var targetInput = document.getElementById("dashboard-week-target");
+    if (!targetInput) return;
+    targetInput.onchange = function () {
+        saveCoachSettings({ entrenamientos_por_semana: parseInt(targetInput.value, 10) });
+        renderDashboard();
+    };
+}
+
 function formatDashboardUserName(user) {
     var raw = String((user && (user.name || user.username || user.email)) || "Entrenador").trim();
     if (!raw) return "Entrenador";
@@ -4013,6 +4218,8 @@ function renderDashboard() {
     var userAvatar = escapeHtml(getDashboardAvatarInitials(userName));
     var entrenamientos = getEntrenamientos();
     var nextEnt = getNextEntrenamiento();
+    var weekSummary = getDashboardWeekSummary();
+    var weekSectionHtml = buildDashboardWeekSectionHtml(weekSummary);
     var tip = COACHING_TIPS[Math.floor(Math.random() * COACHING_TIPS.length)];
 
     contentDiv.innerHTML = (
@@ -4043,13 +4250,7 @@ function renderDashboard() {
         '        <span class="stat-card-label">Entrenamientos creados</span>' +
         '      </div>' +
         '    </div>' +
-        '    <div class="dashboard-card dashboard-card--stat stat-card">' +
-        '      <div class="stat-card-icon">🏀</div>' +
-        '      <div class="stat-card-content">' +
-        '        <span class="stat-card-value">0</span>' +
-        '        <span class="stat-card-label">Ejercicios guardados</span>' +
-        '      </div>' +
-        '    </div>' +
+        weekSectionHtml +
         '    <div class="dashboard-card dashboard-card--stat stat-card">' +
         '      <div class="stat-card-icon">📋</div>' +
         '      <div class="stat-card-content">' +
@@ -4144,6 +4345,8 @@ function renderDashboard() {
             }
         };
     }
+
+    attachDashboardWeekEvents();
 }
 
 

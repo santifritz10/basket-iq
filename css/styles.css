@@ -515,6 +515,196 @@ body {
     color: var(--text-muted);
 }
 
+/* Semana — entrenamientos pendientes */
+.dashboard-card-week {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.dashboard-week-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.dashboard-week-range {
+    margin: 4px 0 0;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.dashboard-week-target {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.dashboard-week-target input {
+    width: 56px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.dashboard-week-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.dashboard-week-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    text-align: center;
+}
+
+.dashboard-week-stat-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1.1;
+}
+
+.dashboard-week-stat-label {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    line-height: 1.2;
+}
+
+.dashboard-week-stat--pending .dashboard-week-stat-value {
+    color: #f59e0b;
+}
+
+.dashboard-week-progress {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+}
+
+.dashboard-week-progress-bar {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-deep));
+    transition: width 0.25s ease;
+}
+
+.dashboard-week-summary-text {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.dashboard-week-summary-text strong {
+    color: var(--text);
+}
+
+.dashboard-week-subtitle {
+    margin: 4px 0 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+}
+
+.dashboard-week-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.dashboard-week-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(255, 152, 0, 0.08);
+    border: 1px solid rgba(255, 152, 0, 0.22);
+    border-radius: var(--radius-sm);
+}
+
+.dashboard-week-item--ghost {
+    background: rgba(255, 255, 255, 0.03);
+    border-style: dashed;
+    border-color: var(--card-border);
+}
+
+.dashboard-week-item-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.dashboard-week-item-main strong {
+    font-size: 0.88rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dashboard-week-item-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.dashboard-week-item-btn {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: rgba(255, 152, 0, 0.12);
+    border: 1px solid rgba(255, 152, 0, 0.35);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dashboard-week-item-btn:hover {
+    background: var(--accent);
+    color: #0d0d0f;
+}
+
+.dashboard-week-empty {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.dashboard-week-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
 /* Wide card (próximo entrenamiento) */
 .dashboard-card--wide {
     grid-column: span 2;
@@ -1059,6 +1249,10 @@ body.app-body {
     grid-column: span 4;
 }
 
+.dashboard-grid > .dashboard-card-week {
+    grid-column: span 8;
+}
+
 .dashboard-grid > .dashboard-card-next {
     grid-column: span 7;
     grid-row: span 2;
@@ -1143,12 +1337,17 @@ body.app-body {
     }
 
     .dashboard-grid > .dashboard-card--stat,
+    .dashboard-grid > .dashboard-card-week,
     .dashboard-grid > .dashboard-card-next,
     .dashboard-grid > .dashboard-card-actions,
     .dashboard-grid > .dashboard-card-tip,
     .dashboard-grid > .dashboard-card-social {
         grid-column: span 1;
         grid-row: auto;
+    }
+
+    .dashboard-week-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -3958,6 +4157,10 @@ table th {
         grid-column: span 4;
     }
 
+    .dashboard-grid > .dashboard-card-week {
+        grid-column: span 8;
+    }
+
     .dashboard-grid > .dashboard-card-next {
         grid-column: 1 / span 8;
         grid-row: span 2;
@@ -4149,6 +4352,7 @@ table th {
     }
 
     .dashboard-grid > .dashboard-card--stat,
+    .dashboard-grid > .dashboard-card-week,
     .dashboard-grid > .dashboard-card-next,
     .dashboard-grid > .dashboard-card-actions,
     .dashboard-grid > .dashboard-card-tip,
