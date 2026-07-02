@@ -455,16 +455,6 @@ const SHOOTING_HEATMAP_STORAGE_KEY = "basketLab_shootingHeatmap7";
 const PLAYERS_TRACKING_STORAGE_KEY = "basketLab_playersTracking";
 const COACH_SETTINGS_STORAGE_KEY = "basketLab_coach_settings";
 
-const DIAS_SEMANA_OPCIONES = [
-    { value: 1, label: "Lunes" },
-    { value: 2, label: "Martes" },
-    { value: 3, label: "Miércoles" },
-    { value: 4, label: "Jueves" },
-    { value: 5, label: "Viernes" },
-    { value: 6, label: "Sábado" },
-    { value: 0, label: "Domingo" }
-];
-
 const APP_DATA_TYPES = {
     plays: "plays",
     trainings: "trainings",
@@ -3976,87 +3966,96 @@ function getCoachSettingsRaw() {
     return readJsonStorageValue(key, {});
 }
 
-function getSesionesSemanales() {
-    var raw = getCoachSettingsRaw();
-    var list = Array.isArray(raw.sesiones_semanales) ? raw.sesiones_semanales : [];
-    return list
-        .map(function (s) {
-            return {
-                id: s.id,
-                nombre: String(s.nombre || "").trim(),
-                dia_semana: typeof s.dia_semana === "number" ? s.dia_semana : parseInt(s.dia_semana, 10),
-                categoria: String(s.categoria || "").trim() || "U15"
-            };
-        })
-        .filter(function (s) { return s.nombre && s.dia_semana >= 0 && s.dia_semana <= 6; });
-}
-
-function saveSesionesSemanales(sesiones) {
+function saveCoachSettingsRaw(data) {
     var key = getStorageKeyForCurrentUser(COACH_SETTINGS_STORAGE_KEY);
-    var raw = getCoachSettingsRaw();
-    raw.sesiones_semanales = sesiones;
-    localStorage.setItem(key, JSON.stringify(raw));
+    localStorage.setItem(key, JSON.stringify(data || {}));
 }
 
-function getDiaSemanaLabel(dia) {
-    var found = DIAS_SEMANA_OPCIONES.find(function (d) { return d.value === dia; });
-    return found ? found.label : "—";
-}
-
-function toIsoDateLocal(date) {
-    var y = date.getFullYear();
-    var m = String(date.getMonth() + 1).padStart(2, "0");
-    var day = String(date.getDate()).padStart(2, "0");
-    return y + "-" + m + "-" + day;
-}
-
-function getWeekDateForDayOfWeek(weekRange, diaSemana) {
-    var monday = new Date(weekRange.start);
-    var offset = diaSemana === 0 ? 6 : diaSemana - 1;
-    var d = new Date(monday);
-    d.setDate(monday.getDate() + offset);
+function formatDateKeyFromDate(date) {
+    if (!date) return "";
+    var d = new Date(date);
+    if (isNaN(d.getTime())) return "";
     d.setHours(0, 0, 0, 0);
-    return d;
+    return d.toISOString().slice(0, 10);
 }
 
-function findEntrenamientoOnDate(entrenamientos, isoDate) {
-    if (!isoDate) return null;
-    return entrenamientos.find(function (e) {
-        return getEntrenamientoFechaKey(e) === isoDate;
-    }) || null;
+function getWeekKey(weekRange) {
+    return formatDateKeyFromDate(weekRange && weekRange.start);
 }
 
-function resolveSesionSemanalEstado(slot, weekRange, entrenamientos) {
-    var fechaIso = toIsoDateLocal(getWeekDateForDayOfWeek(weekRange, slot.dia_semana));
-    var ent = findEntrenamientoOnDate(entrenamientos, fechaIso);
-    if (!ent) {
-        return {
-            fechaIso: fechaIso,
-            fechaLabel: formatFechaAR(fechaIso),
-            diaLabel: getDiaSemanaLabel(slot.dia_semana),
-            entrenamiento: null,
-            status: "pendiente",
-            statusLabel: "Sin crear"
-        };
+function getWeeklyPlanItemsForWeek(weekKey) {
+    var raw = getCoachSettingsRaw();
+    var plans = raw.weekly_plans || {};
+    return Array.isArray(plans[weekKey]) ? plans[weekKey].slice() : [];
+}
+
+function saveWeeklyPlanItemsForWeek(weekKey, items) {
+    var raw = getCoachSettingsRaw();
+    if (!raw.weekly_plans) raw.weekly_plans = {};
+    raw.weekly_plans[weekKey] = items;
+    saveCoachSettingsRaw(raw);
+}
+
+function syncWeeklyPlanLinks(items, allEntrenamientos, weekRange) {
+    var changed = false;
+    items.forEach(function (item) {
+        if (item.entrenamiento_id) return;
+        if (!item.fecha) return;
+        var match = allEntrenamientos.find(function (e) {
+            return getEntrenamientoFechaKey(e) === item.fecha && isEntrenamientoInWeek(e, weekRange);
+        });
+        if (match) {
+            item.entrenamiento_id = match.id;
+            changed = true;
+        }
+    });
+    return changed;
+}
+
+function resolveWeeklyPlanItem(item, allEntrenamientos, weekRange) {
+    var ent = null;
+    if (item.entrenamiento_id) {
+        ent = allEntrenamientos.find(function (e) { return String(e.id) === String(item.entrenamiento_id); });
     }
-    if (isEntrenamientoPlanificado(ent)) {
-        return {
-            fechaIso: fechaIso,
-            fechaLabel: formatFechaAR(fechaIso),
-            diaLabel: getDiaSemanaLabel(slot.dia_semana),
-            entrenamiento: ent,
-            status: "planificado",
-            statusLabel: "Planificado"
-        };
+    if (!ent && item.fecha) {
+        ent = allEntrenamientos.find(function (e) {
+            return getEntrenamientoFechaKey(e) === item.fecha;
+        });
     }
-    return {
-        fechaIso: fechaIso,
-        fechaLabel: formatFechaAR(fechaIso),
-        diaLabel: getDiaSemanaLabel(slot.dia_semana),
-        entrenamiento: ent,
-        status: "borrador",
-        statusLabel: "Falta armar bloques"
-    };
+    var planificado = !!(ent && isEntrenamientoPlanificado(ent));
+    return { item: item, ent: ent, planificado: planificado, pendiente: !planificado };
+}
+
+function addWeeklyPlanItem(weekKey, data) {
+    var items = getWeeklyPlanItemsForWeek(weekKey);
+    items.push({
+        id: Date.now(),
+        nombre: String(data.nombre || "Entrenamiento").trim() || "Entrenamiento",
+        fecha: data.fecha || "",
+        categoria: data.categoria || "U15",
+        entrenamiento_id: null
+    });
+    saveWeeklyPlanItemsForWeek(weekKey, items);
+}
+
+function removeWeeklyPlanItem(weekKey, planItemId) {
+    var items = getWeeklyPlanItemsForWeek(weekKey).filter(function (p) {
+        return String(p.id) !== String(planItemId);
+    });
+    saveWeeklyPlanItemsForWeek(weekKey, items);
+}
+
+function formatPlanItemFecha(fecha) {
+    if (!fecha) return "Sin fecha";
+    try {
+        return new Date(fecha + "T00:00:00").toLocaleDateString("es-AR", {
+            weekday: "short",
+            day: "2-digit",
+            month: "2-digit"
+        });
+    } catch (e) {
+        return fecha;
+    }
 }
 
 function getCurrentWeekRange(refDate) {
@@ -4094,81 +4093,45 @@ function isEntrenamientoPlanificado(ent) {
 
 function getDashboardWeekSummary() {
     var weekRange = getCurrentWeekRange();
-    var sesiones = getSesionesSemanales();
+    var weekKey = getWeekKey(weekRange);
     var all = getEntrenamientos();
-    var filas = sesiones.map(function (slot) {
-        var estado = resolveSesionSemanalEstado(slot, weekRange, all);
-        return { slot: slot, estado: estado };
+    var planItems = getWeeklyPlanItemsForWeek(weekKey);
+    if (syncWeeklyPlanLinks(planItems, all, weekRange)) {
+        saveWeeklyPlanItemsForWeek(weekKey, planItems);
+    }
+
+    var resolved = planItems.map(function (item) {
+        return resolveWeeklyPlanItem(item, all, weekRange);
     });
-    filas.sort(function (a, b) {
-        var da = a.slot.dia_semana === 0 ? 7 : a.slot.dia_semana;
-        var db = b.slot.dia_semana === 0 ? 7 : b.slot.dia_semana;
-        return da - db;
+    resolved.sort(function (a, b) {
+        var fa = a.item.fecha || "";
+        var fb = b.item.fecha || "";
+        return fa.localeCompare(fb);
     });
 
-    var planificadosCount = filas.filter(function (f) { return f.estado.status === "planificado"; }).length;
-    var faltanPlanificar = filas.filter(function (f) { return f.estado.status !== "planificado"; }).length;
-    var fechasOcupadas = {};
-    filas.forEach(function (f) {
-        if (f.estado.entrenamiento) fechasOcupadas[f.estado.fechaIso] = true;
+    var planificadosCount = resolved.filter(function (r) { return r.planificado; }).length;
+    var pendientes = resolved.filter(function (r) { return r.pendiente; });
+    var linkedIds = {};
+    planItems.forEach(function (p) {
+        if (p.entrenamiento_id) linkedIds[String(p.entrenamiento_id)] = true;
     });
-    var extras = all.filter(function (e) {
-        if (!isEntrenamientoInWeek(e, weekRange)) return false;
-        var key = getEntrenamientoFechaKey(e);
-        return key && !fechasOcupadas[key];
+
+    var enSemana = all.filter(function (e) { return isEntrenamientoInWeek(e, weekRange); });
+    var extrasSinPlanificar = enSemana.filter(function (e) {
+        return !isEntrenamientoPlanificado(e) && !linkedIds[String(e.id)];
     });
 
     return {
         weekRange: weekRange,
-        filas: filas,
-        totalSesiones: filas.length,
+        weekKey: weekKey,
+        resolved: resolved,
+        planItemsCount: resolved.length,
         planificadosCount: planificadosCount,
-        faltanPlanificar: faltanPlanificar,
-        extras: extras
+        pendientes: pendientes,
+        faltanPlanificar: pendientes.length,
+        extrasSinPlanificar: extrasSinPlanificar,
+        enSemanaCount: enSemana.length
     };
-}
-
-function addSesionSemanal(nombre, diaSemana, categoria) {
-    var list = getSesionesSemanales();
-    list.push({
-        id: Date.now() + Math.random(),
-        nombre: String(nombre || "").trim(),
-        dia_semana: diaSemana,
-        categoria: categoria || "U15"
-    });
-    saveSesionesSemanales(list);
-}
-
-function removeSesionSemanal(slotId) {
-    var list = getSesionesSemanales().filter(function (s) { return String(s.id) !== String(slotId); });
-    saveSesionesSemanales(list);
-}
-
-function crearEntrenamientoParaSlot(slotId) {
-    var slot = getSesionesSemanales().find(function (s) { return String(s.id) === String(slotId); });
-    if (!slot) return;
-    var weekRange = getCurrentWeekRange();
-    var fechaIso = toIsoDateLocal(getWeekDateForDayOfWeek(weekRange, slot.dia_semana));
-    var existing = findEntrenamientoOnDate(getEntrenamientos(), fechaIso);
-    if (existing) {
-        openEntrenamientoFromDashboard(existing.id);
-        return;
-    }
-    var id = Date.now();
-    var ent = {
-        id: id,
-        nombre: slot.nombre,
-        fecha: fechaIso,
-        categoria: slot.categoria || "U15",
-        ciclo_id: null,
-        notas_generales: "",
-        bloques: []
-    };
-    entrenamientos = getEntrenamientos();
-    entrenamientos.push(ent);
-    saveEntrenamientos();
-    loadContent("planificacion");
-    renderPlanificacionView(id);
 }
 
 function formatWeekRangeLabel(weekRange) {
@@ -4180,125 +4143,79 @@ function formatWeekRangeLabel(weekRange) {
 
 function buildDashboardWeekSectionHtml(summary) {
     var weekLabel = formatWeekRangeLabel(summary.weekRange);
-    var diaOptions = DIAS_SEMANA_OPCIONES.map(function (d) {
-        return '<option value="' + d.value + '">' + d.label + "</option>";
+    var minDate = formatDateKeyFromDate(summary.weekRange.start);
+    var maxDate = formatDateKeyFromDate(summary.weekRange.end);
+    var catOptions = ["U13", "U15", "U17", "Primera", "Otro"].map(function (c) {
+        return '<option value="' + c + '">' + c + "</option>";
     }).join("");
 
-    var progressPct = summary.totalSesiones > 0
-        ? Math.min(100, Math.round((summary.planificadosCount / summary.totalSesiones) * 100))
-        : 0;
-
-    var summaryLine = summary.totalSesiones
-        ? "<strong>" + summary.planificadosCount + "</strong> de <strong>" + summary.totalSesiones + "</strong> entrenamientos listos esta semana."
-        : "Definí abajo qué entrenamientos tenés que armar (día y nombre).";
-
     var listHtml = "";
-    if (!summary.filas.length) {
-        listHtml =
-            '<p class="dashboard-week-empty">Todavía no cargaste entrenamientos para esta semana. Usá el formulario para agregar cada sesión (ej: <em>Martes — Táctica U15</em>).</p>';
+    if (!summary.resolved.length && !summary.extrasSinPlanificar.length) {
+        listHtml = '<p class="dashboard-week-empty">Agregá los entrenamientos que tenés que armar esta semana (día, nombre y categoría).</p>';
     } else {
-        var listScrollClass = summary.filas.length > 4 ? " dashboard-week-list--scroll" : "";
-        listHtml = '<ul class="dashboard-week-list' + listScrollClass + '">';
-        summary.filas.forEach(function (fila) {
-            var slot = fila.slot;
-            var est = fila.estado;
-            var statusClass = "dashboard-week-status--" + est.status;
-            var actionBtn = "";
-            if (est.status === "planificado") {
-                actionBtn =
-                    '<button type="button" class="dashboard-week-item-btn" onclick="openEntrenamientoFromDashboard(' +
-                    est.entrenamiento.id +
-                    ')">Ver</button>';
-            } else if (est.status === "borrador") {
-                actionBtn =
-                    '<button type="button" class="dashboard-week-item-btn dashboard-week-item-btn--accent" onclick="openEntrenamientoFromDashboard(' +
-                    est.entrenamiento.id +
-                    ')">Armar</button>';
-            } else {
-                actionBtn =
-                    '<button type="button" class="dashboard-week-item-btn dashboard-week-item-btn--accent" onclick="crearEntrenamientoParaSlot(' +
-                    slot.id +
-                    ')">Crear</button>';
-            }
+        listHtml = '<ul class="dashboard-week-list">';
+        summary.resolved.forEach(function (row) {
+            var item = row.item;
+            var nombre = escapeHtml(item.nombre || "Entrenamiento");
+            var fecha = formatPlanItemFecha(item.fecha);
+            var cat = escapeHtml(item.categoria || "General");
+            var statusClass = row.planificado ? " dashboard-week-item--done" : "";
+            var statusLabel = row.planificado ? "Planificado" : "Pendiente";
+            var actionBtn = row.ent
+                ? '<button type="button" class="dashboard-week-item-btn" onclick="openEntrenamientoFromDashboard(' + row.ent.id + ')">' + (row.planificado ? "Ver" : "Planificar") + "</button>"
+                : '<button type="button" class="dashboard-week-item-btn" onclick="crearEntrenamientoDesdePlanItem(' + item.id + ')">Crear</button>';
             listHtml +=
-                '<li class="dashboard-week-item dashboard-week-item--' +
-                est.status +
-                '">' +
-                '  <div class="dashboard-week-item-day">' +
-                escapeHtml(est.diaLabel) +
-                "</div>" +
+                '<li class="dashboard-week-item' + statusClass + '">' +
                 '  <div class="dashboard-week-item-main">' +
-                '    <strong>' +
-                escapeHtml(slot.nombre) +
-                "</strong>" +
-                '    <span class="dashboard-week-item-meta">' +
-                escapeHtml(est.fechaLabel) +
-                " · " +
-                escapeHtml(slot.categoria) +
-                "</span>" +
+                '    <strong>' + nombre + "</strong>" +
+                '    <span class="dashboard-week-item-meta">' + escapeHtml(fecha) + " · " + cat + ' · <span class="dashboard-week-status">' + statusLabel + "</span></span>" +
                 "  </div>" +
-                '  <span class="dashboard-week-status ' +
-                statusClass +
-                '">' +
-                escapeHtml(est.statusLabel) +
-                "</span>" +
+                '  <div class="dashboard-week-item-actions">' +
                 actionBtn +
-                '  <button type="button" class="dashboard-week-item-remove" onclick="removeSesionSemanalAndRefresh(' +
-                slot.id +
-                ')" title="Quitar de la lista" aria-label="Quitar">×</button>' +
+                '    <button type="button" class="dashboard-week-item-btn dashboard-week-item-btn--ghost" onclick="removeWeeklyPlanItemFromDashboard(' + item.id + ')" title="Quitar">✕</button>' +
+                "  </div>" +
+                "</li>";
+        });
+        summary.extrasSinPlanificar.forEach(function (ent) {
+            listHtml +=
+                '<li class="dashboard-week-item dashboard-week-item--extra">' +
+                '  <div class="dashboard-week-item-main">' +
+                '    <strong>' + escapeHtml(ent.nombre || "Sin nombre") + "</strong>" +
+                '    <span class="dashboard-week-item-meta">' + formatEntrenamientoFecha(ent) + " · En calendario, sin bloques</span>" +
+                "  </div>" +
+                '  <button type="button" class="dashboard-week-item-btn" onclick="openEntrenamientoFromDashboard(' + ent.id + ')">Planificar</button>' +
                 "</li>";
         });
         listHtml += "</ul>";
     }
 
-    var extrasHtml = "";
-    if (summary.extras && summary.extras.length) {
-        extrasHtml = '<div class="dashboard-week-extras"><p class="dashboard-week-extras-title">En calendario (sin slot asignado)</p><ul class="dashboard-week-extras-list">';
-        summary.extras.forEach(function (ent) {
-            extrasHtml +=
-                '<li><button type="button" class="dashboard-week-extras-link" onclick="openEntrenamientoFromDashboard(' +
-                ent.id +
-                ')">' +
-                escapeHtml(ent.nombre || "Sin nombre") +
-                " · " +
-                escapeHtml(formatEntrenamientoFecha(ent)) +
-                "</button></li>";
-        });
-        extrasHtml += "</ul></div>";
-    }
+    var progressPct = summary.planItemsCount > 0
+        ? Math.min(100, Math.round((summary.planificadosCount / summary.planItemsCount) * 100))
+        : 0;
+    var summaryLine = summary.planItemsCount
+        ? "<strong>" + summary.planificadosCount + "</strong> de <strong>" + summary.planItemsCount + "</strong> entrenamientos de tu lista están planificados."
+        : "Todavía no cargaste entrenamientos para esta semana.";
 
     return (
-        '<div class="dashboard-card dashboard-card-week">' +
+        '<div class="dashboard-card dashboard-card-week" data-week-key="' + escapeHtml(summary.weekKey) + '">' +
         '  <div class="dashboard-week-head">' +
         '    <div class="dashboard-week-head-text">' +
-        '      <h3 class="dashboard-card-title">Entrenamientos de esta semana</h3>' +
-        '      <p class="dashboard-week-range">' + escapeHtml(weekLabel) + "</p>" +
+        '      <h3 class="dashboard-card-title">Entrenamientos a planificar</h3>' +
+        '      <p class="dashboard-week-range">Semana del ' + escapeHtml(weekLabel) + "</p>" +
         "    </div>" +
         "  </div>" +
-        (summary.totalSesiones
-            ? (
-                '  <div class="dashboard-week-progress" role="progressbar" aria-valuenow="' +
-                progressPct +
-                '" aria-valuemin="0" aria-valuemax="100">' +
-                '    <div class="dashboard-week-progress-bar" style="width:' +
-                progressPct +
-                '%"></div>' +
-                "  </div>"
-            )
-            : "") +
-        '  <p class="dashboard-week-summary-text">' + summaryLine + "</p>" +
         '  <form id="dashboard-week-add-form" class="dashboard-week-add-form">' +
-        '    <input type="text" id="dashboard-week-add-nombre" class="dashboard-week-add-input" placeholder="Ej: Táctica presión" required maxlength="80">' +
-        '    <select id="dashboard-week-add-dia" class="dashboard-week-add-select" aria-label="Día">' +
-        diaOptions +
-        "</select>" +
-        '    <select id="dashboard-week-add-cat" class="dashboard-week-add-select dashboard-week-add-select--cat" aria-label="Categoría">' +
-        '      <option value="U13">U13</option><option value="U15" selected>U15</option><option value="U17">U17</option><option value="Primera">Primera</option><option value="Otro">Otro</option>' +
-        "</select>" +
-        '    <button type="submit" class="dashboard-week-add-btn">+ Agregar</button>' +
+        '    <input type="text" name="nombre" placeholder="Nombre (ej: Entrenamiento martes)" required>' +
+        '    <input type="date" name="fecha" min="' + minDate + '" max="' + maxDate + '" required aria-label="Fecha del entrenamiento">' +
+        '    <select name="categoria" aria-label="Categoría">' + catOptions + "</select>" +
+        '    <button type="submit" class="dashboard-week-add-btn">Agregar</button>' +
         "  </form>" +
+        '  <div class="dashboard-week-progress" role="progressbar" aria-valuenow="' + progressPct + '" aria-valuemin="0" aria-valuemax="100" aria-label="Progreso semanal">' +
+        '    <div class="dashboard-week-progress-bar" style="width:' + progressPct + '%"></div>' +
+        "  </div>" +
+        '  <p class="dashboard-week-summary-text">' + summaryLine + "</p>" +
+        (summary.resolved.length || summary.extrasSinPlanificar.length ? '<h4 class="dashboard-week-subtitle">Tu lista</h4>' : "") +
         listHtml +
-        extrasHtml +
         '  <div class="dashboard-week-actions">' +
         '    <button type="button" class="dashboard-btn dashboard-btn-accent" onclick="loadContent(\'planificacion\')">Ir a planificación</button>' +
         "  </div>" +
@@ -4306,31 +4223,67 @@ function buildDashboardWeekSectionHtml(summary) {
     );
 }
 
-function removeSesionSemanalAndRefresh(slotId) {
-    removeSesionSemanal(slotId);
-    renderDashboard();
-}
-
 function openEntrenamientoFromDashboard(entrenamientoId) {
     loadContent("planificacion");
     renderPlanificacionView(entrenamientoId);
 }
 
-function crearEntrenamientoDesdeDashboard() {
+function crearEntrenamientoDesdePlanItem(planItemId) {
+    var weekRange = getCurrentWeekRange();
+    var weekKey = getWeekKey(weekRange);
+    var items = getWeeklyPlanItemsForWeek(weekKey);
+    var item = items.find(function (p) { return String(p.id) === String(planItemId); });
+    if (!item) return;
+
     loadContent("planificacion");
-    nuevoEntrenamiento();
+    var id = Date.now();
+    var ent = {
+        id: id,
+        nombre: item.nombre || "",
+        fecha: item.fecha || "",
+        categoria: item.categoria || "U15",
+        ciclo_id: null,
+        notas_generales: "",
+        bloques: []
+    };
+    entrenamientos = getEntrenamientos();
+    entrenamientos.push(ent);
+    item.entrenamiento_id = id;
+    saveWeeklyPlanItemsForWeek(weekKey, items);
+    saveEntrenamientos();
+    renderPlanificacionView(id);
+}
+
+function removeWeeklyPlanItemFromDashboard(planItemId) {
+    var weekKey = getWeekKey(getCurrentWeekRange());
+    removeWeeklyPlanItem(weekKey, planItemId);
+    renderDashboard();
 }
 
 function attachDashboardWeekEvents() {
     var form = document.getElementById("dashboard-week-add-form");
-    if (!form) return;
+    var weekCard = document.querySelector(".dashboard-card-week");
+    if (!form || !weekCard) return;
+
+    var weekKey = weekCard.getAttribute("data-week-key") || getWeekKey(getCurrentWeekRange());
+
     form.onsubmit = function (ev) {
         ev.preventDefault();
-        var nombre = document.getElementById("dashboard-week-add-nombre").value.trim();
-        var dia = parseInt(document.getElementById("dashboard-week-add-dia").value, 10);
-        var cat = document.getElementById("dashboard-week-add-cat").value;
-        if (!nombre) return;
-        addSesionSemanal(nombre, dia, cat);
+        var fd = new FormData(form);
+        var nombre = String(fd.get("nombre") || "").trim();
+        var fecha = String(fd.get("fecha") || "").trim();
+        var categoria = String(fd.get("categoria") || "U15").trim();
+        if (!nombre || !fecha) return;
+
+        var minDate = formatDateKeyFromDate(getCurrentWeekRange().start);
+        var maxDate = formatDateKeyFromDate(getCurrentWeekRange().end);
+        if (fecha < minDate || fecha > maxDate) {
+            alert("La fecha debe estar dentro de la semana actual.");
+            return;
+        }
+
+        addWeeklyPlanItem(weekKey, { nombre: nombre, fecha: fecha, categoria: categoria });
+        form.reset();
         renderDashboard();
     };
 }
@@ -4435,7 +4388,8 @@ function renderDashboard() {
         '      </div>' +
         '    </div>' +
         weekSectionHtml +
-        '    <div class="dashboard-card dashboard-card--wide dashboard-card-next">' +
+        '    <div class="dashboard-pair-row">' +
+        '    <div class="dashboard-card dashboard-card-next">' +
         '      <h3 class="dashboard-card-title">Próximo entrenamiento</h3>' +
         (nextEnt
             ? (
@@ -4470,6 +4424,8 @@ function renderDashboard() {
         "        </button>" +
         '      </div>' +
         '    </div>' +
+        '    </div>' +
+        '    <div class="dashboard-pair-row">' +
         '    <div class="dashboard-card dashboard-card-tip dashboard-card--support">' +
         '      <h3 class="dashboard-card-title">Tip de coaching</h3>' +
         '      <p class="dashboard-tip-text">"' + tip + '"</p>' +
@@ -4487,6 +4443,7 @@ function renderDashboard() {
         '          <span class="dashboard-social-text">Instagram</span>' +
         '        </a>' +
         '      </div>' +
+        '    </div>' +
         '    </div>' +
         '  </div>' +
         '</div>'

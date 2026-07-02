@@ -82,7 +82,66 @@
         return migrated;
     }
 
-    function loadState() {
+    function emptyZonesState() {
+        var empty = {};
+        ZONES.forEach(function (z) {
+            empty[z.id] = { attempts: 0, made: 0 };
+        });
+        return sanitizeState(empty);
+    }
+
+    function normalizeSession(raw) {
+        var s = raw || {};
+        return {
+            id: String(s.id || "shoot_" + Date.now()),
+            fecha: String(s.fecha || "").slice(0, 10),
+            nombre: String(s.nombre || "Sesión de tiro").trim() || "Sesión de tiro",
+            player_ids: Array.isArray(s.player_ids) ? s.player_ids.map(String) : [],
+            zones: sanitizeState(s.zones || {}),
+            created_at: s.created_at || new Date().toISOString(),
+            updated_at: s.updated_at || new Date().toISOString()
+        };
+    }
+
+    function isLegacyZonePayload(raw) {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
+        if (raw.sessions || raw.version) return false;
+        return ZONES.some(function (z) {
+            return Object.prototype.hasOwnProperty.call(raw, z.id);
+        });
+    }
+
+    function migratePayload(raw) {
+        if (raw && Array.isArray(raw.sessions)) {
+            var sessions = raw.sessions.map(normalizeSession);
+            var activeId = raw.active_session_id;
+            if (!activeId || !sessions.some(function (s) { return s.id === activeId; })) {
+                activeId = sessions[0] ? sessions[0].id : null;
+            }
+            return { version: 2, active_session_id: activeId, sessions: sessions };
+        }
+
+        if (isLegacyZonePayload(raw)) {
+            var zones = sanitizeState(raw);
+            var hasShots = ZONES.some(function (z) {
+                return zoneStats(zones, z.id).attempts > 0;
+            });
+            if (hasShots) {
+                var legacySession = normalizeSession({
+                    id: "legacy_migrated",
+                    fecha: new Date().toISOString().slice(0, 10),
+                    nombre: "Sesión anterior",
+                    player_ids: [],
+                    zones: zones
+                });
+                return { version: 2, active_session_id: legacySession.id, sessions: [legacySession] };
+            }
+        }
+
+        return { version: 2, active_session_id: null, sessions: [] };
+    }
+
+    function loadPayload() {
         var base = {};
         if (global.BasketLabDataSync && typeof global.BasketLabDataSync.loadData === "function") {
             var cloudBacked = global.BasketLabDataSync.loadData("shooting_heatmap");
@@ -95,14 +154,71 @@
                 base = {};
             }
         }
-        return sanitizeState(base);
+        return migratePayload(base);
+    }
+
+    function savePayload(payload) {
+        if (global.BasketLabDataSync && typeof global.BasketLabDataSync.saveData === "function") {
+            global.BasketLabDataSync.saveData("shooting_heatmap", payload);
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    }
+
+    function loadState() {
+        var payload = loadPayload();
+        var active = payload.sessions.find(function (s) { return s.id === payload.active_session_id; });
+        return active ? sanitizeState(active.zones) : emptyZonesState();
     }
 
     function saveState(state) {
-        if (global.BasketLabDataSync && typeof global.BasketLabDataSync.saveData === "function") {
-            global.BasketLabDataSync.saveData("shooting_heatmap", state);
+        var payload = loadPayload();
+        var active = payload.sessions.find(function (s) { return s.id === payload.active_session_id; });
+        if (!active) return;
+        active.zones = sanitizeState(state);
+        active.updated_at = new Date().toISOString();
+        savePayload(payload);
+    }
+
+    function loadPlayers() {
+        if (global.BasketLabDataSync && typeof global.BasketLabDataSync.loadData === "function") {
+            var list = global.BasketLabDataSync.loadData("players_tracking");
+            return Array.isArray(list) ? list : [];
         }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        return [];
+    }
+
+    function formatSessionFecha(fecha) {
+        if (!fecha) return "Sin fecha";
+        try {
+            return new Date(fecha + "T00:00:00").toLocaleDateString("es-AR", {
+                weekday: "short",
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric"
+            });
+        } catch (e) {
+            return fecha;
+        }
+    }
+
+    function sessionPlayersLabel(session, players) {
+        if (!session || !session.player_ids || !session.player_ids.length) return "Sin jugadores";
+        var names = session.player_ids.map(function (pid) {
+            var p = players.find(function (pl) { return String(pl.id) === String(pid); });
+            return p ? String(p.name || "").trim() : "";
+        }).filter(Boolean);
+        return names.length ? names.join(", ") : "Sin jugadores";
+    }
+
+    function sessionTotalShots(zones) {
+        var ta = 0;
+        var tm = 0;
+        ZONES.forEach(function (z) {
+            var s = zoneStats(zones, z.id);
+            ta += s.attempts;
+            tm += s.made;
+        });
+        return { attempts: ta, made: tm };
     }
 
     function maxAttempts(state) {
@@ -277,17 +393,292 @@
 
     var ShootingHeatmap = {
         root: null,
+        payload: null,
         state: {},
         selectedId: null,
         courtMap: null,
+        players: [],
+        showNewSessionForm: false,
 
         init: function (el) {
             if (!el) return;
             this.root = el;
-            this.state = loadState();
+            this.payload = loadPayload();
+            this.players = loadPlayers();
+            this.syncStateFromActiveSession();
+            this.selectedId = null;
+            this.showNewSessionForm = !this.getActiveSession();
+            this.render();
+            this.bind();
+        },
+
+        syncStateFromActiveSession: function () {
+            var active = this.getActiveSession();
+            this.state = active ? sanitizeState(active.zones) : emptyZonesState();
+        },
+
+        getActiveSession: function () {
+            if (!this.payload || !this.payload.active_session_id) return null;
+            return this.payload.sessions.find(function (s) {
+                return s.id === this.payload.active_session_id;
+            }, this) || null;
+        },
+
+        persistActiveSessionZones: function () {
+            var active = this.getActiveSession();
+            if (!active) return;
+            active.zones = sanitizeState(this.state);
+            active.updated_at = new Date().toISOString();
+            savePayload(this.payload);
+        },
+
+        switchSession: function (sessionId) {
+            this.persistActiveSessionZones();
+            this.payload.active_session_id = sessionId;
+            savePayload(this.payload);
+            this.syncStateFromActiveSession();
+            this.selectedId = null;
+            this.showNewSessionForm = false;
+            this.render();
+            this.bind();
+        },
+
+        createSession: function (data) {
+            var session = normalizeSession({
+                id: "shoot_" + Date.now(),
+                fecha: data.fecha,
+                nombre: data.nombre,
+                player_ids: data.player_ids || [],
+                zones: emptyZonesState()
+            });
+            this.persistActiveSessionZones();
+            this.payload.sessions.unshift(session);
+            this.payload.active_session_id = session.id;
+            savePayload(this.payload);
+            this.syncStateFromActiveSession();
+            this.selectedId = null;
+            this.showNewSessionForm = false;
+            this.render();
+            this.bind();
+        },
+
+        updateActiveSessionMeta: function (data) {
+            var active = this.getActiveSession();
+            if (!active) return;
+            if (data.nombre != null) active.nombre = String(data.nombre).trim() || active.nombre;
+            if (data.fecha != null) active.fecha = String(data.fecha).slice(0, 10);
+            if (data.player_ids != null) active.player_ids = data.player_ids.map(String);
+            active.updated_at = new Date().toISOString();
+            savePayload(this.payload);
+            this.players = loadPlayers();
+            this.render();
+            this.bind();
+        },
+
+        deleteSession: function (sessionId) {
+            if (!confirm("¿Borrar esta sesión de tiro y sus registros?")) return;
+            this.payload.sessions = this.payload.sessions.filter(function (s) { return s.id !== sessionId; });
+            if (this.payload.active_session_id === sessionId) {
+                this.payload.active_session_id = this.payload.sessions[0] ? this.payload.sessions[0].id : null;
+            }
+            savePayload(this.payload);
+            this.syncStateFromActiveSession();
+            this.selectedId = null;
+            this.showNewSessionForm = !this.getActiveSession();
+            this.render();
+            this.bind();
+        },
+
+        resetActiveSessionStats: function () {
+            var active = this.getActiveSession();
+            if (!active) return;
+            if (!confirm("¿Reiniciar las estadísticas de esta sesión?")) return;
+            this.state = emptyZonesState();
+            active.zones = this.state;
+            active.updated_at = new Date().toISOString();
+            savePayload(this.payload);
             this.selectedId = null;
             this.render();
             this.bind();
+        },
+
+        sessionsSorted: function () {
+            return (this.payload.sessions || []).slice().sort(function (a, b) {
+                var fa = a.fecha || "";
+                var fb = b.fecha || "";
+                if (fa !== fb) return fb.localeCompare(fa);
+                return (b.updated_at || "").localeCompare(a.updated_at || "");
+            });
+        },
+
+        playerPickerHtml: function (selectedIds, inputPrefix) {
+            var prefix = inputPrefix || "shx";
+            if (!this.players.length) {
+                return '<p class="shx-session-hint">No hay jugadores cargados. Agregalos en <button type="button" class="shx-link-btn" data-shx-goto-players>Seguimiento de jugadores</button>.</p>';
+            }
+            var selected = new Set((selectedIds || []).map(String));
+            return (
+                '<div class="shx-player-picks">' +
+                this.players.map(function (p) {
+                    var pid = String(p.id);
+                    var checked = selected.has(pid) ? " checked" : "";
+                    var label = escapeHtml(p.name || "Sin nombre");
+                    var meta = [p.position, p.category].filter(Boolean).join(" · ");
+                    return (
+                        '<label class="shx-player-pick">' +
+                        '<input type="checkbox" name="' + prefix + '-player" value="' + pid + '"' + checked + ">" +
+                        "<span><strong>" + label + "</strong>" +
+                        (meta ? '<small>' + escapeHtml(meta) + "</small>" : "") +
+                        "</span></label>"
+                    );
+                }).join("") +
+                "</div>"
+            );
+        },
+
+        sessionsPanelHtml: function () {
+            var self = this;
+            var sessions = this.sessionsSorted();
+            var active = this.getActiveSession();
+            var listHtml = sessions.length
+                ? sessions.map(function (s) {
+                    var totals = sessionTotalShots(s.zones);
+                    var isActive = active && s.id === active.id;
+                    return (
+                        '<button type="button" class="shx-session-item' + (isActive ? " shx-session-item--active" : "") + '" data-shx-session-id="' + s.id + '">' +
+                        '<span class="shx-session-item-date">' + escapeHtml(formatSessionFecha(s.fecha)) + "</span>" +
+                        '<span class="shx-session-item-name">' + escapeHtml(s.nombre) + "</span>" +
+                        '<span class="shx-session-item-meta">' + escapeHtml(sessionPlayersLabel(s, self.players)) + " · " + totals.attempts + " tiros</span>" +
+                        "</button>"
+                    );
+                }).join("")
+                : '<p class="shx-session-hint">Todavía no hay sesiones registradas.</p>';
+
+            var newFormHtml = this.showNewSessionForm
+                ? (
+                    '<form id="shx-new-session-form" class="shx-session-form">' +
+                    '<div class="shx-session-form-row">' +
+                    '<label>Nombre<input type="text" name="nombre" placeholder="Ej: Sesión martes U15" required></label>' +
+                    '<label>Fecha<input type="date" name="fecha" value="' + new Date().toISOString().slice(0, 10) + '" required></label>' +
+                    "</div>" +
+                    '<p class="shx-session-form-label">Jugadores de la sesión</p>' +
+                    this.playerPickerHtml([], "shx-new") +
+                    '<div class="shx-session-form-actions">' +
+                    '<button type="submit" class="toolbar-button toolbar-button-accent">Guardar sesión</button>' +
+                    (sessions.length ? '<button type="button" class="toolbar-button" id="shx-cancel-new-session">Cancelar</button>' : "") +
+                    "</div></form>"
+                )
+                : '<button type="button" class="toolbar-button toolbar-button-accent" id="shx-show-new-session">Nueva sesión</button>';
+
+            var activeMetaHtml = active
+                ? (
+                    '<form id="shx-active-session-form" class="shx-session-form shx-session-form--active">' +
+                    '<div class="shx-session-form-row">' +
+                    '<label>Nombre<input type="text" name="nombre" value="' + escapeHtml(active.nombre) + '" required></label>' +
+                    '<label>Fecha<input type="date" name="fecha" value="' + escapeHtml(active.fecha || "") + '" required></label>' +
+                    "</div>" +
+                    '<p class="shx-session-form-label">Jugadores asignados</p>' +
+                    this.playerPickerHtml(active.player_ids, "shx-active") +
+                    '<div class="shx-session-form-actions">' +
+                    '<button type="submit" class="toolbar-button">Actualizar sesión</button>' +
+                    '<button type="button" class="toolbar-button" id="shx-delete-active-session">Borrar sesión</button>' +
+                    "</div></form>"
+                )
+                : "";
+
+            return (
+                '<section class="shx-sessions-card">' +
+                '<div class="shx-sessions-head">' +
+                "<div><h3>Sesiones de lanzamiento</h3>" +
+                "<p>Registrá cada sesión con fecha y asignala a tus jugadores.</p></div>" +
+                newFormHtml +
+                "</div>" +
+                '<div class="shx-session-list">' + listHtml + "</div>" +
+                activeMetaHtml +
+                "</section>"
+            );
+        },
+
+        renderSessionsPanel: function () {
+            var wrap = this.root && this.root.querySelector(".shx-sessions-card");
+            if (!wrap) return;
+            var temp = document.createElement("div");
+            temp.innerHTML = this.sessionsPanelHtml();
+            var next = temp.firstElementChild;
+            if (next) wrap.replaceWith(next);
+            this.bindSessionsPanel();
+        },
+
+        bindSessionsPanel: function () {
+            var self = this;
+
+            this.root.querySelectorAll("[data-shx-session-id]").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    self.switchSession(btn.getAttribute("data-shx-session-id"));
+                });
+            });
+
+            var showBtn = document.getElementById("shx-show-new-session");
+            if (showBtn) {
+                showBtn.addEventListener("click", function () {
+                    self.showNewSessionForm = true;
+                    self.renderSessionsPanel();
+                });
+            }
+
+            var cancelBtn = document.getElementById("shx-cancel-new-session");
+            if (cancelBtn) {
+                cancelBtn.addEventListener("click", function () {
+                    self.showNewSessionForm = false;
+                    self.renderSessionsPanel();
+                });
+            }
+
+            var newForm = document.getElementById("shx-new-session-form");
+            if (newForm) {
+                newForm.addEventListener("submit", function (ev) {
+                    ev.preventDefault();
+                    var fd = new FormData(newForm);
+                    var playerIds = Array.from(newForm.querySelectorAll('input[name="shx-new-player"]:checked')).map(function (el) {
+                        return el.value;
+                    });
+                    self.createSession({
+                        nombre: fd.get("nombre"),
+                        fecha: fd.get("fecha"),
+                        player_ids: playerIds
+                    });
+                });
+            }
+
+            var activeForm = document.getElementById("shx-active-session-form");
+            if (activeForm) {
+                activeForm.addEventListener("submit", function (ev) {
+                    ev.preventDefault();
+                    var fd = new FormData(activeForm);
+                    var playerIds = Array.from(activeForm.querySelectorAll('input[name="shx-active-player"]:checked')).map(function (el) {
+                        return el.value;
+                    });
+                    self.updateActiveSessionMeta({
+                        nombre: fd.get("nombre"),
+                        fecha: fd.get("fecha"),
+                        player_ids: playerIds
+                    });
+                });
+            }
+
+            var deleteBtn = document.getElementById("shx-delete-active-session");
+            if (deleteBtn) {
+                deleteBtn.addEventListener("click", function () {
+                    var active = self.getActiveSession();
+                    if (active) self.deleteSession(active.id);
+                });
+            }
+
+            this.root.querySelectorAll("[data-shx-goto-players]").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    if (typeof global.loadContent === "function") global.loadContent("player_tracking");
+                });
+            });
         },
 
         getZoneStats: function (zoneId) {
@@ -295,19 +686,28 @@
         },
 
         render: function () {
+            this.players = loadPlayers();
             var state = this.state;
+            var active = this.getActiveSession();
+            var hasSession = !!active;
+            var sessionNotice = hasSession
+                ? '<p class="shx-active-session-banner">Sesión activa: <strong>' + escapeHtml(active.nombre) + "</strong> · " + escapeHtml(formatSessionFecha(active.fecha)) + " · " + escapeHtml(sessionPlayersLabel(active, this.players)) + "</p>"
+                : '<p class="shx-active-session-banner shx-active-session-banner--warn">Creá o seleccioná una sesión para registrar lanzamientos.</p>';
+
             this.root.innerHTML =
                 '<div class="shx-wrap">' +
+                this.sessionsPanelHtml() +
                 '<header class="shx-header">' +
                 "<h2>Entrenamiento de tiro</h2>" +
-                "<p>UI por capas: cancha clara, zonas táctiles y estadísticas de lectura rápida.</p>" +
+                "<p>Mapa por zonas con registro por sesión y jugadores asignados.</p>" +
+                sessionNotice +
                 '<div class="shx-legend">' +
                 '<span><i style="background:#ef5350"></i> &lt;40%</span>' +
                 '<span><i style="background:#fbc02d"></i> 40–60%</span>' +
                 '<span><i style="background:#66bb6a"></i> &gt;60%</span>' +
                 '<span><i style="background:#6b7280"></i> Sin tiros</span>' +
                 "</div></header>" +
-                '<div class="shx-layout">' +
+                '<div class="shx-layout' + (hasSession ? "" : " shx-layout--disabled") + '">' +
                 '<section class="shx-court-col">' +
                 '<div id="shx-court-map"></div>' +
                 "</section>" +
@@ -336,7 +736,7 @@
                 '<ul class="shx-workout-list" id="shx-workout-list"></ul>' +
                 "</div>" +
                 '<div class="shx-toolbar">' +
-                '<button type="button" class="toolbar-button" id="shx-btn-reset">Reiniciar estadísticas</button>' +
+                '<button type="button" class="toolbar-button" id="shx-btn-reset"' + (hasSession ? "" : " disabled") + '>Reiniciar sesión activa</button>' +
                 "</div></section></div></div>";
 
             this.courtMap = new global.BasketballCourtMap({
@@ -365,6 +765,22 @@
             }
         },
 
+        refreshSessionListMeta: function () {
+            var self = this;
+            if (!this.root) return;
+            this.root.querySelectorAll("[data-shx-session-id]").forEach(function (btn) {
+                var sessionId = btn.getAttribute("data-shx-session-id");
+                var session = self.payload.sessions.find(function (s) { return s.id === sessionId; });
+                if (!session) return;
+                var zones = session.id === self.payload.active_session_id ? self.state : session.zones;
+                var totals = sessionTotalShots(zones);
+                var meta = btn.querySelector(".shx-session-item-meta");
+                if (meta) {
+                    meta.textContent = sessionPlayersLabel(session, self.players) + " · " + totals.attempts + " tiros";
+                }
+            });
+        },
+
         refreshTableRow: function (zoneId) {
             var row = this.root.querySelector('tr[data-zone-row="' + zoneId + '"]');
             if (!row) return;
@@ -387,6 +803,7 @@
         },
 
         selectZone: function (zoneId) {
+            if (!this.getActiveSession()) return;
             this.selectedId = zoneId;
             this.courtMap.setSelected(zoneId);
             this.root.querySelectorAll('[data-zone-btn]').forEach(function (btn) {
@@ -403,20 +820,25 @@
         },
 
         record: function (zoneId, made) {
-            if (!zoneId) return;
+            if (!zoneId || !this.getActiveSession()) return;
             var s = this.getZoneStats(zoneId);
             s.attempts += 1;
             if (made) s.made += 1;
             this.state[zoneId] = { attempts: s.attempts, made: s.made };
-            saveState(this.state);
+            this.persistActiveSessionZones();
             this.courtMap.updateZone(zoneId);
             this.refreshTableRow(zoneId);
             this.refreshZoneChip(zoneId);
             this.updateTotalLine();
+            this.refreshSessionListMeta();
         },
 
         bind: function () {
             var self = this;
+
+            this.bindSessionsPanel();
+
+            if (!this.getActiveSession()) return;
 
             this.root.querySelectorAll('[data-zone-btn]').forEach(function (btn) {
                 btn.addEventListener("click", function () {
@@ -447,12 +869,7 @@
             });
 
             document.getElementById("shx-btn-reset").addEventListener("click", function () {
-                if (!confirm("¿Borrar todas las estadísticas de tiro?")) return;
-                self.state = sanitizeState({});
-                saveState(self.state);
-                self.selectedId = null;
-                self.render();
-                self.bind();
+                self.resetActiveSessionStats();
             });
         }
     };
