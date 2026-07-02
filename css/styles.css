@@ -3141,6 +3141,15 @@ button:focus-visible,
     color: var(--text-muted);
 }
 
+.shx-build-tag {
+    margin: 6px 0 0 !important;
+    font-size: 0.72rem !important;
+    color: rgba(255, 152, 0, 0.85) !important;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
 .shx-legend {
     margin-top: 12px;
     display: flex;
@@ -3185,6 +3194,15 @@ button:focus-visible,
     padding: 16px;
     margin-bottom: 16px;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+#shooting-heatmap-root .shx-sessions-card {
+    background: var(--card-bg) !important;
+    border: 1px solid var(--card-border) !important;
+    border-radius: 14px !important;
+    padding: 16px !important;
+    margin-bottom: 16px !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18) !important;
 }
 
 .shx-sessions-head {

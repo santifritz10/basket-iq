@@ -476,6 +476,7 @@ let dataSyncDirtyTypes = {};
 let dataSyncInProgress = false;
 let dataSyncBootstrapPromise = null;
 let dataSyncBoundOnlineListener = false;
+let dataSyncBoundLifecycleListener = false;
 
 function getDefaultDataForType(dataType) {
     if (dataType === APP_DATA_TYPES.shootingHeatmap) return {};
@@ -487,6 +488,96 @@ function hasDataContent(dataType, value) {
         return value && typeof value === "object" && Object.keys(value).length > 0;
     }
     return Array.isArray(value) && value.length > 0;
+}
+
+function getItemSyncTimestamp(item) {
+    if (!item || typeof item !== "object") return 0;
+    var ts = Date.parse(item.updated_at || item.created_at || 0);
+    return isNaN(ts) ? 0 : ts;
+}
+
+function getArraySyncTimestamp(arr) {
+    if (!Array.isArray(arr) || !arr.length) return 0;
+    return arr.reduce(function (max, item) {
+        return Math.max(max, getItemSyncTimestamp(item));
+    }, 0);
+}
+
+function getObjectSyncTimestamp(value) {
+    if (!value || typeof value !== "object") return 0;
+    if (Array.isArray(value.sessions)) {
+        return getArraySyncTimestamp(value.sessions);
+    }
+    return getItemSyncTimestamp(value);
+}
+
+function mergeArrayDataById(localArr, remoteArr) {
+    var local = Array.isArray(localArr) ? localArr : [];
+    var remote = Array.isArray(remoteArr) ? remoteArr : [];
+    var map = {};
+
+    remote.forEach(function (item) {
+        if (!item || item.id == null) return;
+        map[String(item.id)] = item;
+    });
+    local.forEach(function (item) {
+        if (!item || item.id == null) return;
+        var id = String(item.id);
+        var existing = map[id];
+        if (!existing) {
+            map[id] = item;
+            return;
+        }
+        map[id] = getItemSyncTimestamp(item) >= getItemSyncTimestamp(existing) ? item : existing;
+    });
+
+    return Object.keys(map).map(function (id) {
+        return map[id];
+    });
+}
+
+function resolveSyncData(dataType, localData, remoteData) {
+    var hasRemote = remoteData !== undefined && remoteData !== null;
+    var hasLocal = hasDataContent(dataType, localData);
+    var hasRemoteContent = hasRemote && hasDataContent(dataType, remoteData);
+
+    if (!hasRemote) {
+        return { data: localData, pushLocal: hasLocal };
+    }
+    if (!hasLocal) {
+        return { data: remoteData, pushLocal: false };
+    }
+    if (!hasRemoteContent) {
+        return { data: localData, pushLocal: true };
+    }
+
+    if (Array.isArray(localData) && Array.isArray(remoteData)) {
+        var merged = mergeArrayDataById(localData, remoteData);
+        var pushLocal = JSON.stringify(merged) !== JSON.stringify(remoteData);
+        return { data: merged, pushLocal: pushLocal };
+    }
+
+    if (dataType === APP_DATA_TYPES.shootingHeatmap) {
+        if (getObjectSyncTimestamp(localData) > getObjectSyncTimestamp(remoteData)) {
+            return { data: localData, pushLocal: true };
+        }
+        return { data: remoteData, pushLocal: false };
+    }
+
+    return { data: remoteData, pushLocal: false };
+}
+
+function bindDataSyncLifecycleListeners() {
+    if (dataSyncBoundLifecycleListener) return;
+    dataSyncBoundLifecycleListener = true;
+    document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "hidden") {
+            flushPendingDataSync();
+        }
+    });
+    window.addEventListener("pagehide", function () {
+        flushPendingDataSync();
+    });
 }
 
 function readJsonStorageValue(storageKey, fallbackValue) {
@@ -546,6 +637,15 @@ function markDataTypeDirty(dataType) {
     }, 600);
 }
 
+function syncDataTypeImmediately(dataType) {
+    dataSyncDirtyTypes[dataType] = true;
+    if (dataSyncFlushTimer) {
+        clearTimeout(dataSyncFlushTimer);
+        dataSyncFlushTimer = null;
+    }
+    return flushPendingDataSync();
+}
+
 async function upsertRemoteDataType(dataType) {
     const client = getSupabaseClient();
     const user = getCurrentUser();
@@ -585,6 +685,34 @@ async function flushPendingDataSync() {
     }
 }
 
+async function pullRemoteDataType(dataType) {
+    var client = getSupabaseClient();
+    var user = getCurrentUser();
+    if (!client || !user || !user.id) return;
+
+    try {
+        var result = await client
+            .from("user_app_data")
+            .select("payload")
+            .eq("user_id", user.id)
+            .eq("data_type", dataType)
+            .maybeSingle();
+
+        if (result.error) throw result.error;
+
+        var remoteData = result.data ? result.data.payload : undefined;
+        var localData = getLocalDataByType(dataType);
+        var resolution = resolveSyncData(dataType, localData, remoteData);
+        setLocalDataByType(dataType, resolution.data);
+        if (resolution.pushLocal) {
+            await upsertRemoteDataType(dataType);
+            dataSyncDirtyTypes[dataType] = false;
+        }
+    } catch (error) {
+        console.error("[DataSync] pull error", dataType, error);
+    }
+}
+
 async function bootstrapUserDataSync() {
     const client = getSupabaseClient();
     const user = getCurrentUser();
@@ -596,6 +724,7 @@ async function bootstrapUserDataSync() {
         });
         dataSyncBoundOnlineListener = true;
     }
+    bindDataSyncLifecycleListeners();
 
     if (dataSyncBootstrapPromise) return dataSyncBootstrapPromise;
 
@@ -626,13 +755,9 @@ async function bootstrapUserDataSync() {
                 var remoteData = Object.prototype.hasOwnProperty.call(remoteMap, t) ? remoteMap[t] : undefined;
                 var localData = getLocalDataByType(t);
 
-                if (remoteData !== undefined && remoteData !== null) {
-                    setLocalDataByType(t, remoteData);
-                    continue;
-                }
-
-                if (hasDataContent(t, localData)) {
-                    // Migración automática inicial: no hay data en nube, sí en local.
+                var resolution = resolveSyncData(t, localData, remoteData);
+                setLocalDataByType(t, resolution.data);
+                if (resolution.pushLocal) {
                     await upsertRemoteDataType(t);
                 }
             }
@@ -2118,7 +2243,7 @@ function getPlayersTracking() {
 
 function savePlayersTracking(list) {
     setLocalDataByType(APP_DATA_TYPES.playersTracking, list);
-    markDataTypeDirty(APP_DATA_TYPES.playersTracking);
+    syncDataTypeImmediately(APP_DATA_TYPES.playersTracking);
 }
 
 function getDefaultPlayerFundamentals() {
@@ -3906,7 +4031,9 @@ function loadContent(sectionId) {
             break;
 
         case "player_tracking":
-            renderPlayerList();
+            pullRemoteDataType(APP_DATA_TYPES.playersTracking).finally(function () {
+                renderPlayerList();
+            });
             break;
 
         case "dashboard":

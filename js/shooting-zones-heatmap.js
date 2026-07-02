@@ -1,6 +1,7 @@
 /**
  * Entrenamiento de tiro — mapa de media cancha por capas (layering).
  * Componente autocontenido: ShootingHeatmap.init(elemento)
+ * Build: sesiones-jugadores-v2
  */
 (function (global) {
     "use strict";
@@ -700,6 +701,7 @@
                 '<header class="shx-header">' +
                 "<h2>Entrenamiento de tiro</h2>" +
                 "<p>Mapa por zonas con registro por sesión y jugadores asignados.</p>" +
+                '<p class="shx-build-tag">Versión: sesiones con jugadores</p>' +
                 sessionNotice +
                 '<div class="shx-legend">' +
                 '<span><i style="background:#ef5350"></i> &lt;40%</span>' +
