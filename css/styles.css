@@ -4255,9 +4255,63 @@ table th {
     margin: 0 0 6px;
 }
 
-.player-shooting-sessions {
+.player-shooting-sessions,
+.player-shooting-accordion {
     display: grid;
-    gap: 12px;
+    gap: 8px;
+}
+
+.player-shooting-session-item {
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
+    overflow: hidden;
+}
+
+.player-shooting-session-item[open] {
+    border-color: rgba(255, 139, 43, 0.45);
+    background: rgba(255, 139, 43, 0.04);
+}
+
+.player-shooting-session-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    padding: 12px 14px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.player-shooting-session-summary::-webkit-details-marker {
+    display: none;
+}
+
+.player-shooting-session-title {
+    font-weight: 700;
+    color: var(--accent-soft);
+}
+
+.player-shooting-session-meta {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+}
+
+.player-shooting-session-chevron {
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+}
+
+.player-shooting-session-item[open] .player-shooting-session-chevron {
+    transform: rotate(90deg);
+}
+
+.player-shooting-session-body {
+    padding: 0 14px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .player-shooting-session-head {

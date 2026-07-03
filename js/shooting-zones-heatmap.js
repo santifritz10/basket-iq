@@ -26,12 +26,16 @@
         return d.innerHTML;
     }
 
+    function toShotCount(value) {
+        var n = Number(value);
+        return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+    }
+
     function zoneStats(state, zoneId) {
         var z = state[zoneId];
-        var attempts = z && typeof z.attempts === "number" ? z.attempts : 0;
-        var made = z && typeof z.made === "number" ? z.made : 0;
-        attempts = Math.max(0, attempts);
-        made = Math.min(Math.max(0, made), attempts);
+        var attempts = toShotCount(z && z.attempts);
+        var made = toShotCount(z && z.made);
+        made = Math.min(made, attempts);
         return { attempts: attempts, made: made };
     }
 
@@ -222,6 +226,12 @@
         return { attempts: ta, made: tm };
     }
 
+    function zonesWithShots(state) {
+        return ZONES.filter(function (z) {
+            return zoneStats(state, z.id).attempts > 0;
+        });
+    }
+
     function maxAttempts(state) {
         var max = 1;
         ZONES.forEach(function (z) {
@@ -231,9 +241,21 @@
         return max;
     }
 
-    function statsTableRows(state) {
-        var maxA = maxAttempts(state);
-        return ZONES.map(function (z) {
+    function statsTableRowsWithShots(state) {
+        return statsTableRows(state, true);
+    }
+
+    function statsTableRows(state, onlyWithShots) {
+        var zones = onlyWithShots ? zonesWithShots(state) : ZONES;
+        if (!zones.length) {
+            return '<tr><td colspan="5" class="text-muted">Sin lanzamientos en esta sesión.</td></tr>';
+        }
+        var maxA = 1;
+        zones.forEach(function (z) {
+            var s = zoneStats(state, z.id);
+            if (s.attempts > maxA) maxA = s.attempts;
+        });
+        return zones.map(function (z) {
             var s = zoneStats(state, z.id);
             var vol = Math.max(6, Math.round((s.attempts / maxA) * 100));
             return (
@@ -944,6 +966,8 @@
         pctLabel: pctLabel,
         sessionTotalShots: sessionTotalShots,
         statsTableRows: statsTableRows,
+        statsTableRowsWithShots: statsTableRowsWithShots,
+        zonesWithShots: zonesWithShots,
         formatSessionFecha: formatSessionFecha,
         getPlayerShootingSessions: getPlayerShootingSessions
     };

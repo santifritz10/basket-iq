@@ -2516,6 +2516,34 @@ function renderPlayerFundamentalsTab(player) {
     }).join("");
 }
 
+function renderPlayerShootingTableRows(shooting, zones) {
+    var state = zones || {};
+    var activeZones = shooting.ZONES.filter(function (z) {
+        return shooting.zoneStats(state, z.id).attempts > 0;
+    });
+    if (!activeZones.length) {
+        return '<tr><td colspan="5" class="text-muted">Sin lanzamientos en esta sesión.</td></tr>';
+    }
+    var maxA = 1;
+    activeZones.forEach(function (z) {
+        var s = shooting.zoneStats(state, z.id);
+        if (s.attempts > maxA) maxA = s.attempts;
+    });
+    return activeZones.map(function (z) {
+        var s = shooting.zoneStats(state, z.id);
+        var vol = Math.max(6, Math.round((s.attempts / maxA) * 100));
+        return (
+            "<tr>" +
+            "<td>" + escapeHtml(z.label) + "</td>" +
+            "<td>" + s.attempts + "</td>" +
+            "<td>" + s.made + "</td>" +
+            '<td class="shx-pct">' + shooting.pctLabel(s.attempts, s.made) + "</td>" +
+            '<td><div class="shx-vol"><span style="width:' + vol + '%"></span></div></td>' +
+            "</tr>"
+        );
+    }).join("");
+}
+
 function renderPlayerShootingTab(player) {
     var shooting = typeof BasketLabShooting !== "undefined" ? BasketLabShooting : null;
     if (!shooting) {
@@ -2531,24 +2559,27 @@ function renderPlayerShootingTab(player) {
         );
     }
     return (
-        '<div class="player-shooting-sessions">' +
+        '<div class="player-shooting-accordion">' +
         sessions.map(function (session, index) {
             var totals = shooting.sessionTotalShots(session.zones || {});
             var customName = String(session.nombre || "").trim();
             var showName = customName && customName !== "Sesión de tiro";
             return (
-                '<article class="player-shooting-session-card player-tab-card">' +
-                '<header class="player-shooting-session-head">' +
-                "<h4>Sesión " + (index + 1) + "</h4>" +
+                '<details class="player-shooting-session-item">' +
+                '<summary class="player-shooting-session-summary">' +
+                '<span class="player-shooting-session-title">Sesión ' + (index + 1) + "</span>" +
                 (showName ? '<span class="player-shooting-session-name">' + escapeHtml(customName) + "</span>" : "") +
                 '<span class="player-shooting-session-date">' + escapeHtml(shooting.formatSessionFecha(session.fecha)) + "</span>" +
-                "</header>" +
-                '<p class="player-shooting-session-total"><strong>Total:</strong> ' +
+                '<span class="player-shooting-session-meta">' +
                 totals.attempts + " intentos · " + totals.made + " encestados · " +
-                shooting.pctLabel(totals.attempts, totals.made) + " global</p>" +
+                shooting.pctLabel(totals.attempts, totals.made) + " global</span>" +
+                '<span class="player-shooting-session-chevron" aria-hidden="true">▶</span>' +
+                "</summary>" +
+                '<div class="player-shooting-session-body">' +
                 '<table class="shx-table"><thead><tr><th>Zona</th><th>Int.</th><th>Enc.</th><th>%</th><th>Volumen</th></tr></thead>' +
-                "<tbody>" + shooting.statsTableRows(session.zones || {}) + "</tbody></table>" +
-                "</article>"
+                "<tbody>" + renderPlayerShootingTableRows(shooting, session.zones) + "</tbody></table>" +
+                "</div>" +
+                "</details>"
             );
         }).join("") +
         "</div>"

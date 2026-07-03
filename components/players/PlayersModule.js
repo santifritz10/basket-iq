@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import {
   formatSessionFecha,
   getPlayerShootingSessions,
+  getZonesWithShots,
   pctLabel,
   sessionTotalShots,
-  SHOOTING_ZONES,
   zoneStats
 } from "@/lib/shooting-zones";
 
@@ -261,7 +261,7 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
             ) : null}
 
             {tab === "shooting" ? (
-              <div className="player-shooting-sessions">
+              <div className="player-shooting-accordion">
                 {!playerShootingSessions.length ? (
                   <div className="player-tab-card">
                     <p className="text-muted">Este jugador no tiene sesiones de tiro registradas.</p>
@@ -272,52 +272,58 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
                     const totals = sessionTotalShots(session.zones || {});
                     const customName = String(session.nombre || "").trim();
                     const showName = customName && customName !== "Sesión de tiro";
-                    const maxAttempts = Math.max(
-                      1,
-                      ...SHOOTING_ZONES.map((z) => zoneStats(session.zones, z.id).attempts)
-                    );
+                    const activeZones = getZonesWithShots(session.zones || {});
+                    const maxAttempts = Math.max(1, ...activeZones.map((z) => zoneStats(session.zones, z.id).attempts));
                     return (
-                      <article key={session.id} className="player-shooting-session-card player-tab-card">
-                        <header className="player-shooting-session-head">
-                          <h4>Sesión {index + 1}</h4>
+                      <details key={session.id} className="player-shooting-session-item">
+                        <summary className="player-shooting-session-summary">
+                          <span className="player-shooting-session-title">Sesión {index + 1}</span>
                           {showName ? <span className="player-shooting-session-name">{customName}</span> : null}
                           <span className="player-shooting-session-date">{formatSessionFecha(session.fecha)}</span>
-                        </header>
-                        <p className="player-shooting-session-total">
-                          <strong>Total:</strong> {totals.attempts} intentos · {totals.made} encestados ·{" "}
-                          {pctLabel(totals.attempts, totals.made)} global
-                        </p>
-                        <table className="shx-table">
-                          <thead>
-                            <tr>
-                              <th>Zona</th>
-                              <th>Int.</th>
-                              <th>Enc.</th>
-                              <th>%</th>
-                              <th>Volumen</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {SHOOTING_ZONES.map((zone) => {
-                              const stats = zoneStats(session.zones, zone.id);
-                              const vol = Math.max(6, Math.round((stats.attempts / maxAttempts) * 100));
-                              return (
-                                <tr key={zone.id}>
-                                  <td>{zone.label}</td>
-                                  <td>{stats.attempts}</td>
-                                  <td>{stats.made}</td>
-                                  <td className="shx-pct">{pctLabel(stats.attempts, stats.made)}</td>
-                                  <td>
-                                    <div className="shx-vol">
-                                      <span style={{ width: `${vol}%` }} />
-                                    </div>
-                                  </td>
+                          <span className="player-shooting-session-meta">
+                            {totals.attempts} intentos · {totals.made} encestados · {pctLabel(totals.attempts, totals.made)} global
+                          </span>
+                          <span className="player-shooting-session-chevron" aria-hidden="true">▶</span>
+                        </summary>
+                        <div className="player-shooting-session-body">
+                          <table className="shx-table">
+                            <thead>
+                              <tr>
+                                <th>Zona</th>
+                                <th>Int.</th>
+                                <th>Enc.</th>
+                                <th>%</th>
+                                <th>Volumen</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {!activeZones.length ? (
+                                <tr>
+                                  <td colSpan={5} className="text-muted">Sin lanzamientos en esta sesión.</td>
                                 </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </article>
+                              ) : (
+                                activeZones.map((zone) => {
+                                  const stats = zoneStats(session.zones, zone.id);
+                                  const vol = Math.max(6, Math.round((stats.attempts / maxAttempts) * 100));
+                                  return (
+                                    <tr key={zone.id}>
+                                      <td>{zone.label}</td>
+                                      <td>{stats.attempts}</td>
+                                      <td>{stats.made}</td>
+                                      <td className="shx-pct">{pctLabel(stats.attempts, stats.made)}</td>
+                                      <td>
+                                        <div className="shx-vol">
+                                          <span style={{ width: `${vol}%` }} />
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </details>
                     );
                   })
                 )}
