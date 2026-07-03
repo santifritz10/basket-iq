@@ -1892,11 +1892,70 @@ button:focus-visible,
 }
 
 /* ===== Library ===== */
-.plays-library {
+.plays-library,
+.plays-library-accordion {
     display: flex;
     flex-direction: column;
-    gap: 28px;
+    gap: 8px;
     margin-top: 24px;
+}
+
+.play-library-item {
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
+    overflow: hidden;
+}
+
+.play-library-item[open] {
+    border-color: rgba(255, 139, 43, 0.45);
+    background: rgba(255, 139, 43, 0.04);
+}
+
+.play-library-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    padding: 12px 14px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.play-library-summary::-webkit-details-marker {
+    display: none;
+}
+
+.play-library-title {
+    font-weight: 700;
+    color: var(--accent-soft);
+    font-size: 1rem;
+}
+
+.play-library-meta {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+}
+
+.play-library-chevron {
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+}
+
+.play-library-item[open] .play-library-chevron {
+    transform: rotate(90deg);
+}
+
+.play-library-body {
+    padding: 0 14px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.play-library-body .play-card-actions {
+    margin: 12px 0 10px;
 }
 
 .play-card {

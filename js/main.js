@@ -3918,40 +3918,50 @@ function loadContent(sectionId) {
                 break;
             }
 
+            var playsSorted = savedPlays.slice().sort(function (a, b) {
+                return String(a.name || "").localeCompare(String(b.name || ""), "es");
+            });
+
             let playsHtml = `
                 <section class="manual-section">
                     <h2>Biblioteca de jugadas</h2>
-                    <p>Acá podés ver las jugadas guardadas como una secuencia de pasos (imágenes de la pizarra).</p>
-                    <div class="plays-library">
+                    <p>Hacé clic en cada jugada para ver sus pasos. Ordenadas por título.</p>
+                    <div class="plays-library-accordion">
             `;
 
-            savedPlays.forEach(play => {
+            playsSorted.forEach(function (play) {
+                var stepCount = (play.steps || []).length;
+                var stepsLabel = stepCount + " paso" + (stepCount === 1 ? "" : "s");
                 playsHtml += `
-                    <article class="play-card">
-                        <div class="play-card-header">
-                            <h3>${escapeHtml(play.name || "")}</h3>
+                    <details class="play-library-item">
+                        <summary class="play-library-summary">
+                            <span class="play-library-title">${escapeHtml(play.name || "Jugada sin nombre")}</span>
+                            <span class="play-library-meta">${stepsLabel}</span>
+                            <span class="play-library-chevron" aria-hidden="true">▶</span>
+                        </summary>
+                        <div class="play-library-body">
                             <div class="play-card-actions">
                                 <button type="button" class="toolbar-button" onclick="printPlayPdf(${play.id})">Descargar PDF</button>
                                 <button type="button" class="play-edit-button" onclick="openEditPlayModal(${play.id})">Editar</button>
                                 <button class="play-delete-button" onclick="deletePlay(${play.id})">Borrar</button>
                             </div>
-                        </div>
-                        ${play.description ? `<div class="play-card-desc">${escapeHtml(play.description)}</div>` : `<p class="play-card-desc-empty">Sin descripción — usá <strong>Editar</strong> para agregar texto (aparece en el PDF).</p>`}
-                        <div class="play-steps-grid">
+                            ${play.description ? `<div class="play-card-desc">${escapeHtml(play.description)}</div>` : `<p class="play-card-desc-empty">Sin descripción — usá <strong>Editar</strong> para agregar texto (aparece en el PDF).</p>`}
+                            <div class="play-steps-grid">
                 `;
 
-                (play.steps || []).forEach((stepUrl, idx) => {
+                (play.steps || []).forEach(function (stepUrl, idx) {
                     playsHtml += `
-                        <div class="play-step-card">
-                            <span class="play-step-label">Paso ${idx + 1}</span>
-                            <img src="${stepUrl}" alt="Paso ${idx + 1} de ${play.name}">
-                        </div>
+                                <div class="play-step-card">
+                                    <span class="play-step-label">Paso ${idx + 1}</span>
+                                    <img src="${stepUrl}" alt="Paso ${idx + 1} de ${escapeHtml(play.name || "")}">
+                                </div>
                     `;
                 });
 
                 playsHtml += `
+                            </div>
                         </div>
-                    </article>
+                    </details>
                 `;
             });
 
