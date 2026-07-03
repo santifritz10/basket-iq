@@ -28,6 +28,7 @@ function basePlayer() {
     height: "",
     level: "",
     photo_url: "",
+    club_shield_url: "",
     fundamentals,
     stats: { ft_pct: "", fg_pct: "", three_pct: "", assists: "", turnovers: "", rebounds: "" },
     notes_history: [],
@@ -77,6 +78,41 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
     if (!selected) return;
     const next = players.map((p) => (p.id === selected.id ? { ...p, ...patch, updated_at: new Date().toISOString() } : p));
     await persist(next);
+  }
+
+  async function readImageFile(file) {
+    if (!file) return "";
+    if (!file.type?.startsWith("image/")) {
+      alert("Seleccioná un archivo de imagen válido.");
+      return null;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert("La imagen supera 2MB. Elegí una más liviana.");
+      return null;
+    }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("No se pudo leer la imagen."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadPlayerPhoto(file) {
+    const dataUrl = await readImageFile(file);
+    if (dataUrl === null) return;
+    if (dataUrl) await updateSelected({ photo_url: dataUrl });
+  }
+
+  async function uploadClubShield(file) {
+    const dataUrl = await readImageFile(file);
+    if (dataUrl === null) return;
+    if (dataUrl) await updateSelected({ club_shield_url: dataUrl });
+  }
+
+  function clubShieldInitials(team) {
+    const txt = String(team || "CL").trim();
+    return txt.split(/\s+/).slice(0, 2).map((c) => c[0]?.toUpperCase() || "").join("") || "CL";
   }
 
   async function setRating(key, value) {
@@ -160,6 +196,14 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
               style={{ borderColor: selectedId === p.id ? "rgba(255,139,43,.6)" : undefined }}
               onClick={() => setSelectedId(p.id)}
             >
+              <div className="player-card-shield-wrap">
+                {p.club_shield_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="player-card-shield" src={p.club_shield_url} alt={`Escudo ${p.team || "club"}`} />
+                ) : (
+                  <div className="player-card-shield player-profile-shield-placeholder">{clubShieldInitials(p.team)}</div>
+                )}
+              </div>
               <div className="player-card-main">
                 <h3>{p.name || "Sin nombre"}</h3>
                 <p className="player-card-meta">{p.position || "Sin posición"} · {p.age || "—"} años</p>
@@ -178,15 +222,26 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
           <div>
             <div className="player-profile-header">
               <div className="player-profile-head-grid">
-                <div>
-                  {selected.photo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img className="player-profile-photo" src={selected.photo_url} alt={selected.name || "Jugador"} />
-                  ) : (
-                    <div className="player-profile-photo-placeholder">
-                      {String(selected.name || "JU").split(" ").slice(0, 2).map((c) => c[0] || "").join("").toUpperCase()}
+                <div className="player-profile-identity-wrap">
+                  <div className="player-profile-identity">
+                    {selected.photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img className="player-profile-photo" src={selected.photo_url} alt={selected.name || "Jugador"} />
+                    ) : (
+                      <div className="player-profile-photo-placeholder">
+                        {String(selected.name || "JU").split(" ").slice(0, 2).map((c) => c[0] || "").join("").toUpperCase()}
+                      </div>
+                    )}
+                    <div className="player-profile-shield-wrap">
+                      {selected.club_shield_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="player-profile-shield" src={selected.club_shield_url} alt={`Escudo ${selected.team || "club"}`} />
+                      ) : (
+                        <div className="player-profile-shield player-profile-shield-placeholder">{clubShieldInitials(selected.team)}</div>
+                      )}
+                      <span className="player-profile-shield-label">Escudo</span>
                     </div>
-                  )}
+                  </div>
                 </div>
                 <div className="player-profile-main">
                   <input value={selected.name || ""} onChange={(e) => updateSelected({ name: e.target.value })} />
@@ -197,7 +252,22 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
                   </div>
                   <div className="form-row form-row-inline" style={{ marginTop: 8 }}>
                     <div><input value={selected.level || ""} onChange={(e) => updateSelected({ level: e.target.value })} placeholder="Nivel" /></div>
-                    <div><input value={selected.photo_url || ""} onChange={(e) => updateSelected({ photo_url: e.target.value })} placeholder="Foto URL opcional" /></div>
+                    <div><input value={selected.team || ""} onChange={(e) => updateSelected({ team: e.target.value })} placeholder="Equipo" /></div>
+                    <div><input value={selected.category || ""} onChange={(e) => updateSelected({ category: e.target.value })} placeholder="Categoría" /></div>
+                  </div>
+                  <div className="form-row form-row-inline" style={{ marginTop: 8 }}>
+                    <div>
+                      <label>Foto jugador</label>
+                      <input type="file" accept="image/*" onChange={(e) => uploadPlayerPhoto(e.target.files?.[0])} />
+                    </div>
+                    <div>
+                      <label>Escudo club</label>
+                      <input type="file" accept="image/*" onChange={(e) => uploadClubShield(e.target.files?.[0])} />
+                    </div>
+                  </div>
+                  <div className="form-row form-row-inline" style={{ marginTop: 8 }}>
+                    <div><input value={selected.photo_url || ""} onChange={(e) => updateSelected({ photo_url: e.target.value })} placeholder="URL foto jugador (opcional)" /></div>
+                    <div><input value={selected.club_shield_url || ""} onChange={(e) => updateSelected({ club_shield_url: e.target.value })} placeholder="URL escudo club (opcional)" /></div>
                   </div>
                 </div>
               </div>

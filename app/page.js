@@ -167,7 +167,7 @@ export default async function HomePage() {
       <Script src="/assets/js/fundamentos-data.js?v=20260702" strategy="afterInteractive" />
       <Script src="/assets/js/shooting-zones-heatmap.js?v=20260703" strategy="afterInteractive" />
       <Script src="/assets/js/supabase-config.js" strategy="afterInteractive" />
-      <Script src="/assets/js/main.js?v=20260705" strategy="afterInteractive" />
+      <Script src="/assets/js/main.js?v=20260706" strategy="afterInteractive" />
       <Script id="legacy-toggle-sidebar" strategy="afterInteractive">
         {toggleSidebarScript}
       </Script>

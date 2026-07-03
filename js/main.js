@@ -2331,6 +2331,7 @@ function normalizePlayer(raw) {
         team: String(p.team || "").trim(),
         category: String(p.category || "").trim(),
         photo_url: String(p.photo_url || "").trim(),
+        club_shield_url: String(p.club_shield_url || "").trim(),
         fundamentals: Object.assign(getDefaultPlayerFundamentals(), p.fundamentals || {}),
         stats: Object.assign(getDefaultPlayerStats(), p.stats || {}),
         notes_history: Array.isArray(p.notes_history) ? p.notes_history : [],
@@ -2402,11 +2403,21 @@ function pushPlayerEvolution(player, message) {
     if (player.evolution.length > 120) player.evolution = player.evolution.slice(0, 120);
 }
 
+function renderPlayerClubShield(player, className) {
+    var cls = className || "player-profile-shield";
+    var team = String(player.team || "Club").trim() || "Club";
+    if (player.club_shield_url) {
+        return '<img src="' + escapeHtml(player.club_shield_url) + '" alt="Escudo de ' + escapeHtml(team) + '" class="' + cls + '">';
+    }
+    return '<div class="' + cls + ' player-profile-shield-placeholder" title="Sin escudo cargado">' + escapeHtml(playerInitials(team)) + "</div>";
+}
+
 function renderPlayerCard(player) {
     var teamLabel = escapeHtml(player.team || "Sin equipo");
     var categoryLabel = escapeHtml(player.category || "Sin categoría");
     return (
         '<article class="player-card" data-id="' + escapeHtml(player.id) + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\')">' +
+        '  <div class="player-card-shield-wrap">' + renderPlayerClubShield(player, "player-card-shield") + "</div>" +
         '  <div class="player-card-main">' +
         '    <h3>' + escapeHtml(player.name || "Jugador sin nombre") + '</h3>' +
         '    <p class="player-card-meta">' + escapeHtml(player.position || "Sin posición") + " · " + (player.age || "—") + " años</p>" +
@@ -2500,9 +2511,14 @@ function renderPlayerCreateForm() {
         '      <div><label>Categoría</label><input type="text" name="category" placeholder="Ej: U17"></div>' +
         "    </div>" +
         '    <div class="form-row">' +
-        '      <label>Foto (opcional)</label>' +
+        '      <label>Foto del jugador (opcional)</label>' +
         '      <input type="file" name="photo_file" accept="image/*">' +
         '      <small class="text-muted">Formatos: JPG, PNG, WEBP · Máx 2MB</small>' +
+        "    </div>" +
+        '    <div class="form-row">' +
+        '      <label>Escudo del club (opcional)</label>' +
+        '      <input type="file" name="club_shield_file" accept="image/*">' +
+        '      <small class="text-muted">Logo o escudo del equipo al que pertenece el jugador.</small>' +
         "    </div>" +
         '    <div class="form-actions">' +
         '      <button type="submit" class="toolbar-button toolbar-button-accent">Guardar jugador</button>' +
@@ -2518,11 +2534,14 @@ function renderPlayerCreateForm() {
         ev.preventDefault();
         var fd = new FormData(form);
         var photoFile = fd.get("photo_file");
+        var shieldFile = fd.get("club_shield_file");
         var photoDataUrl = "";
+        var shieldDataUrl = "";
         try {
             photoDataUrl = await readImageFileAsDataUrl(photoFile && photoFile.size ? photoFile : null);
+            shieldDataUrl = await readImageFileAsDataUrl(shieldFile && shieldFile.size ? shieldFile : null);
         } catch (photoErr) {
-            alert(photoErr.message || "No se pudo procesar la foto.");
+            alert(photoErr.message || "No se pudo procesar la imagen.");
             return;
         }
         var player = normalizePlayer({
@@ -2535,6 +2554,7 @@ function renderPlayerCreateForm() {
             team: fd.get("team"),
             category: fd.get("category"),
             photo_url: photoDataUrl,
+            club_shield_url: shieldDataUrl,
             created_at: nowIso(),
             updated_at: nowIso()
         });
@@ -2732,6 +2752,14 @@ function renderPlayerProfile(playerId, activeTab) {
     var photo = player.photo_url
         ? ('<img src="' + escapeHtml(player.photo_url) + '" alt="' + escapeHtml(player.name || "Jugador") + '" class="player-profile-photo">')
         : ('<div class="player-profile-photo-placeholder">' + escapeHtml(playerInitials(player.name)) + "</div>");
+    var identity = (
+        '<div class="player-profile-identity">' +
+        photo +
+        '<div class="player-profile-shield-wrap">' +
+        renderPlayerClubShield(player, "player-profile-shield") +
+        '<span class="player-profile-shield-label">Escudo</span>' +
+        "</div></div>"
+    );
 
     var tabContent = "";
     if (tab === "fundamentals") tabContent = renderPlayerFundamentalsTab(player);
@@ -2746,7 +2774,7 @@ function renderPlayerProfile(playerId, activeTab) {
         '  <div class="player-profile-header">' +
         '    <button type="button" class="btn-back" onclick="renderPlayerList()">← Volver a jugadores</button>' +
         '    <div class="player-profile-head-grid">' +
-        '      <div class="player-profile-identity">' + photo + "</div>" +
+        '      <div class="player-profile-identity-wrap">' + identity + "</div>" +
         '      <div class="player-profile-main">' +
         "        <h2>" + escapeHtml(player.name || "Jugador") + "</h2>" +
         '        <p class="player-profile-meta">' + escapeHtml(player.position || "Sin posición") + " · " + (player.age || "—") + " años · " + escapeHtml(player.height || "Altura —") + "</p>" +
@@ -2773,9 +2801,14 @@ function renderPlayerProfile(playerId, activeTab) {
         '        <div><label>Categoría</label><input type="text" name="category" value="' + escapeHtml(player.category || "") + '"></div>' +
         "      </div>" +
         '      <div class="form-row">' +
-        '        <label>Actualizar foto</label>' +
+        '        <label>Actualizar foto del jugador</label>' +
         '        <input type="file" name="photo_file" accept="image/*">' +
         '        <small class="text-muted">Si no adjuntás archivo, se mantiene la foto actual.</small>' +
+        "      </div>" +
+        '      <div class="form-row">' +
+        '        <label>Actualizar escudo del club</label>' +
+        '        <input type="file" name="club_shield_file" accept="image/*">' +
+        '        <small class="text-muted">Si no adjuntás archivo, se mantiene el escudo actual.</small>' +
         "      </div>" +
         '      <div class="form-actions"><button type="submit" class="toolbar-button toolbar-button-accent">Guardar datos</button></div>' +
         "    </form>" +
@@ -2829,11 +2862,20 @@ async function savePlayerBasic(playerId) {
     player.team = String(fd.get("team") || "").trim();
     player.category = String(fd.get("category") || "").trim();
     var photoFile = fd.get("photo_file");
+    var shieldFile = fd.get("club_shield_file");
     if (photoFile && photoFile.size) {
         try {
             player.photo_url = await readImageFileAsDataUrl(photoFile);
         } catch (photoErr) {
             alert(photoErr.message || "No se pudo procesar la foto.");
+            return;
+        }
+    }
+    if (shieldFile && shieldFile.size) {
+        try {
+            player.club_shield_url = await readImageFileAsDataUrl(shieldFile);
+        } catch (shieldErr) {
+            alert(shieldErr.message || "No se pudo procesar el escudo.");
             return;
         }
     }
