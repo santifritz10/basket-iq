@@ -1,6 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  formatSessionFecha,
+  getPlayerShootingSessions,
+  pctLabel,
+  sessionTotalShots,
+  SHOOTING_ZONES,
+  zoneStats
+} from "@/lib/shooting-zones";
 
 const schema = [
   { group: "Dribbling", items: [{ key: "drib_control", label: "Control" }, { key: "drib_weak_hand", label: "Mano débil" }] },
@@ -30,11 +38,16 @@ function basePlayer() {
   };
 }
 
-export default function PlayersModule({ initialItems }) {
+export default function PlayersModule({ initialItems, initialShootingPayload = {} }) {
   const [players, setPlayers] = useState(Array.isArray(initialItems) ? initialItems : []);
+  const [shootingPayload] = useState(initialShootingPayload || {});
   const [selectedId, setSelectedId] = useState(initialItems?.[0]?.id || null);
   const [tab, setTab] = useState("fundamentals");
   const selected = useMemo(() => players.find((p) => p.id === selectedId) || null, [players, selectedId]);
+  const playerShootingSessions = useMemo(
+    () => (selected ? getPlayerShootingSessions(selected.id, shootingPayload) : []),
+    [selected, shootingPayload]
+  );
 
   async function persist(next) {
     setPlayers(next);
@@ -194,6 +207,7 @@ export default function PlayersModule({ initialItems }) {
               {[
                 ["fundamentals", "Fundamentos"],
                 ["stats", "Estadísticas"],
+                ["shooting", "Sesiones de tiro"],
                 ["notes", "Notas"],
                 ["goals", "Objetivos"],
                 ["evolution", "Evolución"]
@@ -243,6 +257,70 @@ export default function PlayersModule({ initialItems }) {
                   <div><label>Pérdidas</label><input value={selected.stats?.turnovers || ""} onChange={(e) => updateSelected({ stats: { ...selected.stats, turnovers: e.target.value } })} /></div>
                   <div><label>Rebotes</label><input value={selected.stats?.rebounds || ""} onChange={(e) => updateSelected({ stats: { ...selected.stats, rebounds: e.target.value } })} /></div>
                 </div>
+              </div>
+            ) : null}
+
+            {tab === "shooting" ? (
+              <div className="player-shooting-sessions">
+                {!playerShootingSessions.length ? (
+                  <div className="player-tab-card">
+                    <p className="text-muted">Este jugador no tiene sesiones de tiro registradas.</p>
+                    <p className="text-muted">Asignalo en Entrenamiento de tiro al crear o editar una sesión.</p>
+                  </div>
+                ) : (
+                  playerShootingSessions.map((session, index) => {
+                    const totals = sessionTotalShots(session.zones || {});
+                    const customName = String(session.nombre || "").trim();
+                    const showName = customName && customName !== "Sesión de tiro";
+                    const maxAttempts = Math.max(
+                      1,
+                      ...SHOOTING_ZONES.map((z) => zoneStats(session.zones, z.id).attempts)
+                    );
+                    return (
+                      <article key={session.id} className="player-shooting-session-card player-tab-card">
+                        <header className="player-shooting-session-head">
+                          <h4>Sesión {index + 1}</h4>
+                          {showName ? <span className="player-shooting-session-name">{customName}</span> : null}
+                          <span className="player-shooting-session-date">{formatSessionFecha(session.fecha)}</span>
+                        </header>
+                        <p className="player-shooting-session-total">
+                          <strong>Total:</strong> {totals.attempts} intentos · {totals.made} encestados ·{" "}
+                          {pctLabel(totals.attempts, totals.made)} global
+                        </p>
+                        <table className="shx-table">
+                          <thead>
+                            <tr>
+                              <th>Zona</th>
+                              <th>Int.</th>
+                              <th>Enc.</th>
+                              <th>%</th>
+                              <th>Volumen</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {SHOOTING_ZONES.map((zone) => {
+                              const stats = zoneStats(session.zones, zone.id);
+                              const vol = Math.max(6, Math.round((stats.attempts / maxAttempts) * 100));
+                              return (
+                                <tr key={zone.id}>
+                                  <td>{zone.label}</td>
+                                  <td>{stats.attempts}</td>
+                                  <td>{stats.made}</td>
+                                  <td className="shx-pct">{pctLabel(stats.attempts, stats.made)}</td>
+                                  <td>
+                                    <div className="shx-vol">
+                                      <span style={{ width: `${vol}%` }} />
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </article>
+                    );
+                  })
+                )}
               </div>
             ) : null}
 

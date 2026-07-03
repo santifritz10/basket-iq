@@ -719,6 +719,10 @@
                 '<div class="shx-panel-actions" id="shx-panel-actions" hidden>' +
                 '<button type="button" class="shx-btn shx-btn-make" id="shx-btn-made">Encestado</button>' +
                 '<button type="button" class="shx-btn shx-btn-miss" id="shx-btn-miss">Fallado</button>' +
+                "</div>" +
+                '<div class="shx-panel-actions shx-panel-actions--undo" id="shx-panel-undo-actions" hidden>' +
+                '<button type="button" class="shx-btn shx-btn-undo-make" id="shx-btn-undo-made">− Encestado</button>' +
+                '<button type="button" class="shx-btn shx-btn-undo-miss" id="shx-btn-undo-miss">− Fallado</button>' +
                 "</div></aside>" +
                 '<div class="shx-zone-chip-grid">' + zoneButtonsHtml(state) + "</div>" +
                 '<div class="shx-card">' +
@@ -817,8 +821,20 @@
             var z = ZONES.find(function (zone) { return zone.id === zoneId; });
             var title = document.getElementById("shx-panel-title");
             var actions = document.getElementById("shx-panel-actions");
-            if (title) title.textContent = z ? z.label + " · Registrá el resultado" : "Seleccioná una zona para cargar tiros";
+            var undoActions = document.getElementById("shx-panel-undo-actions");
+            if (title) title.textContent = z ? z.label + " · Registrá o corregí el resultado" : "Seleccioná una zona para cargar tiros";
             if (actions) actions.hidden = !z;
+            if (undoActions) undoActions.hidden = !z;
+            if (z) this.updateUndoButtons();
+        },
+
+        updateUndoButtons: function () {
+            if (!this.selectedId) return;
+            var s = this.getZoneStats(this.selectedId);
+            var undoMade = document.getElementById("shx-btn-undo-made");
+            var undoMiss = document.getElementById("shx-btn-undo-miss");
+            if (undoMade) undoMade.disabled = s.made <= 0;
+            if (undoMiss) undoMiss.disabled = s.attempts <= s.made;
         },
 
         record: function (zoneId, made) {
@@ -833,6 +849,28 @@
             this.refreshZoneChip(zoneId);
             this.updateTotalLine();
             this.refreshSessionListMeta();
+            this.updateUndoButtons();
+        },
+
+        unrecord: function (zoneId, made) {
+            if (!zoneId || !this.getActiveSession()) return;
+            var s = this.getZoneStats(zoneId);
+            if (made) {
+                if (s.made <= 0) return;
+                s.made -= 1;
+                s.attempts -= 1;
+            } else {
+                if (s.attempts <= s.made) return;
+                s.attempts -= 1;
+            }
+            this.state[zoneId] = { attempts: s.attempts, made: s.made };
+            this.persistActiveSessionZones();
+            this.courtMap.updateZone(zoneId);
+            this.refreshTableRow(zoneId);
+            this.refreshZoneChip(zoneId);
+            this.updateTotalLine();
+            this.refreshSessionListMeta();
+            this.updateUndoButtons();
         },
 
         bind: function () {
@@ -861,6 +899,13 @@
                 if (self.selectedId) self.record(self.selectedId, false);
             });
 
+            document.getElementById("shx-btn-undo-made").addEventListener("click", function () {
+                if (self.selectedId) self.unrecord(self.selectedId, true);
+            });
+            document.getElementById("shx-btn-undo-miss").addEventListener("click", function () {
+                if (self.selectedId) self.unrecord(self.selectedId, false);
+            });
+
             document.getElementById("shx-btn-workout").addEventListener("click", function () {
                 var n = parseInt(document.getElementById("shx-workout-total").value, 10) || 60;
                 var plan = generateWorkoutPlan(self.state, n);
@@ -876,5 +921,30 @@
         }
     };
 
+    function getPlayerShootingSessions(playerId) {
+        var payload = loadPayload();
+        var sessions = (payload.sessions || []).filter(function (session) {
+            return (session.player_ids || []).some(function (pid) {
+                return String(pid) === String(playerId);
+            });
+        });
+        sessions.sort(function (a, b) {
+            var da = String(a.fecha || a.created_at || "").slice(0, 10);
+            var db = String(b.fecha || b.created_at || "").slice(0, 10);
+            if (da !== db) return da < db ? -1 : 1;
+            return String(a.created_at || "") < String(b.created_at || "") ? -1 : 1;
+        });
+        return sessions;
+    }
+
     global.ShootingHeatmap = ShootingHeatmap;
+    global.BasketLabShooting = {
+        ZONES: ZONES,
+        zoneStats: zoneStats,
+        pctLabel: pctLabel,
+        sessionTotalShots: sessionTotalShots,
+        statsTableRows: statsTableRows,
+        formatSessionFecha: formatSessionFecha,
+        getPlayerShootingSessions: getPlayerShootingSessions
+    };
 })(typeof window !== "undefined" ? window : this);

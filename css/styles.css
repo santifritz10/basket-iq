@@ -3555,6 +3555,10 @@ button:focus-visible,
     gap: 8px;
 }
 
+.shx-panel-actions--undo {
+    margin-top: 8px;
+}
+
 .shx-btn {
     flex: 1;
     min-height: 48px;
@@ -3563,6 +3567,11 @@ button:focus-visible,
     font-weight: 700;
     font-family: Inter, Roboto, "Segoe UI", system-ui, sans-serif;
     cursor: pointer;
+}
+
+.shx-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 .shx-btn-make {
@@ -3574,6 +3583,18 @@ button:focus-visible,
     background: #2b2f38;
     color: #f3f4f6;
     border: 1px solid #404756;
+}
+
+.shx-btn-undo-make {
+    background: rgba(46, 125, 50, 0.12);
+    color: #a5d6a7;
+    border: 1px dashed rgba(102, 187, 106, 0.55);
+}
+
+.shx-btn-undo-miss {
+    background: rgba(255, 255, 255, 0.04);
+    color: #cfd8dc;
+    border: 1px dashed rgba(255, 255, 255, 0.22);
 }
 
 .shx-card {
@@ -4232,6 +4253,38 @@ table th {
 .player-goal-main p,
 .player-evolution-item p {
     margin: 0 0 6px;
+}
+
+.player-shooting-sessions {
+    display: grid;
+    gap: 12px;
+}
+
+.player-shooting-session-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 12px;
+    margin-bottom: 8px;
+}
+
+.player-shooting-session-head h4 {
+    margin: 0;
+}
+
+.player-shooting-session-name {
+    font-size: 0.88rem;
+    color: var(--accent-soft);
+}
+
+.player-shooting-session-date {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.player-shooting-session-total {
+    margin: 0 0 10px;
+    font-size: 0.88rem;
 }
 
 .player-note-item span,

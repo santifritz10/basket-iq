@@ -2516,6 +2516,45 @@ function renderPlayerFundamentalsTab(player) {
     }).join("");
 }
 
+function renderPlayerShootingTab(player) {
+    var shooting = typeof BasketLabShooting !== "undefined" ? BasketLabShooting : null;
+    if (!shooting) {
+        return '<div class="player-tab-card"><p class="text-muted">El módulo de tiro no está disponible.</p></div>';
+    }
+    var sessions = shooting.getPlayerShootingSessions(player.id);
+    if (!sessions.length) {
+        return (
+            '<div class="player-tab-card">' +
+            '<p class="text-muted">Este jugador no tiene sesiones de tiro registradas.</p>' +
+            '<p class="text-muted">Asignalo en <strong>Entrenamiento de tiro</strong> al crear o editar una sesión.</p>' +
+            "</div>"
+        );
+    }
+    return (
+        '<div class="player-shooting-sessions">' +
+        sessions.map(function (session, index) {
+            var totals = shooting.sessionTotalShots(session.zones || {});
+            var customName = String(session.nombre || "").trim();
+            var showName = customName && customName !== "Sesión de tiro";
+            return (
+                '<article class="player-shooting-session-card player-tab-card">' +
+                '<header class="player-shooting-session-head">' +
+                "<h4>Sesión " + (index + 1) + "</h4>" +
+                (showName ? '<span class="player-shooting-session-name">' + escapeHtml(customName) + "</span>" : "") +
+                '<span class="player-shooting-session-date">' + escapeHtml(shooting.formatSessionFecha(session.fecha)) + "</span>" +
+                "</header>" +
+                '<p class="player-shooting-session-total"><strong>Total:</strong> ' +
+                totals.attempts + " intentos · " + totals.made + " encestados · " +
+                shooting.pctLabel(totals.attempts, totals.made) + " global</p>" +
+                '<table class="shx-table"><thead><tr><th>Zona</th><th>Int.</th><th>Enc.</th><th>%</th><th>Volumen</th></tr></thead>' +
+                "<tbody>" + shooting.statsTableRows(session.zones || {}) + "</tbody></table>" +
+                "</article>"
+            );
+        }).join("") +
+        "</div>"
+    );
+}
+
 function renderPlayerStatsTab(player) {
     var fields = PLAYER_STATS_FIELDS.map(function (f) {
         return (
@@ -2614,6 +2653,7 @@ function renderPlayerProfile(playerId, activeTab) {
     var tabContent = "";
     if (tab === "fundamentals") tabContent = renderPlayerFundamentalsTab(player);
     if (tab === "stats") tabContent = renderPlayerStatsTab(player);
+    if (tab === "shooting") tabContent = renderPlayerShootingTab(player);
     if (tab === "notes") tabContent = renderPlayerNotesTab(player);
     if (tab === "goals") tabContent = renderPlayerGoalsTab(player);
     if (tab === "evolution") tabContent = renderPlayerEvolutionTab(player);
@@ -2660,6 +2700,7 @@ function renderPlayerProfile(playerId, activeTab) {
         '  <div class="player-tabs">' +
         '    <button class="player-tab-btn ' + (tab === "fundamentals" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'fundamentals\')">Fundamentos</button>' +
         '    <button class="player-tab-btn ' + (tab === "stats" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'stats\')">Estadísticas</button>' +
+        '    <button class="player-tab-btn ' + (tab === "shooting" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'shooting\')">Sesiones de tiro</button>' +
         '    <button class="player-tab-btn ' + (tab === "notes" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'notes\')">Notas</button>' +
         '    <button class="player-tab-btn ' + (tab === "goals" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'goals\')">Objetivos</button>' +
         '    <button class="player-tab-btn ' + (tab === "evolution" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'evolution\')">Evolución</button>' +
