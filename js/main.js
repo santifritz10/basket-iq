@@ -1106,12 +1106,14 @@ function renderPlanificacionView(editingId) {
         if (ent) {
             contentDiv.innerHTML = buildEditorEntrenamiento(ent);
             attachPlanificacionEvents(editingId);
+            injectNavBackButton();
             return;
         }
     }
 
     contentDiv.innerHTML = buildListaEntrenamientos();
     attachPlanificacionListEvents();
+    injectNavBackButton();
 }
 
 function getEntrenamientoFechaKey(entrenamiento) {
@@ -2112,6 +2114,7 @@ function renderPlanificacionAnualView() {
             renderPlanificacionAnualDetalleView(id);
         };
     }
+    injectNavBackButton();
 }
 
 function mostrarModalPlanificacionAnual() {
@@ -2212,6 +2215,7 @@ function renderPlanificacionAnualDetalleView(planificacionId) {
             renderPlanificacionAnualDetalleView(planId);
         };
     }
+    injectNavBackButton();
 }
 
 function editarCiclo(planificacionId, cicloId) {
@@ -2485,6 +2489,7 @@ function renderPlayerList() {
         (teamSections || '<p class="text-muted">Todavía no hay jugadores cargados.</p>') +
         "</section>"
     );
+    injectNavBackButton();
 }
 
 function renderPlayerCreateForm() {
@@ -2527,6 +2532,7 @@ function renderPlayerCreateForm() {
         "  </form>" +
         "</section>"
     );
+    injectNavBackButton();
 
     var form = document.getElementById("player-create-form");
     if (!form) return;
@@ -2839,6 +2845,7 @@ function renderPlayerProfile(playerId, activeTab) {
             savePlayerStats(player.id);
         };
     }
+    injectNavBackButton();
 }
 
 function togglePlayerBasicForm() {
@@ -3563,10 +3570,86 @@ function renderFundamentosCategoryView(sectionId) {
     );
 }
 
+// ===============================
+// NAVEGACIÓN ATRÁS (historial)
+// ===============================
+
+var navHistory = [];
+var currentNavSection = null;
+var navBackInProgress = false;
+
+var NAV_ROOT_SECTIONS = {
+    dashboard: true,
+    planificacion_hub: true,
+    player_tracking_hub: true,
+    jugadas_hub: true,
+    ataques_hub: true,
+    defensas_zona_hub: true,
+    presion_hub: true,
+    planilla_hub: true,
+    fund_cat_dribbling: true,
+    fund_cat_pase: true,
+    fund_cat_tiro: true,
+    fund_cat_finalizaciones: true,
+    fund_cat_juego_pies: true,
+    fund_cat_posteo: true,
+    fund_cat_defensa: true,
+    fund_cat_rebote: true
+};
+
+function trackNavSection(sectionId) {
+    sectionId = String(sectionId || "");
+    if (!sectionId) return;
+
+    if (NAV_ROOT_SECTIONS[sectionId]) {
+        navHistory = [];
+    } else if (!navBackInProgress && currentNavSection && currentNavSection !== sectionId) {
+        navHistory.push(currentNavSection);
+        if (navHistory.length > 40) navHistory.shift();
+    }
+    currentNavSection = sectionId;
+}
+
+function goBackContent() {
+    if (!navHistory.length) return;
+    var prev = navHistory.pop();
+    navBackInProgress = true;
+    try {
+        loadContent(prev);
+    } finally {
+        navBackInProgress = false;
+    }
+}
+
+function injectNavBackButton() {
+    var contentDiv = document.getElementById("content");
+    if (!contentDiv) return;
+
+    var existing = contentDiv.querySelector(":scope > .nav-back-btn");
+    if (existing) existing.remove();
+    if (!navHistory.length) return;
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn-back nav-back-btn";
+    btn.setAttribute("aria-label", "Volver a la sección anterior");
+    btn.innerHTML = '<span class="nav-back-arrow" aria-hidden="true">←</span> Volver';
+    btn.addEventListener("click", function () {
+        goBackContent();
+    });
+    contentDiv.insertBefore(btn, contentDiv.firstChild);
+}
+
 function loadContent(sectionId) {
     const contentDiv = document.getElementById("content");
 
     if (!contentDiv) return;
+
+    sectionId = String(sectionId || "");
+    if (!sectionId) return;
+
+    trackNavSection(sectionId);
+    setTimeout(injectNavBackButton, 0);
 
     if (sectionId === "pizarra_virtual") {
         loadBoard();
@@ -4848,6 +4931,7 @@ function loadBoard() {
     initBoard();
     renderCurrentPlaySteps();
     updateBoardToolbarUI();
+    injectNavBackButton();
 }
 
 

@@ -2151,6 +2151,31 @@ button:focus-visible,
     color: var(--accent);
 }
 
+.nav-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 14px;
+    padding: 8px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #e8eefb;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.nav-back-btn:hover {
+    border-color: rgba(255, 139, 43, 0.5);
+    background: rgba(255, 139, 43, 0.12);
+    color: #fff4e8;
+}
+
+.nav-back-arrow {
+    font-size: 1rem;
+    line-height: 1;
+}
+
 .planificacion-total {
     background: rgba(255, 152, 0, 0.12);
     border-radius: var(--radius-sm);
