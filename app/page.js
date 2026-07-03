@@ -165,7 +165,7 @@ export default async function HomePage() {
       <Script src="https://unpkg.com/lucide@latest" strategy="afterInteractive" />
       <Script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" strategy="beforeInteractive" />
       <Script src="/assets/js/fundamentos-data.js?v=20260702" strategy="afterInteractive" />
-      <Script src="/assets/js/shooting-zones-heatmap.js?v=20260709" strategy="afterInteractive" />
+      <Script src="/assets/js/shooting-zones-heatmap.js?v=20260710" strategy="afterInteractive" />
       <Script src="/assets/js/supabase-config.js" strategy="afterInteractive" />
       <Script src="/assets/js/main.js?v=20260708" strategy="afterInteractive" />
       <Script id="legacy-toggle-sidebar" strategy="afterInteractive">

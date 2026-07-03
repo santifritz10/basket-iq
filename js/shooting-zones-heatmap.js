@@ -684,14 +684,17 @@
             var toggle = document.getElementById("shx-session-toggle");
             if (toggle) {
                 toggle.addEventListener("click", function (ev) {
+                    ev.preventDefault();
                     ev.stopPropagation();
-                    self.sessionMenuOpen = !self.sessionMenuOpen;
-                    self.renderSessionsPanel();
+                    self.setSessionMenuOpen(!self.sessionMenuOpen);
                 });
             }
 
             this.root.querySelectorAll("[data-shx-session-id]").forEach(function (btn) {
-                btn.addEventListener("click", function () {
+                btn.addEventListener("click", function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    self.sessionMenuOpen = false;
                     self.switchSession(btn.getAttribute("data-shx-session-id"));
                 });
             });
@@ -792,12 +795,25 @@
             this._onDocClick = function (ev) {
                 if (!self.sessionMenuOpen || !self.root) return;
                 var picker = self.root.querySelector(".shx-session-picker");
-                if (picker && !picker.contains(ev.target)) {
-                    self.sessionMenuOpen = false;
-                    self.renderSessionsPanel();
-                }
+                if (!picker || picker.contains(ev.target)) return;
+                self.setSessionMenuOpen(false);
             };
             document.addEventListener("click", this._onDocClick);
+        },
+
+        setSessionMenuOpen: function (open) {
+            this.sessionMenuOpen = !!open && this.sessionsSorted().length > 0;
+            var picker = this.root && this.root.querySelector(".shx-session-picker");
+            var menu = document.getElementById("shx-session-menu");
+            var toggle = document.getElementById("shx-session-toggle");
+            if (!picker || !menu || !toggle) {
+                this.renderSessionsPanel();
+                return;
+            }
+            picker.classList.toggle("is-open", this.sessionMenuOpen);
+            if (this.sessionMenuOpen) menu.removeAttribute("hidden");
+            else menu.setAttribute("hidden", "");
+            toggle.setAttribute("aria-expanded", this.sessionMenuOpen ? "true" : "false");
         },
 
         getZoneStats: function (zoneId) {
