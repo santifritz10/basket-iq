@@ -1728,6 +1728,33 @@ button:focus-visible,
     flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 20px;
+    align-items: center;
+}
+
+.board-toolbar-divider {
+    width: 1px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.14);
+    margin: 0 2px;
+}
+
+.board-toolbar .toolbar-button.is-active {
+    background: linear-gradient(135deg, #ff9800, #ffc107);
+    color: #1a1208;
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.75), 0 4px 16px rgba(255, 152, 0, 0.45);
+    transform: translateY(-1px);
+}
+
+.board-toolbar .toolbar-button:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.board-toolbar .toolbar-button:disabled:hover {
+    transform: none;
+    box-shadow: none;
 }
 
 .toolbar-button {

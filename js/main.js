@@ -444,6 +444,58 @@ let dragging = false;
 let isLineMode = false;
 let isDrawingLine = false;
 let currentLinePath = [];
+let boardHistory = [];
+let boardHistoryDragSaved = false;
+
+function snapshotBoardState() {
+    return {
+        players: JSON.parse(JSON.stringify(players)),
+        lines: JSON.parse(JSON.stringify(lines)),
+        ball: ball ? { x: ball.x, y: ball.y } : null
+    };
+}
+
+function pushBoardHistory() {
+    boardHistory.push(snapshotBoardState());
+    if (boardHistory.length > 80) boardHistory.shift();
+    updateBoardToolbarUI();
+}
+
+function undoBoardAction() {
+    if (!boardHistory.length) return;
+    var state = boardHistory.pop();
+    players = state.players;
+    lines = state.lines;
+    ball = state.ball;
+    lineStart = null;
+    isDrawingLine = false;
+    currentLinePath = [];
+    drawCourt();
+    updateBoardToolbarUI();
+}
+
+function updateBoardToolbarUI() {
+    var toolbar = document.querySelector(".board-toolbar");
+    if (!toolbar) return;
+    var activeTool = isLineMode ? currentLineType : "move";
+    toolbar.querySelectorAll("[data-board-tool]").forEach(function (btn) {
+        btn.classList.toggle("is-active", btn.getAttribute("data-board-tool") === activeTool);
+    });
+    var undoBtn = document.getElementById("board-undo-btn");
+    if (undoBtn) undoBtn.disabled = boardHistory.length === 0;
+}
+
+function setBoardTool(tool) {
+    if (tool === "move") {
+        isLineMode = false;
+        lineStart = null;
+        isDrawingLine = false;
+        currentLinePath = [];
+        updateBoardToolbarUI();
+        return;
+    }
+    setLineType(tool);
+}
 
 // Jugadas
 let currentPlaySteps = [];
@@ -4694,21 +4746,28 @@ function loadBoard() {
         <h2>Pizarra Virtual</h2>
 
         <div class="board-toolbar">
-            <button class="toolbar-button" onclick="addAttackers()">Agregar Atacantes</button>
-            <button class="toolbar-button" onclick="addDefenders()">Agregar Defensores</button>
-            <button class="toolbar-button" onclick="addBall()">Agregar Pelota</button>
+            <button type="button" class="toolbar-button" data-board-tool="move" onclick="setBoardTool('move')">Mover</button>
+            <button type="button" class="toolbar-button" onclick="addAttackers()">Agregar Atacantes</button>
+            <button type="button" class="toolbar-button" onclick="addDefenders()">Agregar Defensores</button>
+            <button type="button" class="toolbar-button" onclick="addBall()">Agregar Pelota</button>
 
-            <button class="toolbar-button" onclick="setLineType('normal')">Línea Normal</button>
-            <button class="toolbar-button" onclick="setLineType('dashed')">Línea Punteada</button>
-            <button class="toolbar-button" onclick="setLineType('zigzag')">Línea Víbora</button>
-            <button class="toolbar-button" onclick="setLineType('screen')">Línea Bloqueo</button>
+            <span class="board-toolbar-divider" aria-hidden="true"></span>
 
-            <button class="toolbar-button" onclick="deleteLastLine()">Borrar Última Línea</button>
-            <button class="toolbar-button" onclick="clearBoard()">Limpiar Pizarra</button>
+            <button type="button" class="toolbar-button" data-board-tool="normal" onclick="setLineType('normal')">Línea Normal</button>
+            <button type="button" class="toolbar-button" data-board-tool="dashed" onclick="setLineType('dashed')">Línea Punteada</button>
+            <button type="button" class="toolbar-button" data-board-tool="zigzag" onclick="setLineType('zigzag')">Línea Víbora</button>
+            <button type="button" class="toolbar-button" data-board-tool="screen" onclick="setLineType('screen')">Línea Bloqueo</button>
 
-            <button class="toolbar-button toolbar-button-accent" onclick="capturePlayStep()">Guardar paso</button>
-            <button class="toolbar-button toolbar-button-accent" onclick="saveCurrentPlay()">Guardar jugada</button>
-            <button class="toolbar-button" onclick="clearCurrentPlaySteps()">Borrar pasos jugada</button>
+            <span class="board-toolbar-divider" aria-hidden="true"></span>
+
+            <button type="button" id="board-undo-btn" class="toolbar-button" onclick="undoBoardAction()" disabled>Deshacer</button>
+            <button type="button" class="toolbar-button" onclick="clearBoard()">Limpiar Pizarra</button>
+
+            <span class="board-toolbar-divider" aria-hidden="true"></span>
+
+            <button type="button" class="toolbar-button toolbar-button-accent" onclick="capturePlayStep()">Guardar paso</button>
+            <button type="button" class="toolbar-button toolbar-button-accent" onclick="saveCurrentPlay()">Guardar jugada</button>
+            <button type="button" class="toolbar-button" onclick="clearCurrentPlaySteps()">Borrar pasos jugada</button>
         </div>
 
         <div class="play-description-field">
@@ -4728,11 +4787,15 @@ function loadBoard() {
     `;
 
     currentPlaySteps = [];
+    boardHistory = [];
     const descIn = document.getElementById("play-description-input");
     if (descIn) descIn.value = "";
 
+    isLineMode = false;
+    currentLineType = "normal";
     initBoard();
     renderCurrentPlaySteps();
+    updateBoardToolbarUI();
 }
 
 
@@ -4796,6 +4859,7 @@ function initBoard() {
 // ===============================
 
 function addAttackers() {
+    pushBoardHistory();
     players = players.filter(p => p.color !== "blue");
 
     for (let i = 1; i <= 5; i++) {
@@ -4811,6 +4875,7 @@ function addAttackers() {
 }
 
 function addDefenders() {
+    pushBoardHistory();
     players = players.filter(p => p.color !== "red");
 
     for (let i = 1; i <= 5; i++) {
@@ -4826,6 +4891,7 @@ function addDefenders() {
 }
 
 function addBall() {
+    pushBoardHistory();
     ball = { x: 400, y: 300 };
     drawCourt();
 }
@@ -4862,6 +4928,7 @@ function getEventCoords(e) {
 
 function startDrag(e) {
     const { x, y } = getEventCoords(e);
+    boardHistoryDragSaved = false;
 
     // En modo líneas: comenzar un trazo libre del usuario
     if (isLineMode) {
@@ -4873,6 +4940,8 @@ function startDrag(e) {
     players.forEach(p => {
         const distance = Math.hypot(p.x - x, p.y - y);
         if (distance < 18) {
+            pushBoardHistory();
+            boardHistoryDragSaved = true;
             selectedPlayer = p;
             dragging = true;
         }
@@ -4881,6 +4950,8 @@ function startDrag(e) {
     if (ball) {
         const distance = Math.hypot(ball.x - x, ball.y - y);
         if (distance < 10) {
+            if (!boardHistoryDragSaved) pushBoardHistory();
+            boardHistoryDragSaved = true;
             selectedPlayer = ball;
             dragging = true;
         }
@@ -4906,6 +4977,7 @@ function drag(e) {
 function stopDrag() {
     if (isLineMode && isDrawingLine) {
         if (currentLinePath.length > 1) {
+            pushBoardHistory();
             const first = currentLinePath[0];
             const last = currentLinePath[currentLinePath.length - 1];
             lines.push({
@@ -4939,12 +5011,14 @@ function setLineType(type) {
         lineStart = null;
         isDrawingLine = false;
         currentLinePath = [];
+        updateBoardToolbarUI();
         return;
     }
 
     currentLineType = type;
     lineStart = null;
     isLineMode = true;
+    updateBoardToolbarUI();
 }
 
 var lineHandledByTouch = false;
@@ -4958,6 +5032,7 @@ function handleLineClick(e) {
     if (!lineStart) {
         lineStart = { x, y };
     } else {
+        pushBoardHistory();
         lines.push({
             x1: lineStart.x,
             y1: lineStart.y,
@@ -4972,16 +5047,12 @@ function handleLineClick(e) {
 }
 
 function deleteLastLine() {
-    lines.pop();
-    drawCourt();
+    undoBoardAction();
 }
 
-
-// ===============================
-// LIMPIAR
-// ===============================
-
 function clearBoard() {
+    if (!players.length && !lines.length && !ball) return;
+    pushBoardHistory();
     players = [];
     lines = [];
     ball = null;
