@@ -422,6 +422,8 @@
         courtMap: null,
         players: [],
         showNewSessionForm: false,
+        showEditSessionForm: false,
+        sessionMenuOpen: false,
 
         init: function (el) {
             if (!el) return;
@@ -431,6 +433,8 @@
             this.syncStateFromActiveSession();
             this.selectedId = null;
             this.showNewSessionForm = !this.getActiveSession();
+            this.showEditSessionForm = false;
+            this.sessionMenuOpen = false;
             this.render();
             this.bind();
         },
@@ -462,6 +466,8 @@
             this.syncStateFromActiveSession();
             this.selectedId = null;
             this.showNewSessionForm = false;
+            this.showEditSessionForm = false;
+            this.sessionMenuOpen = false;
             this.render();
             this.bind();
         },
@@ -481,6 +487,8 @@
             this.syncStateFromActiveSession();
             this.selectedId = null;
             this.showNewSessionForm = false;
+            this.showEditSessionForm = false;
+            this.sessionMenuOpen = false;
             this.render();
             this.bind();
         },
@@ -494,6 +502,8 @@
             active.updated_at = new Date().toISOString();
             savePayload(this.payload);
             this.players = loadPlayers();
+            this.showEditSessionForm = false;
+            this.sessionMenuOpen = false;
             this.render();
             this.bind();
         },
@@ -508,6 +518,8 @@
             this.syncStateFromActiveSession();
             this.selectedId = null;
             this.showNewSessionForm = !this.getActiveSession();
+            this.showEditSessionForm = false;
+            this.sessionMenuOpen = false;
             this.render();
             this.bind();
         },
@@ -559,27 +571,52 @@
             );
         },
 
+        activeSessionSummaryHtml: function (session) {
+            if (!session) {
+                return (
+                    '<span class="shx-session-toggle-name">Sin sesión activa</span>' +
+                    '<span class="shx-session-toggle-meta" id="shx-active-session-meta">Creá una sesión para empezar a cargar tiros</span>'
+                );
+            }
+            var zones = session.id === this.payload.active_session_id ? this.state : session.zones;
+            var totals = sessionTotalShots(zones);
+            return (
+                '<span class="shx-session-toggle-name" id="shx-active-session-name">' + escapeHtml(session.nombre) + "</span>" +
+                '<span class="shx-session-toggle-meta" id="shx-active-session-meta">' +
+                escapeHtml(formatSessionFecha(session.fecha)) + " · " +
+                escapeHtml(sessionPlayersLabel(session, this.players)) + " · " +
+                totals.attempts + " int · " + totals.made + " enc · " + pctLabel(totals.attempts, totals.made) +
+                "</span>"
+            );
+        },
+
         sessionsPanelHtml: function () {
             var self = this;
             var sessions = this.sessionsSorted();
             var active = this.getActiveSession();
-            var listHtml = sessions.length
+            var menuOpen = this.sessionMenuOpen && sessions.length > 0;
+
+            var menuHtml = sessions.length
                 ? sessions.map(function (s) {
-                    var totals = sessionTotalShots(s.zones);
+                    var zones = active && s.id === active.id ? self.state : s.zones;
+                    var totals = sessionTotalShots(zones);
                     var isActive = active && s.id === active.id;
                     return (
                         '<button type="button" class="shx-session-item' + (isActive ? " shx-session-item--active" : "") + '" data-shx-session-id="' + s.id + '">' +
                         '<span class="shx-session-item-date">' + escapeHtml(formatSessionFecha(s.fecha)) + "</span>" +
                         '<span class="shx-session-item-name">' + escapeHtml(s.nombre) + "</span>" +
-                        '<span class="shx-session-item-meta">' + escapeHtml(sessionPlayersLabel(s, self.players)) + " · " + totals.attempts + " tiros</span>" +
+                        '<span class="shx-session-item-meta">' + escapeHtml(sessionPlayersLabel(s, self.players)) + " · " +
+                        totals.attempts + " int · " + totals.made + " enc · " + pctLabel(totals.attempts, totals.made) + "</span>" +
                         "</button>"
                     );
                 }).join("")
                 : '<p class="shx-session-hint">Todavía no hay sesiones registradas.</p>';
 
-            var newFormHtml = this.showNewSessionForm
-                ? (
+            var formHtml = "";
+            if (this.showNewSessionForm) {
+                formHtml =
                     '<form id="shx-new-session-form" class="shx-session-form">' +
+                    '<p class="shx-session-form-title">Nueva sesión</p>' +
                     '<div class="shx-session-form-row">' +
                     '<label>Nombre<input type="text" name="nombre" placeholder="Ej: Sesión martes U15" required></label>' +
                     '<label>Fecha<input type="date" name="fecha" value="' + new Date().toISOString().slice(0, 10) + '" required></label>' +
@@ -589,13 +626,11 @@
                     '<div class="shx-session-form-actions">' +
                     '<button type="submit" class="toolbar-button toolbar-button-accent">Guardar sesión</button>' +
                     (sessions.length ? '<button type="button" class="toolbar-button" id="shx-cancel-new-session">Cancelar</button>' : "") +
-                    "</div></form>"
-                )
-                : '<button type="button" class="toolbar-button toolbar-button-accent" id="shx-show-new-session">Nueva sesión</button>';
-
-            var activeMetaHtml = active
-                ? (
+                    "</div></form>";
+            } else if (this.showEditSessionForm && active) {
+                formHtml =
                     '<form id="shx-active-session-form" class="shx-session-form shx-session-form--active">' +
+                    '<p class="shx-session-form-title">Editar sesión</p>' +
                     '<div class="shx-session-form-row">' +
                     '<label>Nombre<input type="text" name="nombre" value="' + escapeHtml(active.nombre) + '" required></label>' +
                     '<label>Fecha<input type="date" name="fecha" value="' + escapeHtml(active.fecha || "") + '" required></label>' +
@@ -603,27 +638,38 @@
                     '<p class="shx-session-form-label">Jugadores asignados</p>' +
                     this.playerPickerHtml(active.player_ids, "shx-active") +
                     '<div class="shx-session-form-actions">' +
-                    '<button type="submit" class="toolbar-button">Actualizar sesión</button>' +
+                    '<button type="submit" class="toolbar-button toolbar-button-accent">Guardar cambios</button>' +
+                    '<button type="button" class="toolbar-button" id="shx-cancel-edit-session">Cancelar</button>' +
                     '<button type="button" class="toolbar-button" id="shx-delete-active-session">Borrar sesión</button>' +
-                    "</div></form>"
-                )
-                : "";
+                    "</div></form>";
+            }
 
             return (
-                '<section class="shx-sessions-card">' +
-                '<div class="shx-sessions-head">' +
-                "<div><h3>Sesiones de lanzamiento</h3>" +
-                "<p>Registrá cada sesión con fecha y asignala a tus jugadores.</p></div>" +
-                newFormHtml +
-                "</div>" +
-                '<div class="shx-session-list">' + listHtml + "</div>" +
-                activeMetaHtml +
+                '<section class="shx-session-bar">' +
+                '<div class="shx-session-bar-main">' +
+                '<div class="shx-session-picker' + (menuOpen ? " is-open" : "") + '">' +
+                '<button type="button" class="shx-session-toggle" id="shx-session-toggle"' +
+                (sessions.length ? "" : " disabled") +
+                ' aria-expanded="' + (menuOpen ? "true" : "false") + '" aria-haspopup="listbox">' +
+                '<span class="shx-session-toggle-label">Sesión activa</span>' +
+                this.activeSessionSummaryHtml(active) +
+                '<span class="shx-session-toggle-chevron" aria-hidden="true">▾</span>' +
+                "</button>" +
+                '<div class="shx-session-menu" id="shx-session-menu"' + (menuOpen ? "" : " hidden") + ' role="listbox">' +
+                menuHtml +
+                "</div></div>" +
+                '<div class="shx-session-bar-actions">' +
+                '<button type="button" class="toolbar-button" id="shx-edit-session"' + (active ? "" : " disabled") + ">Editar</button>" +
+                '<button type="button" class="toolbar-button toolbar-button-accent" id="shx-show-new-session">Nueva sesión</button>' +
+                '<button type="button" class="toolbar-button" id="shx-btn-reset"' + (active ? "" : " disabled") + ">Reiniciar</button>" +
+                "</div></div>" +
+                formHtml +
                 "</section>"
             );
         },
 
         renderSessionsPanel: function () {
-            var wrap = this.root && this.root.querySelector(".shx-sessions-card");
+            var wrap = this.root && this.root.querySelector(".shx-session-bar");
             if (!wrap) return;
             var temp = document.createElement("div");
             temp.innerHTML = this.sessionsPanelHtml();
@@ -635,6 +681,15 @@
         bindSessionsPanel: function () {
             var self = this;
 
+            var toggle = document.getElementById("shx-session-toggle");
+            if (toggle) {
+                toggle.addEventListener("click", function (ev) {
+                    ev.stopPropagation();
+                    self.sessionMenuOpen = !self.sessionMenuOpen;
+                    self.renderSessionsPanel();
+                });
+            }
+
             this.root.querySelectorAll("[data-shx-session-id]").forEach(function (btn) {
                 btn.addEventListener("click", function () {
                     self.switchSession(btn.getAttribute("data-shx-session-id"));
@@ -645,14 +700,35 @@
             if (showBtn) {
                 showBtn.addEventListener("click", function () {
                     self.showNewSessionForm = true;
+                    self.showEditSessionForm = false;
+                    self.sessionMenuOpen = false;
                     self.renderSessionsPanel();
                 });
             }
 
-            var cancelBtn = document.getElementById("shx-cancel-new-session");
-            if (cancelBtn) {
-                cancelBtn.addEventListener("click", function () {
+            var editBtn = document.getElementById("shx-edit-session");
+            if (editBtn) {
+                editBtn.addEventListener("click", function () {
+                    if (!self.getActiveSession()) return;
+                    self.showEditSessionForm = true;
                     self.showNewSessionForm = false;
+                    self.sessionMenuOpen = false;
+                    self.renderSessionsPanel();
+                });
+            }
+
+            var cancelNewBtn = document.getElementById("shx-cancel-new-session");
+            if (cancelNewBtn) {
+                cancelNewBtn.addEventListener("click", function () {
+                    self.showNewSessionForm = false;
+                    self.renderSessionsPanel();
+                });
+            }
+
+            var cancelEditBtn = document.getElementById("shx-cancel-edit-session");
+            if (cancelEditBtn) {
+                cancelEditBtn.addEventListener("click", function () {
+                    self.showEditSessionForm = false;
                     self.renderSessionsPanel();
                 });
             }
@@ -697,11 +773,31 @@
                 });
             }
 
+            var resetBtn = document.getElementById("shx-btn-reset");
+            if (resetBtn) {
+                resetBtn.addEventListener("click", function () {
+                    self.resetActiveSessionStats();
+                });
+            }
+
             this.root.querySelectorAll("[data-shx-goto-players]").forEach(function (btn) {
                 btn.addEventListener("click", function () {
                     if (typeof global.loadContent === "function") global.loadContent("player_tracking");
                 });
             });
+
+            if (this._onDocClick) {
+                document.removeEventListener("click", this._onDocClick);
+            }
+            this._onDocClick = function (ev) {
+                if (!self.sessionMenuOpen || !self.root) return;
+                var picker = self.root.querySelector(".shx-session-picker");
+                if (picker && !picker.contains(ev.target)) {
+                    self.sessionMenuOpen = false;
+                    self.renderSessionsPanel();
+                }
+            };
+            document.addEventListener("click", this._onDocClick);
         },
 
         getZoneStats: function (zoneId) {
@@ -713,59 +809,47 @@
             var state = this.state;
             var active = this.getActiveSession();
             var hasSession = !!active;
-            var sessionNotice = hasSession
-                ? '<p class="shx-active-session-banner">Sesión activa: <strong>' + escapeHtml(active.nombre) + "</strong> · " + escapeHtml(formatSessionFecha(active.fecha)) + " · " + escapeHtml(sessionPlayersLabel(active, this.players)) + "</p>"
-                : '<p class="shx-active-session-banner shx-active-session-banner--warn">Creá o seleccioná una sesión para registrar lanzamientos.</p>';
+            var selectedZone = this.selectedId
+                ? ZONES.find(function (zone) { return zone.id === this.selectedId; }, this)
+                : null;
 
             this.root.innerHTML =
                 '<div class="shx-wrap">' +
-                this.sessionsPanelHtml() +
                 '<header class="shx-header">' +
                 "<h2>Entrenamiento de tiro</h2>" +
-                "<p>Mapa por zonas con registro por sesión y jugadores asignados.</p>" +
-                '<p class="shx-build-tag">Versión: sesiones con jugadores</p>' +
-                sessionNotice +
+                "</header>" +
+                this.sessionsPanelHtml() +
+                '<div class="shx-layout' + (hasSession ? "" : " shx-layout--disabled") + '">' +
+                '<section class="shx-court-col">' +
+                '<div id="shx-court-map"></div>' +
                 '<div class="shx-legend">' +
                 '<span><i style="background:#ef5350"></i> &lt;40%</span>' +
                 '<span><i style="background:#fbc02d"></i> 40–60%</span>' +
                 '<span><i style="background:#66bb6a"></i> &gt;60%</span>' +
                 '<span><i style="background:#6b7280"></i> Sin tiros</span>' +
-                "</div></header>" +
-                '<div class="shx-layout' + (hasSession ? "" : " shx-layout--disabled") + '">' +
-                '<section class="shx-court-col">' +
-                '<div id="shx-court-map"></div>' +
+                "</div>" +
                 "</section>" +
                 '<section class="shx-side-col">' +
                 '<aside class="shx-panel">' +
-                '<p class="shx-panel-title" id="shx-panel-title">Seleccioná una zona para cargar tiros</p>' +
-                '<div class="shx-panel-actions" id="shx-panel-actions" hidden>' +
+                '<p class="shx-panel-title" id="shx-panel-title">' +
+                (selectedZone ? escapeHtml(selectedZone.label) : "Seleccioná una zona en la cancha") +
+                "</p>" +
+                '<div class="shx-panel-actions" id="shx-panel-actions"' + (selectedZone ? "" : " hidden") + ">" +
                 '<button type="button" class="shx-btn shx-btn-make" id="shx-btn-made">Encestado</button>' +
                 '<button type="button" class="shx-btn shx-btn-miss" id="shx-btn-miss">Fallado</button>' +
                 "</div>" +
-                '<div class="shx-panel-actions shx-panel-actions--undo" id="shx-panel-undo-actions" hidden>' +
+                '<div class="shx-panel-actions shx-panel-actions--undo" id="shx-panel-undo-actions"' + (selectedZone ? "" : " hidden") + ">" +
                 '<button type="button" class="shx-btn shx-btn-undo-make" id="shx-btn-undo-made">− Encestado</button>' +
                 '<button type="button" class="shx-btn shx-btn-undo-miss" id="shx-btn-undo-miss">− Fallado</button>' +
                 "</div></aside>" +
-                '<div class="shx-zone-chip-grid">' + zoneButtonsHtml(state) + "</div>" +
-                '<div class="shx-card">' +
+                '<div class="shx-summary" id="shx-total"></div>' +
+                '<div class="shx-card shx-stats-card">' +
                 "<h3>Estadísticas por zona</h3>" +
-                '<table class="shx-table"><thead><tr><th>Zona</th><th>Int.</th><th>Enc.</th><th>%</th><th>Volumen</th></tr></thead>' +
+                '<div class="shx-table-wrap">' +
+                '<table class="shx-table"><thead><tr><th>Zona</th><th>Int.</th><th>Enc.</th><th>%</th><th>Vol.</th></tr></thead>' +
                 '<tbody id="shx-tbody">' + statsTableRows(state) + "</tbody></table>" +
-                '<p class="shx-total" id="shx-total"></p>' +
-                "</div>" +
-                '<div class="shx-card">' +
-                "<h3>Plan automático</h3>" +
-                "<p>Más tiros en zonas débiles, menos en zonas fuertes.</p>" +
-                '<div class="shx-workout-row">' +
-                '<label for="shx-workout-total">Tiros totales</label>' +
-                '<input type="number" id="shx-workout-total" min="18" max="250" value="60" />' +
-                '<button type="button" class="toolbar-button toolbar-button-accent" id="shx-btn-workout">Generar plan</button>' +
-                "</div>" +
-                '<ul class="shx-workout-list" id="shx-workout-list"></ul>' +
-                "</div>" +
-                '<div class="shx-toolbar">' +
-                '<button type="button" class="toolbar-button" id="shx-btn-reset"' + (hasSession ? "" : " disabled") + '>Reiniciar sesión activa</button>' +
-                "</div></section></div></div>";
+                "</div></div>" +
+                "</section></div></div>";
 
             this.courtMap = new global.BasketballCourtMap({
                 root: document.getElementById("shx-court-map"),
@@ -776,6 +860,7 @@
             });
             this.courtMap.render();
             this.updateTotalLine();
+            if (selectedZone) this.updateUndoButtons();
         },
 
         updateTotalLine: function () {
@@ -789,13 +874,30 @@
             });
             var el = document.getElementById("shx-total");
             if (el) {
-                el.innerHTML = "<strong>Total:</strong> " + ta + " intentos · " + tm + " encestados · " + pctLabel(ta, tm) + " global";
+                el.innerHTML =
+                    '<div class="shx-summary-item"><span>Intentos</span><strong>' + ta + "</strong></div>" +
+                    '<div class="shx-summary-item"><span>Encestados</span><strong>' + tm + "</strong></div>" +
+                    '<div class="shx-summary-item"><span>% global</span><strong>' + pctLabel(ta, tm) + "</strong></div>";
             }
+            this.refreshSessionListMeta();
         },
 
         refreshSessionListMeta: function () {
             var self = this;
             if (!this.root) return;
+            var active = this.getActiveSession();
+            if (active) {
+                var nameEl = document.getElementById("shx-active-session-name");
+                var metaEl = document.getElementById("shx-active-session-meta");
+                var totals = sessionTotalShots(this.state);
+                if (nameEl) nameEl.textContent = active.nombre;
+                if (metaEl) {
+                    metaEl.textContent =
+                        formatSessionFecha(active.fecha) + " · " +
+                        sessionPlayersLabel(active, this.players) + " · " +
+                        totals.attempts + " int · " + totals.made + " enc · " + pctLabel(totals.attempts, totals.made);
+                }
+            }
             this.root.querySelectorAll("[data-shx-session-id]").forEach(function (btn) {
                 var sessionId = btn.getAttribute("data-shx-session-id");
                 var session = self.payload.sessions.find(function (s) { return s.id === sessionId; });
@@ -804,7 +906,9 @@
                 var totals = sessionTotalShots(zones);
                 var meta = btn.querySelector(".shx-session-item-meta");
                 if (meta) {
-                    meta.textContent = sessionPlayersLabel(session, self.players) + " · " + totals.attempts + " tiros";
+                    meta.textContent =
+                        sessionPlayersLabel(session, self.players) + " · " +
+                        totals.attempts + " int · " + totals.made + " enc · " + pctLabel(totals.attempts, totals.made);
                 }
             });
         },
@@ -822,29 +926,18 @@
             if (bar) bar.style.width = vol + "%";
         },
 
-        refreshZoneChip: function (zoneId) {
-            var chip = this.root.querySelector('[data-zone-btn="' + zoneId + '"]');
-            if (!chip) return;
-            var s = this.getZoneStats(zoneId);
-            var meta = chip.querySelector(".shx-zone-chip-meta");
-            if (meta) meta.textContent = s.attempts + " int · " + s.made + " enc · " + pctLabel(s.attempts, s.made);
-        },
-
         selectZone: function (zoneId) {
             if (!this.getActiveSession()) return;
             this.selectedId = zoneId;
-            this.courtMap.setSelected(zoneId);
-            this.root.querySelectorAll('[data-zone-btn]').forEach(function (btn) {
-                btn.classList.toggle("shx-zone-chip--sel", btn.getAttribute("data-zone-btn") === zoneId);
-            });
-            this.root.querySelectorAll('tr[data-zone-row]').forEach(function (row) {
+            if (this.courtMap) this.courtMap.setSelected(zoneId);
+            this.root.querySelectorAll("tr[data-zone-row]").forEach(function (row) {
                 row.classList.toggle("shx-table-row--sel", row.getAttribute("data-zone-row") === zoneId);
             });
             var z = ZONES.find(function (zone) { return zone.id === zoneId; });
             var title = document.getElementById("shx-panel-title");
             var actions = document.getElementById("shx-panel-actions");
             var undoActions = document.getElementById("shx-panel-undo-actions");
-            if (title) title.textContent = z ? z.label + " · Registrá o corregí el resultado" : "Seleccioná una zona para cargar tiros";
+            if (title) title.textContent = z ? z.label : "Seleccioná una zona en la cancha";
             if (actions) actions.hidden = !z;
             if (undoActions) undoActions.hidden = !z;
             if (z) this.updateUndoButtons();
@@ -866,11 +959,9 @@
             if (made) s.made += 1;
             this.state[zoneId] = { attempts: s.attempts, made: s.made };
             this.persistActiveSessionZones();
-            this.courtMap.updateZone(zoneId);
+            if (this.courtMap) this.courtMap.updateZone(zoneId);
             this.refreshTableRow(zoneId);
-            this.refreshZoneChip(zoneId);
             this.updateTotalLine();
-            this.refreshSessionListMeta();
             this.updateUndoButtons();
         },
 
@@ -887,11 +978,9 @@
             }
             this.state[zoneId] = { attempts: s.attempts, made: s.made };
             this.persistActiveSessionZones();
-            this.courtMap.updateZone(zoneId);
+            if (this.courtMap) this.courtMap.updateZone(zoneId);
             this.refreshTableRow(zoneId);
-            this.refreshZoneChip(zoneId);
             this.updateTotalLine();
-            this.refreshSessionListMeta();
             this.updateUndoButtons();
         },
 
@@ -902,44 +991,37 @@
 
             if (!this.getActiveSession()) return;
 
-            this.root.querySelectorAll('[data-zone-btn]').forEach(function (btn) {
-                btn.addEventListener("click", function () {
-                    self.selectZone(btn.getAttribute("data-zone-btn"));
-                });
-            });
-
-            this.root.querySelectorAll('tr[data-zone-row]').forEach(function (row) {
+            this.root.querySelectorAll("tr[data-zone-row]").forEach(function (row) {
                 row.addEventListener("click", function () {
                     self.selectZone(row.getAttribute("data-zone-row"));
                 });
             });
 
-            document.getElementById("shx-btn-made").addEventListener("click", function () {
-                if (self.selectedId) self.record(self.selectedId, true);
-            });
-            document.getElementById("shx-btn-miss").addEventListener("click", function () {
-                if (self.selectedId) self.record(self.selectedId, false);
-            });
+            var madeBtn = document.getElementById("shx-btn-made");
+            var missBtn = document.getElementById("shx-btn-miss");
+            var undoMadeBtn = document.getElementById("shx-btn-undo-made");
+            var undoMissBtn = document.getElementById("shx-btn-undo-miss");
 
-            document.getElementById("shx-btn-undo-made").addEventListener("click", function () {
-                if (self.selectedId) self.unrecord(self.selectedId, true);
-            });
-            document.getElementById("shx-btn-undo-miss").addEventListener("click", function () {
-                if (self.selectedId) self.unrecord(self.selectedId, false);
-            });
-
-            document.getElementById("shx-btn-workout").addEventListener("click", function () {
-                var n = parseInt(document.getElementById("shx-workout-total").value, 10) || 60;
-                var plan = generateWorkoutPlan(self.state, n);
-                var ul = document.getElementById("shx-workout-list");
-                ul.innerHTML = plan.map(function (item) {
-                    return "<li><strong>" + escapeHtml(item.zone.label) + "</strong>: " + item.shots + " tiros sugeridos</li>";
-                }).join("");
-            });
-
-            document.getElementById("shx-btn-reset").addEventListener("click", function () {
-                self.resetActiveSessionStats();
-            });
+            if (madeBtn) {
+                madeBtn.addEventListener("click", function () {
+                    if (self.selectedId) self.record(self.selectedId, true);
+                });
+            }
+            if (missBtn) {
+                missBtn.addEventListener("click", function () {
+                    if (self.selectedId) self.record(self.selectedId, false);
+                });
+            }
+            if (undoMadeBtn) {
+                undoMadeBtn.addEventListener("click", function () {
+                    if (self.selectedId) self.unrecord(self.selectedId, true);
+                });
+            }
+            if (undoMissBtn) {
+                undoMissBtn.addEventListener("click", function () {
+                    if (self.selectedId) self.unrecord(self.selectedId, false);
+                });
+            }
         }
     };
 
