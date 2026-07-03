@@ -5384,11 +5384,15 @@ function drawScene(targetCtx) {
         if (currentLineType === "dashed") {
             targetCtx.setLineDash([8, 6]);
         }
-        drawCurvedOrFreehandLineOnContext(targetCtx, preview);
-        targetCtx.setLineDash([]);
-        if (currentLineType === "normal" || currentLineType === "dashed") {
-            drawArrowAtPathEnd(targetCtx, currentLinePath);
+        if (currentLineType === "zigzag") {
+            drawZigZagOnContext(targetCtx, preview);
+        } else {
+            drawCurvedOrFreehandLineOnContext(targetCtx, preview);
+            if (currentLineType === "normal" || currentLineType === "dashed") {
+                drawArrowAtPathEnd(targetCtx, currentLinePath);
+            }
         }
+        targetCtx.setLineDash([]);
     }
 }
 
@@ -5473,48 +5477,188 @@ function drawArrow(x1, y1, x2, y2) {
 
 
 // ===============================
-// LÍNEA VÍBORA
+// LÍNEA VÍBORA (onda suave sobre el trazo)
 // ===============================
 
-function drawZigZag(line) {
+function pathLength(path) {
+    if (!path || path.length < 2) return 0;
+    var total = 0;
+    for (var i = 1; i < path.length; i++) {
+        total += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+    }
+    return total;
+}
 
-    const segments = 25;
-    const dx = (line.x2 - line.x1) / segments;
-    const dy = (line.y2 - line.y1) / segments;
+function simplifyPath(path, minDist) {
+    if (!path || path.length <= 2) return path || [];
+    minDist = minDist || 3;
+    var out = [path[0]];
+    for (var i = 1; i < path.length; i++) {
+        var last = out[out.length - 1];
+        if (Math.hypot(path[i].x - last.x, path[i].y - last.y) >= minDist) {
+            out.push(path[i]);
+        }
+    }
+    var end = path[path.length - 1];
+    var tail = out[out.length - 1];
+    if (Math.hypot(end.x - tail.x, end.y - tail.y) > 1) out.push(end);
+    return out;
+}
 
-    ctx.beginPath();
-    ctx.moveTo(line.x1, line.y1);
+function resamplePathByLength(path, spacing) {
+    if (!path || path.length < 2) return path || [];
+    spacing = spacing || 5;
+    var total = pathLength(path);
+    if (total < spacing) return path.slice();
 
-    for (let i = 1; i < segments; i++) {
-        const x = line.x1 + dx * i;
-        const y = line.y1 + dy * i + (i % 2 === 0 ? 8 : -8);
-        ctx.lineTo(x, y);
+    var result = [{ x: path[0].x, y: path[0].y }];
+    var nextSample = spacing;
+    var segIndex = 0;
+    var segStart = 0;
+
+    while (nextSample < total && segIndex < path.length - 1) {
+        while (segIndex < path.length - 1) {
+            var segLen = Math.hypot(
+                path[segIndex + 1].x - path[segIndex].x,
+                path[segIndex + 1].y - path[segIndex].y
+            );
+            if (segStart + segLen >= nextSample) break;
+            segStart += segLen;
+            segIndex++;
+        }
+        if (segIndex >= path.length - 1) break;
+        var dx = path[segIndex + 1].x - path[segIndex].x;
+        var dy = path[segIndex + 1].y - path[segIndex].y;
+        var segLen = Math.hypot(dx, dy) || 1;
+        var t = (nextSample - segStart) / segLen;
+        result.push({
+            x: path[segIndex].x + dx * t,
+            y: path[segIndex].y + dy * t
+        });
+        nextSample += spacing;
     }
 
-    ctx.lineTo(line.x2, line.y2);
-    ctx.stroke();
+    var last = path[path.length - 1];
+    var prev = result[result.length - 1];
+    if (Math.hypot(last.x - prev.x, last.y - prev.y) > 2) {
+        result.push({ x: last.x, y: last.y });
+    }
+    return result;
+}
 
-    drawArrow(line.x1, line.y1, line.x2, line.y2);
+function smoothPathChaikin(path, iterations) {
+    if (!path || path.length < 3) return path || [];
+    iterations = iterations || 1;
+    var pts = path.slice();
+    for (var iter = 0; iter < iterations; iter++) {
+        var next = [pts[0]];
+        for (var i = 0; i < pts.length - 1; i++) {
+            var p0 = pts[i];
+            var p1 = pts[i + 1];
+            next.push(
+                { x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y },
+                { x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y }
+            );
+        }
+        next.push(pts[pts.length - 1]);
+        pts = next;
+    }
+    return pts;
+}
+
+function getCenterlineFromLine(line) {
+    if (line.path && line.path.length > 1) {
+        var simplified = simplifyPath(line.path, 3);
+        var smoothed = smoothPathChaikin(simplified, 1);
+        return resamplePathByLength(smoothed, 5);
+    }
+
+    var dist = Math.hypot(line.x2 - line.x1, line.y2 - line.y1);
+    var steps = Math.max(10, Math.ceil(dist / 6));
+    var path = [];
+    for (var i = 0; i <= steps; i++) {
+        var t = i / steps;
+        path.push({
+            x: line.x1 + t * (line.x2 - line.x1),
+            y: line.y1 + t * (line.y2 - line.y1)
+        });
+    }
+    return path;
+}
+
+function buildSnakePoints(centerline, amplitude, wavelength) {
+    if (!centerline || centerline.length < 2) return centerline || [];
+
+    amplitude = amplitude || 10;
+    wavelength = wavelength || 28;
+
+    var cumLen = [0];
+    for (var i = 1; i < centerline.length; i++) {
+        cumLen.push(
+            cumLen[i - 1] + Math.hypot(
+                centerline[i].x - centerline[i - 1].x,
+                centerline[i].y - centerline[i - 1].y
+            )
+        );
+    }
+
+    var snake = [];
+    for (var j = 0; j < centerline.length; j++) {
+        var tx;
+        var ty;
+        if (j === 0) {
+            tx = centerline[1].x - centerline[0].x;
+            ty = centerline[1].y - centerline[0].y;
+        } else if (j === centerline.length - 1) {
+            tx = centerline[j].x - centerline[j - 1].x;
+            ty = centerline[j].y - centerline[j - 1].y;
+        } else {
+            tx = centerline[j + 1].x - centerline[j - 1].x;
+            ty = centerline[j + 1].y - centerline[j - 1].y;
+        }
+
+        var len = Math.hypot(tx, ty) || 1;
+        var nx = -ty / len;
+        var ny = tx / len;
+        var phase = (2 * Math.PI * cumLen[j]) / wavelength;
+        var offset = amplitude * Math.sin(phase);
+
+        snake.push({
+            x: centerline[j].x + nx * offset,
+            y: centerline[j].y + ny * offset
+        });
+    }
+    return snake;
+}
+
+function drawSnakePathOnContext(targetCtx, points) {
+    if (!points || points.length < 2) return;
+    targetCtx.beginPath();
+    targetCtx.moveTo(points[0].x, points[0].y);
+    for (var i = 1; i < points.length; i++) {
+        targetCtx.lineTo(points[i].x, points[i].y);
+    }
+    targetCtx.stroke();
+}
+
+function getSnakePointsFromLine(line) {
+    var centerline = getCenterlineFromLine(line);
+    var total = pathLength(centerline);
+    var amplitude = Math.min(12, Math.max(7, total / 18));
+    var wavelength = Math.min(34, Math.max(22, total / 5));
+    return buildSnakePoints(centerline, amplitude, wavelength);
+}
+
+function drawZigZag(line) {
+    var snake = getSnakePointsFromLine(line);
+    drawSnakePathOnContext(ctx, snake);
+    drawArrowAtPathEnd(ctx, snake);
 }
 
 function drawZigZagOnContext(targetCtx, line) {
-    const segments = 25;
-    const dx = (line.x2 - line.x1) / segments;
-    const dy = (line.y2 - line.y1) / segments;
-
-    targetCtx.beginPath();
-    targetCtx.moveTo(line.x1, line.y1);
-
-    for (let i = 1; i < segments; i++) {
-        const x = line.x1 + dx * i;
-        const y = line.y1 + dy * i + (i % 2 === 0 ? 8 : -8);
-        targetCtx.lineTo(x, y);
-    }
-
-    targetCtx.lineTo(line.x2, line.y2);
-    targetCtx.stroke();
-
-    drawArrowOnContext(targetCtx, line.x1, line.y1, line.x2, line.y2);
+    var snake = getSnakePointsFromLine(line);
+    drawSnakePathOnContext(targetCtx, snake);
+    drawArrowAtPathEnd(targetCtx, snake);
 }
 
 // ===============================
