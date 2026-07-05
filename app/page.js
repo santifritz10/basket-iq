@@ -14,6 +14,17 @@ function toggleSidebarGroup(elm) {
 }
 `;
 
+const playerDomainPublicConfig = {
+  enabled: process.env.NEXT_PUBLIC_PLAYER_CENTRIC_ENABLED === "true",
+  read: process.env.NEXT_PUBLIC_PLAYER_CENTRIC_ENABLED === "true" || process.env.NEXT_PUBLIC_PLAYER_CENTRIC_READ === "true",
+  write: process.env.NEXT_PUBLIC_PLAYER_CENTRIC_ENABLED === "true" || process.env.NEXT_PUBLIC_PLAYER_CENTRIC_WRITE === "true",
+  realtime: process.env.NEXT_PUBLIC_PLAYER_CENTRIC_ENABLED === "true" || process.env.NEXT_PUBLIC_PLAYER_CENTRIC_REALTIME === "true"
+};
+
+const playerTrackingNavAction = playerDomainPublicConfig.write
+  ? "window.location.href='/players'"
+  : "loadContent('player_tracking_hub')";
+
 const sidebarUiEnhancerScript = `
 (function setupSidebarUiEnhancements() {
   function decorateSidebar() {
@@ -89,7 +100,7 @@ const sidebarUiEnhancerScript = `
         '<p class="sidebar-section-title">Herramientas del coach</p>',
         '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="planilla" onclick="loadContent(\\'planilla_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Planilla</span></div></div>',
         '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="planificacion-menu" onclick="loadContent(\\'planificacion_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Planificación</span></div></div>',
-        '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="player-tracking-menu" onclick="loadContent(\\'player_tracking_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Seguimiento de Jugadores</span></div></div>',
+        '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="player-tracking-menu" onclick="${playerTrackingNavAction}"><span class="sidebar-toggle-icon">▶</span><span>Seguimiento de Jugadores</span></div></div>',
         '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="jugadas" onclick="loadContent(\\'jugadas_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Jugadas Guardadas</span></div></div>'
       ].join('');
     }
@@ -156,13 +167,6 @@ const sidebarUiEnhancerScript = `
 })();
 `;
 
-const playerDomainPublicConfig = {
-  enabled: process.env.NEXT_PUBLIC_PLAYER_CENTRIC_ENABLED === "true",
-  read: process.env.NEXT_PUBLIC_PLAYER_CENTRIC_ENABLED === "true" || process.env.NEXT_PUBLIC_PLAYER_CENTRIC_READ === "true",
-  write: process.env.NEXT_PUBLIC_PLAYER_CENTRIC_ENABLED === "true" || process.env.NEXT_PUBLIC_PLAYER_CENTRIC_WRITE === "true",
-  realtime: process.env.NEXT_PUBLIC_PLAYER_CENTRIC_ENABLED === "true" || process.env.NEXT_PUBLIC_PLAYER_CENTRIC_REALTIME === "true"
-};
-
 const playerDomainConfigScript = `
 window.BasketLabPlayerDomainConfig = ${JSON.stringify(playerDomainPublicConfig)};
 `;
@@ -179,11 +183,11 @@ export default async function HomePage() {
         {playerDomainConfigScript}
       </Script>
       <Script src="/assets/js/fundamentos-data.js?v=20260702" strategy="afterInteractive" />
-      <Script src="/assets/js/player-domain-api.js?v=20260712" strategy="afterInteractive" />
-      <Script src="/assets/js/player-domain-realtime.js?v=20260712" strategy="afterInteractive" />
-      <Script src="/assets/js/shooting-zones-heatmap.js?v=20260712" strategy="afterInteractive" />
+      <Script src="/assets/js/player-domain-api.js?v=20260713" strategy="afterInteractive" />
+      <Script src="/assets/js/player-domain-realtime.js?v=20260713" strategy="afterInteractive" />
+      <Script src="/assets/js/shooting-zones-heatmap.js?v=20260713" strategy="afterInteractive" />
       <Script src="/assets/js/supabase-config.js" strategy="afterInteractive" />
-      <Script src="/assets/js/main.js?v=20260712" strategy="afterInteractive" />
+      <Script src="/assets/js/main.js?v=20260713" strategy="afterInteractive" />
       <Script id="legacy-toggle-sidebar" strategy="afterInteractive">
         {toggleSidebarScript}
       </Script>

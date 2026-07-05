@@ -76,10 +76,10 @@ security definer
 set search_path = public
 as $$
 begin
-  return case p_action
-    when 'read' then public.has_player_access(p_player_id, 'viewer')
-    when 'write', 'delete' then public.has_player_access(p_player_id, 'editor')
-    when 'admin' then public.has_player_access(p_player_id, 'admin')
+  return case
+    when p_action = 'read' then public.has_player_access(p_player_id, 'viewer')
+    when p_action in ('write', 'delete') then public.has_player_access(p_player_id, 'editor')
+    when p_action = 'admin' then public.has_player_access(p_player_id, 'admin')
     else false
   end;
 end;

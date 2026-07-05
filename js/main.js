@@ -271,6 +271,7 @@ async function login(email, password) {
             console.error("[Auth][signIn] session available but app user mapping failed");
             return { ok: false, error: "No se pudo cargar el perfil del usuario luego del login." };
         }
+        await syncAuthCookiesFromClient();
         return { ok: true, user: current };
     } catch (error) {
         console.error("[Auth][signIn] unexpected error", error);
@@ -288,6 +289,7 @@ function showApp() {
     if (userNameEl && cur) userNameEl.textContent = cur.name || cur.username;
     var btnLogout = document.getElementById("btn-logout");
     if (btnLogout) btnLogout.onclick = function () { logout(); };
+    syncAuthCookiesFromClient();
     bootstrapUserDataSync()
         .finally(function () {
             loadSavedPlaysFromStorage();
@@ -306,6 +308,27 @@ function showAuthScreen() {
     attachAuthListeners();
 }
 
+async function syncAuthCookiesFromClient() {
+    var client = getSupabaseClient();
+    if (!client) return;
+    try {
+        var sessionResult = await client.auth.getSession();
+        var session = sessionResult.data && sessionResult.data.session;
+        if (!session || !session.access_token || !session.refresh_token) return;
+        await fetch("/api/auth/sync-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({
+                access_token: session.access_token,
+                refresh_token: session.refresh_token
+            })
+        });
+    } catch (e) {
+        console.warn("[Auth] sync-session cookies failed", e);
+    }
+}
+
 function logout() {
     var client = getSupabaseClient();
     if (!client) {
@@ -318,6 +341,7 @@ function logout() {
             return null;
         })
         .finally(function () {
+            fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(function () {});
             authCurrentUser = null;
             dataSyncDirtyTypes = {};
             dataSyncBootstrapPromise = null;
