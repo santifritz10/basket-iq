@@ -699,6 +699,14 @@ function syncDataTypeImmediately(dataType) {
 }
 
 async function upsertRemoteDataType(dataType) {
+    var cfg = window.BasketLabPlayerDomainConfig || {};
+    if (
+        (cfg.write || cfg.enabled) &&
+        (dataType === APP_DATA_TYPES.playersTracking || dataType === APP_DATA_TYPES.shootingHeatmap)
+    ) {
+        return;
+    }
+
     const client = getSupabaseClient();
     const user = getCurrentUser();
     if (!client || !user || !user.id) return;
@@ -738,9 +746,38 @@ async function flushPendingDataSync() {
 }
 
 async function pullRemoteDataType(dataType) {
-    var client = getSupabaseClient();
     var user = getCurrentUser();
-    if (!client || !user || !user.id) return;
+    if (!user || !user.id) return;
+
+    if (
+        window.BasketLabPlayerDomainConfig &&
+        (window.BasketLabPlayerDomainConfig.read || window.BasketLabPlayerDomainConfig.enabled) &&
+        (dataType === APP_DATA_TYPES.playersTracking || dataType === APP_DATA_TYPES.shootingHeatmap)
+    ) {
+        try {
+            if (dataType === APP_DATA_TYPES.playersTracking) {
+                var playersRes = await fetch("/api/players", { credentials: "same-origin" });
+                var playersJson = await playersRes.json();
+                if (playersJson.ok && Array.isArray(playersJson.items)) {
+                    setLocalDataByType(dataType, playersJson.items);
+                    return;
+                }
+            }
+            if (dataType === APP_DATA_TYPES.shootingHeatmap) {
+                var shootingRes = await fetch("/api/shooting", { credentials: "same-origin" });
+                var shootingJson = await shootingRes.json();
+                if (shootingJson.ok && shootingJson.payload) {
+                    setLocalDataByType(dataType, shootingJson.payload);
+                    return;
+                }
+            }
+        } catch (apiErr) {
+            console.warn("[PlayerDomain] relational read fallback to blob", dataType, apiErr);
+        }
+    }
+
+    var client = getSupabaseClient();
+    if (!client) return;
 
     try {
         var result = await client
@@ -2299,6 +2336,7 @@ function getPlayersTracking() {
 
 function savePlayersTracking(list) {
     setLocalDataByType(APP_DATA_TYPES.playersTracking, list);
+    if (window.BasketLabPlayerDomainApi && window.BasketLabPlayerDomainApi.isWrite()) return;
     syncDataTypeImmediately(APP_DATA_TYPES.playersTracking);
 }
 
@@ -2351,14 +2389,53 @@ function getPlayerById(playerId) {
     return list.find(function (p) { return String(p.id) === String(playerId); }) || null;
 }
 
-function upsertPlayer(player) {
+async function upsertPlayer(player) {
+    if (window.BasketLabPlayerDomainApi && window.BasketLabPlayerDomainApi.isWrite()) {
+        var api = window.BasketLabPlayerDomainApi;
+        try {
+            if (api.isUuid(player.id)) {
+                await api.patchPlayer(player.id, player);
+            } else {
+                var created = await api.createPlayer({
+                    display_name: player.name,
+                    name: player.name,
+                    position: player.position,
+                    age: player.age,
+                    height: player.height,
+                    level: player.level,
+                    team: player.team,
+                    category: player.category,
+                    photo_url: player.photo_url,
+                    club_shield_url: player.club_shield_url,
+                    fundamentals: player.fundamentals,
+                    game_stats: player.stats
+                });
+                if (created && created.id) player.id = created.id;
+            }
+            await api.refreshLocalPlayerData();
+        } catch (e) {
+            console.error("[PlayerDomain] upsertPlayer failed", e);
+            alert(e.message || "No se pudo guardar el jugador.");
+        }
+        return;
+    }
     var list = getPlayersTracking();
     var idx = list.findIndex(function (p) { return String(p.id) === String(player.id); });
     if (idx >= 0) list[idx] = player; else list.unshift(player);
     savePlayersTracking(list);
 }
 
-function removePlayer(playerId) {
+async function removePlayer(playerId) {
+    if (window.BasketLabPlayerDomainApi && window.BasketLabPlayerDomainApi.isWrite()) {
+        try {
+            await window.BasketLabPlayerDomainApi.archivePlayer(playerId);
+            await window.BasketLabPlayerDomainApi.refreshLocalPlayerData();
+        } catch (e) {
+            console.error("[PlayerDomain] removePlayer failed", e);
+            alert(e.message || "No se pudo eliminar el jugador.");
+        }
+        return;
+    }
     var list = getPlayersTracking().filter(function (p) { return String(p.id) !== String(playerId); });
     savePlayersTracking(list);
 }
@@ -2396,8 +2473,16 @@ function readImageFileAsDataUrl(file) {
     });
 }
 
-function pushPlayerEvolution(player, message) {
+async function pushPlayerEvolution(player, message) {
     if (!message) return;
+    if (window.BasketLabPlayerDomainApi && window.BasketLabPlayerDomainApi.isWrite() && window.BasketLabPlayerDomainApi.isUuid(player.id)) {
+        try {
+            await window.BasketLabPlayerDomainApi.createEvolution(player.id, message);
+        } catch (e) {
+            console.warn("[PlayerDomain] evolution event failed", e);
+        }
+        return;
+    }
     if (!Array.isArray(player.evolution)) player.evolution = [];
     player.evolution.unshift({
         id: "ev_" + Date.now() + "_" + Math.round(Math.random() * 1000),
@@ -2565,7 +2650,7 @@ function renderPlayerCreateForm() {
             updated_at: nowIso()
         });
         pushPlayerEvolution(player, "Jugador creado");
-        upsertPlayer(player);
+        await upsertPlayer(player);
         renderPlayerProfile(player.id);
     };
 }
@@ -2755,6 +2840,21 @@ function renderPlayerProfile(playerId, activeTab) {
     }
     player = normalizePlayer(player);
     var tab = activeTab || "fundamentals";
+
+    if (typeof window.__playerRealtimeTeardown === "function") {
+        window.__playerRealtimeTeardown();
+        window.__playerRealtimeTeardown = null;
+    }
+    if (window.BasketLabPlayerRealtime && typeof window.BasketLabPlayerRealtime.setup === "function") {
+        window.__playerRealtimeTeardown = window.BasketLabPlayerRealtime.setup(playerId, function () {
+            Promise.all([
+                pullRemoteDataType(APP_DATA_TYPES.playersTracking),
+                pullRemoteDataType(APP_DATA_TYPES.shootingHeatmap)
+            ]).then(function () {
+                renderPlayerProfile(playerId, tab);
+            });
+        });
+    }
     var photo = player.photo_url
         ? ('<img src="' + escapeHtml(player.photo_url) + '" alt="' + escapeHtml(player.name || "Jugador") + '" class="player-profile-photo">')
         : ('<div class="player-profile-photo-placeholder">' + escapeHtml(playerInitials(player.name)) + "</div>");
@@ -2887,18 +2987,28 @@ async function savePlayerBasic(playerId) {
         }
     }
     player.updated_at = nowIso();
-    pushPlayerEvolution(player, "Datos básicos actualizados");
-    upsertPlayer(player);
+    await pushPlayerEvolution(player, "Datos básicos actualizados");
+    if (window.BasketLabPlayerDomainApi && window.BasketLabPlayerDomainApi.isWrite()) {
+        try {
+            await window.BasketLabPlayerDomainApi.patchPlayer(player.id, player);
+            await window.BasketLabPlayerDomainApi.refreshLocalPlayerData();
+        } catch (e) {
+            alert(e.message || "No se pudo guardar.");
+            return;
+        }
+    } else {
+        await upsertPlayer(player);
+    }
     renderPlayerProfile(player.id, "fundamentals");
 }
 
-function deletePlayer(playerId) {
+async function deletePlayer(playerId) {
     if (!confirm("¿Eliminar este jugador y todo su seguimiento?")) return;
-    removePlayer(playerId);
+    await removePlayer(playerId);
     renderPlayerList();
 }
 
-function updatePlayerRating(playerId, ratingKey, value) {
+async function updatePlayerRating(playerId, ratingKey, value) {
     var player = getPlayerById(playerId);
     if (!player) return;
     player = normalizePlayer(player);
@@ -2906,13 +3016,23 @@ function updatePlayerRating(playerId, ratingKey, value) {
     player.fundamentals[ratingKey] = Number(value) || 1;
     player.updated_at = nowIso();
     if (prev !== player.fundamentals[ratingKey]) {
-        pushPlayerEvolution(player, "Fundamento actualizado: " + ratingKey + " → " + player.fundamentals[ratingKey] + "/5");
+        await pushPlayerEvolution(player, "Fundamento actualizado: " + ratingKey + " → " + player.fundamentals[ratingKey] + "/5");
     }
-    upsertPlayer(player);
+    if (window.BasketLabPlayerDomainApi && window.BasketLabPlayerDomainApi.isWrite()) {
+        try {
+            await window.BasketLabPlayerDomainApi.patchPlayer(player.id, { fundamentals: player.fundamentals });
+            await window.BasketLabPlayerDomainApi.refreshLocalPlayerData();
+        } catch (e) {
+            alert(e.message || "No se pudo guardar.");
+            return;
+        }
+    } else {
+        await upsertPlayer(player);
+    }
     renderPlayerProfile(playerId, "fundamentals");
 }
 
-function savePlayerStats(playerId) {
+async function savePlayerStats(playerId) {
     var form = document.getElementById("player-stats-form");
     if (!form) return;
     var fd = new FormData(form);
@@ -2923,16 +3043,38 @@ function savePlayerStats(playerId) {
         player.stats[field.key] = String(fd.get(field.key) || "").trim();
     });
     player.updated_at = nowIso();
-    pushPlayerEvolution(player, "Estadísticas actualizadas");
-    upsertPlayer(player);
+    await pushPlayerEvolution(player, "Estadísticas actualizadas");
+    if (window.BasketLabPlayerDomainApi && window.BasketLabPlayerDomainApi.isWrite()) {
+        try {
+            await window.BasketLabPlayerDomainApi.patchPlayer(player.id, { stats: player.stats });
+            await window.BasketLabPlayerDomainApi.refreshLocalPlayerData();
+        } catch (e) {
+            alert(e.message || "No se pudo guardar.");
+            return;
+        }
+    } else {
+        await upsertPlayer(player);
+    }
     renderPlayerProfile(playerId, "stats");
 }
 
-function addPlayerNote(playerId) {
+async function addPlayerNote(playerId) {
     var input = document.getElementById("player-note-input");
     if (!input) return;
     var text = String(input.value || "").trim();
     if (!text) return;
+    if (window.BasketLabPlayerDomainApi && window.BasketLabPlayerDomainApi.isWrite()) {
+        try {
+            await window.BasketLabPlayerDomainApi.createNote(playerId, text);
+            await window.BasketLabPlayerDomainApi.createEvolution(playerId, "Nueva nota del entrenador");
+            await window.BasketLabPlayerDomainApi.refreshLocalPlayerData();
+            input.value = "";
+            renderPlayerProfile(playerId, "notes");
+        } catch (e) {
+            alert(e.message || "No se pudo guardar la nota.");
+        }
+        return;
+    }
     var player = getPlayerById(playerId);
     if (!player) return;
     player = normalizePlayer(player);
@@ -2944,16 +3086,28 @@ function addPlayerNote(playerId) {
     });
     if (player.notes_history.length > 200) player.notes_history = player.notes_history.slice(0, 200);
     player.updated_at = nowIso();
-    pushPlayerEvolution(player, "Nueva nota del entrenador");
-    upsertPlayer(player);
+    await pushPlayerEvolution(player, "Nueva nota del entrenador");
+    await upsertPlayer(player);
     renderPlayerProfile(playerId, "notes");
 }
 
-function addPlayerGoal(playerId) {
+async function addPlayerGoal(playerId) {
     var input = document.getElementById("player-goal-input");
     if (!input) return;
     var text = String(input.value || "").trim();
     if (!text) return;
+    if (window.BasketLabPlayerDomainApi && window.BasketLabPlayerDomainApi.isWrite()) {
+        try {
+            await window.BasketLabPlayerDomainApi.createGoal(playerId, text);
+            await window.BasketLabPlayerDomainApi.createEvolution(playerId, "Objetivo agregado: " + text);
+            await window.BasketLabPlayerDomainApi.refreshLocalPlayerData();
+            input.value = "";
+            renderPlayerProfile(playerId, "goals");
+        } catch (e) {
+            alert(e.message || "No se pudo guardar el objetivo.");
+        }
+        return;
+    }
     var player = getPlayerById(playerId);
     if (!player) return;
     player = normalizePlayer(player);
@@ -2966,12 +3120,23 @@ function addPlayerGoal(playerId) {
     });
     if (player.goals.length > 160) player.goals = player.goals.slice(0, 160);
     player.updated_at = nowIso();
-    pushPlayerEvolution(player, "Objetivo agregado: " + text);
-    upsertPlayer(player);
+    await pushPlayerEvolution(player, "Objetivo agregado: " + text);
+    await upsertPlayer(player);
     renderPlayerProfile(playerId, "goals");
 }
 
-function updatePlayerGoalStatus(playerId, goalId, status) {
+async function updatePlayerGoalStatus(playerId, goalId, status) {
+    if (window.BasketLabPlayerDomainApi && window.BasketLabPlayerDomainApi.isWrite()) {
+        try {
+            await window.BasketLabPlayerDomainApi.updateGoal(playerId, goalId, { status: status });
+            await window.BasketLabPlayerDomainApi.createEvolution(playerId, "Objetivo actualizado (" + status + ")");
+            await window.BasketLabPlayerDomainApi.refreshLocalPlayerData();
+            renderPlayerProfile(playerId, "goals");
+        } catch (e) {
+            alert(e.message || "No se pudo actualizar.");
+        }
+        return;
+    }
     var player = getPlayerById(playerId);
     if (!player) return;
     player = normalizePlayer(player);
@@ -2979,19 +3144,30 @@ function updatePlayerGoalStatus(playerId, goalId, status) {
     if (!goal) return;
     goal.status = status;
     player.updated_at = nowIso();
-    pushPlayerEvolution(player, "Objetivo actualizado: " + (goal.text || "Objetivo") + " (" + status + ")");
-    upsertPlayer(player);
+    await pushPlayerEvolution(player, "Objetivo actualizado: " + (goal.text || "Objetivo") + " (" + status + ")");
+    await upsertPlayer(player);
     renderPlayerProfile(playerId, "goals");
 }
 
-function deletePlayerGoal(playerId, goalId) {
+async function deletePlayerGoal(playerId, goalId) {
+    if (window.BasketLabPlayerDomainApi && window.BasketLabPlayerDomainApi.isWrite()) {
+        try {
+            await window.BasketLabPlayerDomainApi.deleteGoal(playerId, goalId);
+            await window.BasketLabPlayerDomainApi.createEvolution(playerId, "Objetivo eliminado");
+            await window.BasketLabPlayerDomainApi.refreshLocalPlayerData();
+            renderPlayerProfile(playerId, "goals");
+        } catch (e) {
+            alert(e.message || "No se pudo eliminar.");
+        }
+        return;
+    }
     var player = getPlayerById(playerId);
     if (!player) return;
     player = normalizePlayer(player);
     player.goals = (player.goals || []).filter(function (g) { return String(g.id) !== String(goalId); });
     player.updated_at = nowIso();
-    pushPlayerEvolution(player, "Objetivo eliminado");
-    upsertPlayer(player);
+    await pushPlayerEvolution(player, "Objetivo eliminado");
+    await upsertPlayer(player);
     renderPlayerProfile(playerId, "goals");
 }
 

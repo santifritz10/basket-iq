@@ -1,29 +1,49 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUserFromCookies } from "@/lib/server/auth";
+import { playerDomainFlags } from "@/lib/server/player-domain-flags";
 import { getUserDataByType, saveUserDataByType } from "@/services/server/user-data-service";
+import { buildShootingHeatmapPayload } from "@/services/server/shooting-session-service";
+import { listPlayerIdsForUser } from "@/services/server/player-permissions";
+import { requireApiUser, handleApiError, jsonOk } from "@/app/api/_lib/player-route-helpers";
 
-const TYPE = "shooting_heatmap";
+const LEGACY_TYPE = "shooting_heatmap";
 
 export async function GET() {
-  const user = await getAuthenticatedUserFromCookies();
-  if (!user?.id) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  const auth = await requireApiUser();
+  if (auth.error) return auth.error;
+  const { user } = auth;
+
   try {
-    const payload = (await getUserDataByType(user.id, TYPE)) || {};
-    return NextResponse.json({ ok: true, payload });
+    if (playerDomainFlags.active) {
+      const playerIds = await listPlayerIdsForUser(user.id);
+      const payload = await buildShootingHeatmapPayload(user.id, playerIds);
+      return jsonOk({ payload, source: "relational" });
+    }
+
+    const payload = (await getUserDataByType(user.id, LEGACY_TYPE)) || {};
+    return jsonOk({ payload, source: "legacy" });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return handleApiError(error);
   }
 }
 
 export async function POST(req) {
-  const user = await getAuthenticatedUserFromCookies();
-  if (!user?.id) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  const auth = await requireApiUser();
+  if (auth.error) return auth.error;
+  const { user } = auth;
+
   try {
+    if (playerDomainFlags.write) {
+      return NextResponse.json(
+        { ok: false, error: "Use /api/players/:playerId/shooting-sessions for session writes." },
+        { status: 410 }
+      );
+    }
+
     const body = await req.json();
     const payload = body?.payload ?? {};
-    await saveUserDataByType(user.id, TYPE, payload);
-    return NextResponse.json({ ok: true });
+    await saveUserDataByType(user.id, LEGACY_TYPE, payload);
+    return jsonOk({ source: "legacy" });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    return handleApiError(error);
   }
 }

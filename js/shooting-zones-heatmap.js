@@ -146,6 +146,32 @@
         return { version: 2, active_session_id: null, sessions: [] };
     }
 
+    function isRelationalWrite() {
+        var cfg = global.BasketLabPlayerDomainConfig || {};
+        return (cfg.write || cfg.enabled) &&
+            global.BasketLabPlayerDomainApi && typeof global.BasketLabPlayerDomainApi.isWrite === "function" &&
+            global.BasketLabPlayerDomainApi.isWrite();
+    }
+
+    function isRelationalRead() {
+        var cfg = global.BasketLabPlayerDomainConfig || {};
+        return cfg.read || cfg.enabled;
+    }
+
+    var relationalSaveTimer = null;
+
+    function scheduleRelationalSessionPatch(sessionId, patch) {
+        if (!isRelationalWrite() || !global.BasketLabPlayerDomainApi) return;
+        if (relationalSaveTimer) clearTimeout(relationalSaveTimer);
+        relationalSaveTimer = setTimeout(function () {
+            global.BasketLabPlayerDomainApi.patchShootingSession(sessionId, patch).then(function () {
+                return global.BasketLabPlayerDomainApi.refreshLocalPlayerData();
+            }).catch(function (e) {
+                console.warn("[Shooting] relational patch failed", e);
+            });
+        }, 350);
+    }
+
     function loadPayload() {
         var base = {};
         if (global.BasketLabDataSync && typeof global.BasketLabDataSync.loadData === "function") {
@@ -163,6 +189,13 @@
     }
 
     function savePayload(payload) {
+        if (isRelationalWrite()) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+            if (global.BasketLabDataSync && typeof global.BasketLabDataSync.saveData === "function") {
+                global.BasketLabDataSync.saveData("shooting_heatmap", payload);
+            }
+            return;
+        }
         if (global.BasketLabDataSync && typeof global.BasketLabDataSync.saveData === "function") {
             global.BasketLabDataSync.saveData("shooting_heatmap", payload);
         }
@@ -456,6 +489,11 @@
             if (!active) return;
             active.zones = sanitizeState(this.state);
             active.updated_at = new Date().toISOString();
+            if (isRelationalWrite() && global.BasketLabPlayerDomainApi && global.BasketLabPlayerDomainApi.isUuid(active.id)) {
+                scheduleRelationalSessionPatch(active.id, { zones: active.zones });
+                savePayload(this.payload);
+                return;
+            }
             savePayload(this.payload);
         },
 
@@ -473,6 +511,36 @@
         },
 
         createSession: function (data) {
+            var self = this;
+            if (isRelationalWrite() && global.BasketLabPlayerDomainApi) {
+                var playerIds = (data.player_ids || []).map(String);
+                var anchor = playerIds[0];
+                if (!anchor) {
+                    alert("Seleccioná al menos un jugador para la sesión.");
+                    return;
+                }
+                global.BasketLabPlayerDomainApi.createShootingSession(anchor, {
+                    nombre: data.nombre,
+                    fecha: data.fecha,
+                    zones: emptyZonesState(),
+                    player_ids: playerIds
+                }).then(function (session) {
+                    return global.BasketLabPlayerDomainApi.refreshLocalPlayerData().then(function () {
+                        self.payload = loadPayload();
+                        self.payload.active_session_id = session.id;
+                        self.syncStateFromActiveSession();
+                        self.selectedId = null;
+                        self.showNewSessionForm = false;
+                        self.showEditSessionForm = false;
+                        self.sessionMenuOpen = false;
+                        self.render();
+                        self.bind();
+                    });
+                }).catch(function (e) {
+                    alert(e.message || "No se pudo crear la sesión.");
+                });
+                return;
+            }
             var session = normalizeSession({
                 id: "shoot_" + Date.now(),
                 fecha: data.fecha,
@@ -500,6 +568,26 @@
             if (data.fecha != null) active.fecha = String(data.fecha).slice(0, 10);
             if (data.player_ids != null) active.player_ids = data.player_ids.map(String);
             active.updated_at = new Date().toISOString();
+            if (isRelationalWrite() && global.BasketLabPlayerDomainApi && global.BasketLabPlayerDomainApi.isUuid(active.id)) {
+                var self = this;
+                global.BasketLabPlayerDomainApi.patchShootingSession(active.id, {
+                    nombre: active.nombre,
+                    fecha: active.fecha,
+                    player_ids: active.player_ids
+                }).then(function () {
+                    return global.BasketLabPlayerDomainApi.refreshLocalPlayerData();
+                }).then(function () {
+                    self.payload = loadPayload();
+                    self.players = loadPlayers();
+                    self.showEditSessionForm = false;
+                    self.sessionMenuOpen = false;
+                    self.render();
+                    self.bind();
+                }).catch(function (e) {
+                    alert(e.message || "No se pudo actualizar la sesión.");
+                });
+                return;
+            }
             savePayload(this.payload);
             this.players = loadPlayers();
             this.showEditSessionForm = false;
@@ -510,6 +598,27 @@
 
         deleteSession: function (sessionId) {
             if (!confirm("¿Borrar esta sesión de tiro y sus registros?")) return;
+            var self = this;
+            if (isRelationalWrite() && global.BasketLabPlayerDomainApi && global.BasketLabPlayerDomainApi.isUuid(sessionId)) {
+                global.BasketLabPlayerDomainApi.deleteShootingSession(sessionId).then(function () {
+                    return global.BasketLabPlayerDomainApi.refreshLocalPlayerData();
+                }).then(function () {
+                    self.payload = loadPayload();
+                    if (self.payload.active_session_id === sessionId) {
+                        self.payload.active_session_id = self.payload.sessions[0] ? self.payload.sessions[0].id : null;
+                    }
+                    self.syncStateFromActiveSession();
+                    self.selectedId = null;
+                    self.showNewSessionForm = !self.getActiveSession();
+                    self.showEditSessionForm = false;
+                    self.sessionMenuOpen = false;
+                    self.render();
+                    self.bind();
+                }).catch(function (e) {
+                    alert(e.message || "No se pudo eliminar la sesión.");
+                });
+                return;
+            }
             this.payload.sessions = this.payload.sessions.filter(function (s) { return s.id !== sessionId; });
             if (this.payload.active_session_id === sessionId) {
                 this.payload.active_session_id = this.payload.sessions[0] ? this.payload.sessions[0].id : null;

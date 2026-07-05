@@ -17,6 +17,18 @@ Compatibilidad legacy (también server-only):
 - `lib/auth-server.js` (re-export server)
 - `services/user-data-service.js` (re-export server)
 
+Dominio jugador (server-only):
+
+- `lib/server/player-domain-flags.js`
+- `services/server/player-permissions.js`
+- `services/server/player-service.js`
+- `services/server/shooting-session-service.js`
+- `services/server/player-member-service.js`
+- `services/server/activity-service.js`
+- `services/server/player-legacy-adapter.js`
+- `lib/client/player-api.js`
+- `lib/client/player-realtime.js`
+
 ## Regla de imports
 
 ### Permitido

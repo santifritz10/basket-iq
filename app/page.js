@@ -156,6 +156,17 @@ const sidebarUiEnhancerScript = `
 })();
 `;
 
+const playerDomainPublicConfig = {
+  enabled: process.env.NEXT_PUBLIC_PLAYER_CENTRIC_ENABLED === "true",
+  read: process.env.NEXT_PUBLIC_PLAYER_CENTRIC_ENABLED === "true" || process.env.NEXT_PUBLIC_PLAYER_CENTRIC_READ === "true",
+  write: process.env.NEXT_PUBLIC_PLAYER_CENTRIC_ENABLED === "true" || process.env.NEXT_PUBLIC_PLAYER_CENTRIC_WRITE === "true",
+  realtime: process.env.NEXT_PUBLIC_PLAYER_CENTRIC_ENABLED === "true" || process.env.NEXT_PUBLIC_PLAYER_CENTRIC_REALTIME === "true"
+};
+
+const playerDomainConfigScript = `
+window.BasketLabPlayerDomainConfig = ${JSON.stringify(playerDomainPublicConfig)};
+`;
+
 export default async function HomePage() {
   const legacyBodyMarkup = await getLegacyBodyMarkup();
 
@@ -164,10 +175,15 @@ export default async function HomePage() {
       <div dangerouslySetInnerHTML={{ __html: legacyBodyMarkup }} />
       <Script src="https://unpkg.com/lucide@latest" strategy="afterInteractive" />
       <Script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" strategy="beforeInteractive" />
+      <Script id="player-domain-config" strategy="beforeInteractive">
+        {playerDomainConfigScript}
+      </Script>
       <Script src="/assets/js/fundamentos-data.js?v=20260702" strategy="afterInteractive" />
-      <Script src="/assets/js/shooting-zones-heatmap.js?v=20260710" strategy="afterInteractive" />
+      <Script src="/assets/js/player-domain-api.js?v=20260712" strategy="afterInteractive" />
+      <Script src="/assets/js/player-domain-realtime.js?v=20260712" strategy="afterInteractive" />
+      <Script src="/assets/js/shooting-zones-heatmap.js?v=20260712" strategy="afterInteractive" />
       <Script src="/assets/js/supabase-config.js" strategy="afterInteractive" />
-      <Script src="/assets/js/main.js?v=20260708" strategy="afterInteractive" />
+      <Script src="/assets/js/main.js?v=20260712" strategy="afterInteractive" />
       <Script id="legacy-toggle-sidebar" strategy="afterInteractive">
         {toggleSidebarScript}
       </Script>

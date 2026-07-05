@@ -100,3 +100,8 @@ for update
 to authenticated
 using (auth.uid() = id)
 with check (auth.uid() = id);
+
+-- ---------------------------------------------------------------------------
+-- Player domain (relational) — ver docs/sql/001-player-domain-schema.sql
+-- Ejecutar scripts en docs/sql/ en orden después del esquema base.
+-- ---------------------------------------------------------------------------

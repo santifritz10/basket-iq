@@ -1,0 +1,25 @@
+-- Basket Lab — Fase 0: Realtime (checklist)
+--
+-- Supabase Dashboard → Database → Publications → supabase_realtime
+-- Agregar las siguientes tablas a la publicación:
+--
+--   - players
+--   - player_members
+--   - player_notes
+--   - player_goals
+--   - player_evolution_events
+--   - shooting_sessions
+--   - shooting_session_players
+--
+-- Alternativa SQL (requiere permisos en supabase_realtime):
+--
+-- alter publication supabase_realtime add table public.players;
+-- alter publication supabase_realtime add table public.player_members;
+-- alter publication supabase_realtime add table public.player_notes;
+-- alter publication supabase_realtime add table public.player_goals;
+-- alter publication supabase_realtime add table public.player_evolution_events;
+-- alter publication supabase_realtime add table public.shooting_sessions;
+-- alter publication supabase_realtime add table public.shooting_session_players;
+--
+-- Canal sugerido en cliente: player:{player_id}
+-- Eventos: INSERT, UPDATE, DELETE

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUserFromCookies } from "@/lib/server/auth";
 import { getUserDataByType, saveUserDataByType } from "@/services/server/user-data-service";
+import { playerDomainFlags } from "@/lib/server/player-domain-flags";
+
+const MIGRATED_TYPES = new Set(["shooting_heatmap", "players_tracking"]);
 
 const DATA_TYPES = new Set([
   "plays",
@@ -46,6 +49,12 @@ export async function POST(req, { params }) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   try {
+    if (playerDomainFlags.write && MIGRATED_TYPES.has(dataType)) {
+      return NextResponse.json(
+        { ok: false, error: "Legacy blob write disabled. Use player domain API." },
+        { status: 410 }
+      );
+    }
     const parsed = saveSchema.parse(await req.json());
     await saveUserDataByType(user.id, dataType, parsed.payload);
     return NextResponse.json({ ok: true });

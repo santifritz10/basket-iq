@@ -1,15 +1,61 @@
-import PlayersModule from "@/components/players/PlayersModule";
+import { playerDomainFlags } from "@/lib/server/player-domain-flags";
 import { getAuthenticatedUserFromCookies } from "@/lib/server/auth";
 import { getUserDataByType } from "@/services/server/user-data-service";
+import {
+  getPlayerProfileBundle,
+  listPlayersForUser
+} from "@/services/server/player-service";
+import { playerToLegacyShape } from "@/services/server/player-legacy-adapter";
+import { buildShootingHeatmapPayload } from "@/services/server/shooting-session-service";
+import { listPlayerIdsForUser } from "@/services/server/player-permissions";
+import PlayersModule from "@/components/players/PlayersModule";
+
+async function loadLegacyPlayers(userId) {
+  const items = (await getUserDataByType(userId, "players_tracking")) || [];
+  return Array.isArray(items) ? items : [];
+}
+
+async function loadLegacyShooting(userId) {
+  const payload = (await getUserDataByType(userId, "shooting_heatmap")) || {};
+  return payload && typeof payload === "object" ? payload : {};
+}
+
+async function loadRelationalPlayers(userId) {
+  const players = await listPlayersForUser(userId);
+  const bundles = await Promise.all(
+    players.map((p) => getPlayerProfileBundle(userId, p.id))
+  );
+  return bundles.map(({ player, notes, goals, evolution }) =>
+    playerToLegacyShape(player, { notes, goals, evolution })
+  );
+}
 
 export default async function PlayersPage() {
   const user = await getAuthenticatedUserFromCookies();
-  const items = user?.id ? (await getUserDataByType(user.id, "players_tracking")) || [] : [];
-  const shootingPayload = user?.id ? (await getUserDataByType(user.id, "shooting_heatmap")) || {} : {};
+  const useRelational = playerDomainFlags.active;
+
+  let initialItems = [];
+  let initialShootingPayload = {};
+
+  if (user?.id) {
+    if (useRelational) {
+      initialItems = await loadRelationalPlayers(user.id);
+      const playerIds = await listPlayerIdsForUser(user.id);
+      initialShootingPayload = await buildShootingHeatmapPayload(user.id, playerIds);
+    } else {
+      initialItems = await loadLegacyPlayers(user.id);
+      initialShootingPayload = await loadLegacyShooting(user.id);
+    }
+  }
+
   return (
     <PlayersModule
-      initialItems={Array.isArray(items) ? items : []}
-      initialShootingPayload={shootingPayload && typeof shootingPayload === "object" ? shootingPayload : {}}
+      initialItems={initialItems}
+      initialShootingPayload={initialShootingPayload}
+      playerDomainRead={useRelational}
+      playerDomainWrite={playerDomainFlags.write}
+      playerDomainEnabled={playerDomainFlags.enabled}
+      playerDomainRealtime={playerDomainFlags.realtime}
     />
   );
 }

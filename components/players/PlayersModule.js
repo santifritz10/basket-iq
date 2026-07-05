@@ -1,6 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { subscribePlayerChannel } from "@/lib/client/player-realtime";
+import {
+  archivePlayer,
+  createEvolution,
+  createGoal,
+  createNote,
+  createPlayer,
+  deleteGoal,
+  isPlayerUuid,
+  patchPlayer,
+  updateGoal
+} from "@/lib/client/player-api";
+import InviteMemberForm from "@/components/players/InviteMemberForm";
 import {
   formatSessionFecha,
   getPlayerShootingSessions,
@@ -39,11 +52,60 @@ function basePlayer() {
   };
 }
 
-export default function PlayersModule({ initialItems, initialShootingPayload = {} }) {
+export default function PlayersModule({
+  initialItems,
+  initialShootingPayload = {},
+  playerDomainRead = false,
+  playerDomainWrite = false,
+  playerDomainEnabled = false,
+  playerDomainRealtime = false
+}) {
   const [players, setPlayers] = useState(Array.isArray(initialItems) ? initialItems : []);
-  const [shootingPayload] = useState(initialShootingPayload || {});
+  const [shootingPayload, setShootingPayload] = useState(initialShootingPayload || {});
   const [selectedId, setSelectedId] = useState(initialItems?.[0]?.id || null);
   const [tab, setTab] = useState("fundamentals");
+  const refetchTimer = useRef(null);
+
+  const refetchFromApi = useCallback(async () => {
+    try {
+      const [playersRes, shootingRes] = await Promise.all([
+        fetch("/api/players", { credentials: "same-origin" }),
+        fetch("/api/shooting", { credentials: "same-origin" })
+      ]);
+      const playersJson = await playersRes.json();
+      const shootingJson = await shootingRes.json();
+      if (playersJson.ok && Array.isArray(playersJson.items)) {
+        setPlayers(playersJson.items);
+      }
+      if (shootingJson.ok && shootingJson.payload) {
+        setShootingPayload(shootingJson.payload);
+      }
+    } catch (e) {
+      console.warn("[PlayersModule] refetch failed", e);
+    }
+  }, []);
+
+  const scheduleRefetch = useCallback(() => {
+    if (refetchTimer.current) clearTimeout(refetchTimer.current);
+    refetchTimer.current = setTimeout(() => {
+      refetchFromApi();
+    }, 300);
+  }, [refetchFromApi]);
+
+  useEffect(() => {
+    if (!(playerDomainRealtime || playerDomainEnabled) || !selectedId) return undefined;
+    let unsub = () => {};
+    let cancelled = false;
+    subscribePlayerChannel(selectedId, scheduleRefetch).then((fn) => {
+      if (cancelled) fn();
+      else unsub = fn;
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+      if (refetchTimer.current) clearTimeout(refetchTimer.current);
+    };
+  }, [playerDomainRealtime, playerDomainEnabled, selectedId, scheduleRefetch]);
   const selected = useMemo(() => players.find((p) => p.id === selectedId) || null, [players, selectedId]);
   const playerShootingSessions = useMemo(
     () => (selected ? getPlayerShootingSessions(selected.id, shootingPayload) : []),
@@ -60,6 +122,16 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
   }
 
   async function addPlayer() {
+    if (playerDomainWrite) {
+      try {
+        const created = await createPlayer({ display_name: "Nuevo jugador", name: "Nuevo jugador" });
+        await refetchFromApi();
+        if (created?.id) setSelectedId(created.id);
+      } catch (e) {
+        alert(e.message || "No se pudo crear el jugador.");
+      }
+      return;
+    }
     const p = basePlayer();
     p.name = "Nuevo jugador";
     const next = [p, ...players];
@@ -69,6 +141,16 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
 
   async function deletePlayer(id) {
     if (!confirm("¿Eliminar jugador?")) return;
+    if (playerDomainWrite) {
+      try {
+        await archivePlayer(id);
+        await refetchFromApi();
+        setSelectedId((prev) => (prev === id ? players.find((p) => p.id !== id)?.id || null : prev));
+      } catch (e) {
+        alert(e.message || "No se pudo eliminar.");
+      }
+      return;
+    }
     const next = players.filter((p) => p.id !== id);
     await persist(next);
     setSelectedId(next[0]?.id || null);
@@ -76,6 +158,18 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
 
   async function updateSelected(patch) {
     if (!selected) return;
+    if (playerDomainWrite && isPlayerUuid(selected.id)) {
+      try {
+        await patchPlayer(selected.id, patch);
+        if (patch.fundamentals || patch.stats || patch.name) {
+          await createEvolution(selected.id, "Perfil actualizado");
+        }
+        await refetchFromApi();
+      } catch (e) {
+        alert(e.message || "No se pudo guardar.");
+      }
+      return;
+    }
     const next = players.map((p) => (p.id === selected.id ? { ...p, ...patch, updated_at: new Date().toISOString() } : p));
     await persist(next);
   }
@@ -118,6 +212,16 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
   async function setRating(key, value) {
     if (!selected) return;
     const fundamentals = { ...(selected.fundamentals || {}), [key]: value };
+    if (playerDomainWrite && isPlayerUuid(selected.id)) {
+      try {
+        await patchPlayer(selected.id, { fundamentals });
+        await createEvolution(selected.id, `Actualización ${key}: ${value}/5`);
+        await refetchFromApi();
+      } catch (e) {
+        alert(e.message || "No se pudo guardar.");
+      }
+      return;
+    }
     await updateSelected({
       fundamentals,
       evolution: [
@@ -129,7 +233,17 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
 
   async function addNote() {
     const value = prompt("Nueva nota del entrenador:");
-    if (!value) return;
+    if (!value || !selected) return;
+    if (playerDomainWrite && isPlayerUuid(selected.id)) {
+      try {
+        await createNote(selected.id, value);
+        await createEvolution(selected.id, "Nueva nota agregada");
+        await refetchFromApi();
+      } catch (e) {
+        alert(e.message || "No se pudo guardar.");
+      }
+      return;
+    }
     await updateSelected({
       notes_history: [
         { id: `n_${Date.now()}`, text: value, created_at: new Date().toISOString() },
@@ -144,7 +258,17 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
 
   async function addGoal() {
     const value = prompt("Nuevo objetivo:");
-    if (!value) return;
+    if (!value || !selected) return;
+    if (playerDomainWrite && isPlayerUuid(selected.id)) {
+      try {
+        await createGoal(selected.id, value);
+        await createEvolution(selected.id, `Objetivo creado: ${value}`);
+        await refetchFromApi();
+      } catch (e) {
+        alert(e.message || "No se pudo guardar.");
+      }
+      return;
+    }
     await updateSelected({
       goals: [
         { id: `g_${Date.now()}`, text: value, status: "pendiente", created_at: new Date().toISOString() },
@@ -159,12 +283,32 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
 
   async function changeGoalStatus(goalId, status) {
     if (!selected) return;
+    if (playerDomainWrite && isPlayerUuid(selected.id)) {
+      try {
+        await updateGoal(selected.id, goalId, { status });
+        await createEvolution(selected.id, "Objetivo actualizado");
+        await refetchFromApi();
+      } catch (e) {
+        alert(e.message || "No se pudo actualizar.");
+      }
+      return;
+    }
     const goals = (selected.goals || []).map((g) => (g.id === goalId ? { ...g, status } : g));
     await updateSelected({ goals });
   }
 
   async function removeGoal(goalId) {
     if (!selected) return;
+    if (playerDomainWrite && isPlayerUuid(selected.id)) {
+      try {
+        await deleteGoal(selected.id, goalId);
+        await createEvolution(selected.id, "Objetivo eliminado");
+        await refetchFromApi();
+      } catch (e) {
+        alert(e.message || "No se pudo eliminar.");
+      }
+      return;
+    }
     const goals = (selected.goals || []).filter((g) => g.id !== goalId);
     await updateSelected({ goals });
   }
@@ -280,7 +424,8 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
                 ["shooting", "Sesiones de tiro"],
                 ["notes", "Notas"],
                 ["goals", "Objetivos"],
-                ["evolution", "Evolución"]
+                ["evolution", "Evolución"],
+                ...(playerDomainWrite ? [["team", "Colaboradores"]] : [])
               ].map(([id, label]) => (
                 <button key={id} type="button" className={`player-tab-btn ${tab === id ? "is-active" : ""}`} onClick={() => setTab(id)}>
                   {label}
@@ -448,12 +593,16 @@ export default function PlayersModule({ initialItems, initialShootingPayload = {
               <div className="player-tab-card">
                 {(selected.evolution || []).map((ev) => (
                   <article className="player-evolution-item" key={ev.id}>
-                    <p>{ev.text}</p>
+                    <p>{ev.text || ev.message}</p>
                     <span>{new Date(ev.created_at).toLocaleString("es-AR")}</span>
                   </article>
                 ))}
                 {!selected.evolution?.length ? <p className="text-muted">Sin cambios registrados.</p> : null}
               </div>
+            ) : null}
+
+            {tab === "team" && playerDomainWrite ? (
+              <InviteMemberForm playerId={selected.id} onInvited={refetchFromApi} />
             ) : null}
           </div>
         ) : null}
