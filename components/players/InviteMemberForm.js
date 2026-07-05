@@ -5,6 +5,7 @@ import { inviteMember } from "@/lib/client/player-api";
 
 export default function InviteMemberForm({ playerId, onInvited }) {
   const [email, setEmail] = useState("");
+  const [inviteAs, setInviteAs] = useState("player");
   const [status, setStatus] = useState("");
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,12 +17,13 @@ export default function InviteMemberForm({ playerId, onInvited }) {
     setStatus("");
     setToken("");
     try {
+      const isPlayer = inviteAs === "player";
       const result = await inviteMember(playerId, {
         email: email.trim().toLowerCase(),
-        relationship_type: "coach",
-        access_level: "editor"
+        relationship_type: isPlayer ? "player" : "coach",
+        access_level: isPlayer ? "admin" : "editor"
       });
-      setStatus("Invitación enviada.");
+      setStatus("Invitación creada.");
       if (result.token) setToken(result.token);
       setEmail("");
       onInvited?.();
@@ -35,7 +37,16 @@ export default function InviteMemberForm({ playerId, onInvited }) {
   return (
     <form className="player-tab-card" onSubmit={submit} style={{ marginTop: 12 }}>
       <h4>Invitar colaborador</h4>
-      <p className="text-muted">Invitá a un entrenador u otro usuario para trabajar sobre este perfil.</p>
+      <p className="text-muted">
+        Invitá al jugador (admin del perfil) o a otro entrenador para trabajar sobre este perfil.
+      </p>
+      <div className="form-row">
+        <label>Tipo</label>
+        <select value={inviteAs} onChange={(e) => setInviteAs(e.target.value)}>
+          <option value="player">Jugador (admin del perfil)</option>
+          <option value="coach">Entrenador (editor)</option>
+        </select>
+      </div>
       <div className="form-row">
         <label>Email</label>
         <input

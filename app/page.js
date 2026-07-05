@@ -183,11 +183,11 @@ export default async function HomePage() {
         {playerDomainConfigScript}
       </Script>
       <Script src="/assets/js/fundamentos-data.js?v=20260702" strategy="afterInteractive" />
-      <Script src="/assets/js/player-domain-api.js?v=20260713" strategy="afterInteractive" />
-      <Script src="/assets/js/player-domain-realtime.js?v=20260713" strategy="afterInteractive" />
-      <Script src="/assets/js/shooting-zones-heatmap.js?v=20260713" strategy="afterInteractive" />
+      <Script src="/assets/js/player-domain-api.js?v=20260714" strategy="afterInteractive" />
+      <Script src="/assets/js/player-domain-realtime.js?v=20260714" strategy="afterInteractive" />
+      <Script src="/assets/js/shooting-zones-heatmap.js?v=20260714" strategy="afterInteractive" />
       <Script src="/assets/js/supabase-config.js" strategy="afterInteractive" />
-      <Script src="/assets/js/main.js?v=20260713" strategy="afterInteractive" />
+      <Script src="/assets/js/main.js?v=20260714" strategy="afterInteractive" />
       <Script id="legacy-toggle-sidebar" strategy="afterInteractive">
         {toggleSidebarScript}
       </Script>

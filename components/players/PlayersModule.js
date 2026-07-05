@@ -425,7 +425,7 @@ export default function PlayersModule({
                 ["notes", "Notas"],
                 ["goals", "Objetivos"],
                 ["evolution", "Evolución"],
-                ...(playerDomainWrite ? [["team", "Colaboradores"]] : [])
+                ["team", "Colaboradores"]
               ].map(([id, label]) => (
                 <button key={id} type="button" className={`player-tab-btn ${tab === id ? "is-active" : ""}`} onClick={() => setTab(id)}>
                   {label}
@@ -601,8 +601,18 @@ export default function PlayersModule({
               </div>
             ) : null}
 
-            {tab === "team" && playerDomainWrite ? (
-              <InviteMemberForm playerId={selected.id} onInvited={refetchFromApi} />
+            {tab === "team" ? (
+              playerDomainWrite && isPlayerUuid(selected.id) ? (
+                <InviteMemberForm playerId={selected.id} onInvited={refetchFromApi} />
+              ) : (
+                <div className="player-tab-card">
+                  <p className="text-muted">
+                    {!playerDomainWrite
+                      ? "Activá PLAYER_CENTRIC_ENABLED en el servidor para invitar colaboradores."
+                      : "Guardá el jugador primero para poder invitar colaboradores."}
+                  </p>
+                </div>
+              )
             ) : null}
           </div>
         ) : null}

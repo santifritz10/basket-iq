@@ -2840,6 +2840,48 @@ function renderPlayerGoalsTab(player) {
     );
 }
 
+function playerDomainWriteEnabled() {
+    var cfg = window.BasketLabPlayerDomainConfig || {};
+    return cfg.write === true || cfg.enabled === true;
+}
+
+function renderPlayerTeamTab(player) {
+    if (!playerDomainWriteEnabled()) {
+        return (
+            '<div class="player-tab-card">' +
+            '<p class="text-muted">Activá PLAYER_CENTRIC_ENABLED en Vercel para invitar colaboradores.</p>' +
+            "</div>"
+        );
+    }
+    if (!window.BasketLabPlayerDomainApi || !window.BasketLabPlayerDomainApi.isUuid(player.id)) {
+        return (
+            '<div class="player-tab-card">' +
+            '<p class="text-muted">Guardá el jugador con el dominio activo para poder invitar colaboradores (necesita ID UUID).</p>' +
+            "</div>"
+        );
+    }
+    return (
+        '<form id="player-invite-form" class="player-tab-card">' +
+        '  <h4>Invitar colaborador</h4>' +
+        '  <p class="text-muted">Invitá al jugador (admin del perfil) o a otro entrenador.</p>' +
+        '  <div class="form-row"><label>Tipo</label>' +
+        '    <select name="invite_as">' +
+        '      <option value="player">Jugador (admin del perfil)</option>' +
+        '      <option value="coach">Entrenador (editor)</option>' +
+        "    </select>" +
+        "  </div>" +
+        '  <div class="form-row"><label>Email</label>' +
+        '    <input type="email" name="email" required placeholder="correo@ejemplo.com">' +
+        "  </div>" +
+        '  <div class="form-actions">' +
+        '    <button type="submit" class="toolbar-button toolbar-button-accent">Enviar invitación</button>' +
+        "  </div>" +
+        '  <p id="player-invite-status" class="text-muted"></p>' +
+        '  <p id="player-invite-token" class="text-muted" style="word-break:break-all;display:none"></p>' +
+        "</form>"
+    );
+}
+
 function renderPlayerEvolutionTab(player) {
     var items = (player.evolution || []).slice().sort(function (a, b) {
         return String(a.created_at || "") < String(b.created_at || "") ? 1 : -1;
@@ -2898,6 +2940,11 @@ function renderPlayerProfile(playerId, activeTab) {
     if (tab === "notes") tabContent = renderPlayerNotesTab(player);
     if (tab === "goals") tabContent = renderPlayerGoalsTab(player);
     if (tab === "evolution") tabContent = renderPlayerEvolutionTab(player);
+    if (tab === "team") tabContent = renderPlayerTeamTab(player);
+
+    var teamTabBtn = (
+        '    <button class="player-tab-btn ' + (tab === "team" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'team\')">Colaboradores</button>'
+    );
 
     contentDiv.innerHTML = (
         '<section class="manual-section players-view">' +
@@ -2950,6 +2997,7 @@ function renderPlayerProfile(playerId, activeTab) {
         '    <button class="player-tab-btn ' + (tab === "notes" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'notes\')">Notas</button>' +
         '    <button class="player-tab-btn ' + (tab === "goals" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'goals\')">Objetivos</button>' +
         '    <button class="player-tab-btn ' + (tab === "evolution" ? "is-active" : "") + '" onclick="renderPlayerProfile(\'' + escapeHtml(player.id) + '\',\'evolution\')">Evolución</button>' +
+        teamTabBtn +
         "  </div>" +
         '  <div class="player-tab-content">' + tabContent + "</div>" +
         "</section>"
@@ -2967,6 +3015,36 @@ function renderPlayerProfile(playerId, activeTab) {
         statsForm.onsubmit = function (ev) {
             ev.preventDefault();
             savePlayerStats(player.id);
+        };
+    }
+    var inviteForm = document.getElementById("player-invite-form");
+    if (inviteForm) {
+        inviteForm.onsubmit = async function (ev) {
+            ev.preventDefault();
+            var fd = new FormData(inviteForm);
+            var email = String(fd.get("email") || "").trim().toLowerCase();
+            var inviteAs = String(fd.get("invite_as") || "player");
+            var statusEl = document.getElementById("player-invite-status");
+            var tokenEl = document.getElementById("player-invite-token");
+            if (!email || !window.BasketLabPlayerDomainApi) return;
+            if (statusEl) statusEl.textContent = "Enviando…";
+            if (tokenEl) tokenEl.style.display = "none";
+            try {
+                var isPlayer = inviteAs === "player";
+                var result = await window.BasketLabPlayerDomainApi.inviteMember(player.id, {
+                    email: email,
+                    relationship_type: isPlayer ? "player" : "coach",
+                    access_level: isPlayer ? "admin" : "editor"
+                });
+                if (statusEl) statusEl.textContent = "Invitación creada.";
+                if (tokenEl && result.token) {
+                    tokenEl.style.display = "block";
+                    tokenEl.textContent = "Token (compartir con el invitado): " + result.token;
+                }
+                inviteForm.reset();
+            } catch (e) {
+                if (statusEl) statusEl.textContent = e.message || "No se pudo invitar.";
+            }
         };
     }
     injectNavBackButton();

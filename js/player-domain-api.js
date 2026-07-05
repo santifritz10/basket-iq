@@ -142,6 +142,16 @@
         }));
     }
 
+    async function inviteMember(playerId, body) {
+        var data = await parseJson(await fetch("/api/players/" + playerId + "/invitations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(body)
+        }));
+        return data;
+    }
+
     async function refreshLocalPlayerData() {
         if (!global.BasketLabDataSync) return;
         var players = await fetchPlayers();
@@ -166,6 +176,7 @@
         createShootingSession: createShootingSession,
         patchShootingSession: patchShootingSession,
         deleteShootingSession: deleteShootingSession,
+        inviteMember: inviteMember,
         refreshLocalPlayerData: refreshLocalPlayerData
     };
 })(window);

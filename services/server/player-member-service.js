@@ -21,7 +21,7 @@ export async function listPlayerMembers(userId, playerId) {
 }
 
 export async function createInvitation(userId, playerId, body) {
-  await requirePlayerAccess(userId, playerId, "admin");
+  await requirePlayerAccess(userId, playerId, "editor");
 
   const email = String(body?.email || "").trim().toLowerCase();
   if (!email) {
