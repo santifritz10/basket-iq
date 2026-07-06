@@ -63,8 +63,6 @@
             <div class="sidebar-brand-text">
                 <h1 class="sidebar-brand-title" onclick="loadContent('dashboard')" onkeydown="if(event.key==='Enter') loadContent('dashboard')" role="button" tabindex="0" title="Ir al inicio">Basket Lab</h1>
                 <p class="sidebar-credit">By Coach Fritz</p>
-                <p class="sidebar-user" id="sidebar-user-name"></p>
-                <button type="button" class="sidebar-logout" id="btn-logout">Cerrar sesión</button>
             </div>
         </div>
 
@@ -587,9 +585,41 @@
         </nav>
     </aside>
 
-    <main class="content" id="content">
-        <p class="content-placeholder">Cargando…</p>
-    </main>
+    <div class="app-main">
+        <header class="app-topbar" id="app-topbar" hidden>
+            <div class="app-topbar-inner">
+                <div class="app-topbar-spacer"></div>
+                <div class="app-user-menu" id="app-user-menu">
+                    <button
+                        type="button"
+                        class="app-user-menu-trigger"
+                        id="app-user-menu-trigger"
+                        aria-haspopup="menu"
+                        aria-expanded="false"
+                        aria-controls="app-user-menu-dropdown"
+                    >
+                        <span class="app-user-avatar" id="app-user-avatar">CO</span>
+                        <span class="app-user-menu-meta">
+                            <span class="app-user-menu-role">Coach</span>
+                            <strong class="app-user-menu-name" id="app-user-menu-name">Entrenador</strong>
+                        </span>
+                        <span class="app-user-menu-chevron" aria-hidden="true">▾</span>
+                    </button>
+                    <div class="app-user-menu-dropdown" id="app-user-menu-dropdown" role="menu" hidden>
+                        <button type="button" class="app-user-menu-item" id="app-user-menu-edit-name" role="menuitem">
+                            Cambiar nombre
+                        </button>
+                        <button type="button" class="app-user-menu-item app-user-menu-item-danger" id="app-user-menu-logout" role="menuitem">
+                            Cerrar sesión
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <main class="content" id="content">
+            <p class="content-placeholder">Cargando…</p>
+        </main>
+    </div>
 
 </div>
 

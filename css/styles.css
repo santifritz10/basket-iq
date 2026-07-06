@@ -5989,6 +5989,136 @@ body.app-body {
     margin-bottom: 0 !important;
 }
 
+.app-main {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+.app-topbar {
+    flex: 0 0 auto;
+    padding: 10px 20px;
+    border-bottom: 1px solid #27272a;
+    background: #0b0b0b;
+    z-index: 20;
+}
+
+.app-topbar-inner {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.app-topbar-spacer {
+    flex: 1 1 auto;
+}
+
+.app-user-menu {
+    position: relative;
+}
+
+.app-user-menu-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px 6px 6px;
+    border: 1px solid #27272a;
+    border-radius: 12px;
+    background: #111111;
+    color: #e4e4e7;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.app-user-menu-trigger:hover,
+.app-user-menu-trigger[aria-expanded="true"] {
+    border-color: rgba(249, 115, 22, 0.45);
+    background: #161616;
+}
+
+.app-user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff7ed;
+    background: linear-gradient(130deg, #f97316, #ea580c);
+    flex-shrink: 0;
+}
+
+.app-user-menu-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.15;
+    text-align: left;
+}
+
+.app-user-menu-role {
+    font-size: 0.64rem;
+    color: #71717a;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.app-user-menu-name {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #fafafa;
+}
+
+.app-user-menu-chevron {
+    color: #a1a1aa;
+    font-size: 0.8rem;
+    margin-left: 2px;
+}
+
+.app-user-menu-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 210px;
+    padding: 6px;
+    border: 1px solid #27272a;
+    border-radius: 12px;
+    background: #111111;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    z-index: 40;
+}
+
+.app-user-menu-item {
+    width: 100%;
+    display: block;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #e4e4e7;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.app-user-menu-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.app-user-menu-item-danger {
+    color: #fca5a5;
+}
+
+.app-user-menu-item-danger:hover {
+    background: rgba(239, 68, 68, 0.12);
+}
+
 @media (max-width: 980px) {
     html,
     body.app-body {

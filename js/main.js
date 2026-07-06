@@ -282,13 +282,10 @@ async function login(email, password) {
 function showApp() {
     var authScreen = document.getElementById("auth-screen");
     var appContainer = document.getElementById("app-container");
-    var userNameEl = document.getElementById("sidebar-user-name");
     if (authScreen) authScreen.classList.add("hidden");
     if (appContainer) appContainer.hidden = false;
-    var cur = getCurrentUser();
-    if (userNameEl && cur) userNameEl.textContent = cur.name || cur.username;
-    var btnLogout = document.getElementById("btn-logout");
-    if (btnLogout) btnLogout.onclick = function () { logout(); };
+    initAppUserMenu();
+    updateAppUserMenuUi();
     syncAuthCookiesFromClient();
     bootstrapUserDataSync()
         .finally(function () {
@@ -301,8 +298,11 @@ function showApp() {
 function showAuthScreen() {
     var authScreen = document.getElementById("auth-screen");
     var appContainer = document.getElementById("app-container");
+    var appTopbar = document.getElementById("app-topbar");
     if (authScreen) authScreen.classList.remove("hidden");
     if (appContainer) appContainer.hidden = true;
+    if (appTopbar) appTopbar.hidden = true;
+    closeAppUserMenu();
     document.getElementById("auth-login-error").textContent = "";
     document.getElementById("auth-register-error").textContent = "";
     attachAuthListeners();
@@ -4988,6 +4988,131 @@ function formatDashboardUserName(user) {
         .join(" ");
 }
 
+var appUserMenuBound = false;
+
+function closeAppUserMenu() {
+    var trigger = document.getElementById("app-user-menu-trigger");
+    var dropdown = document.getElementById("app-user-menu-dropdown");
+    if (dropdown) dropdown.hidden = true;
+    if (trigger) trigger.setAttribute("aria-expanded", "false");
+}
+
+function toggleAppUserMenu() {
+    var trigger = document.getElementById("app-user-menu-trigger");
+    var dropdown = document.getElementById("app-user-menu-dropdown");
+    if (!trigger || !dropdown) return;
+    var willOpen = dropdown.hidden;
+    dropdown.hidden = !willOpen;
+    trigger.setAttribute("aria-expanded", willOpen ? "true" : "false");
+}
+
+function updateAppUserMenuUi() {
+    var topbar = document.getElementById("app-topbar");
+    var nameEl = document.getElementById("app-user-menu-name");
+    var avatarEl = document.getElementById("app-user-avatar");
+    var user = getCurrentUser();
+    if (!user) {
+        if (topbar) topbar.hidden = true;
+        return;
+    }
+    var displayName = formatDashboardUserName(user);
+    if (topbar) topbar.hidden = false;
+    if (nameEl) nameEl.textContent = displayName;
+    if (avatarEl) avatarEl.textContent = getDashboardAvatarInitials(displayName);
+}
+
+function initAppUserMenu() {
+    updateAppUserMenuUi();
+    if (appUserMenuBound) return;
+    appUserMenuBound = true;
+
+    var trigger = document.getElementById("app-user-menu-trigger");
+    var editBtn = document.getElementById("app-user-menu-edit-name");
+    var logoutBtn = document.getElementById("app-user-menu-logout");
+    var menu = document.getElementById("app-user-menu");
+
+    if (trigger) {
+        trigger.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            toggleAppUserMenu();
+        });
+    }
+
+    if (editBtn) {
+        editBtn.addEventListener("click", function () {
+            closeAppUserMenu();
+            openEditDisplayNameDialog();
+        });
+    }
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", function () {
+            closeAppUserMenu();
+            logout();
+        });
+    }
+
+    document.addEventListener("click", function (ev) {
+        if (!menu || menu.contains(ev.target)) return;
+        closeAppUserMenu();
+    });
+
+    document.addEventListener("keydown", function (ev) {
+        if (ev.key === "Escape") closeAppUserMenu();
+    });
+}
+
+function openEditDisplayNameDialog() {
+    var user = getCurrentUser();
+    if (!user) return;
+    var current = formatDashboardUserName(user);
+    var next = window.prompt("Nombre para mostrar en la app:", current);
+    if (next == null) return;
+    updateUserDisplayName(next).then(function (result) {
+        if (!result || !result.ok) {
+            alert((result && result.error) || "No se pudo actualizar el nombre.");
+            return;
+        }
+        updateAppUserMenuUi();
+        var contentDiv = document.getElementById("content");
+        if (contentDiv && contentDiv.querySelector(".dashboard")) {
+            renderDashboard();
+        }
+    });
+}
+
+async function updateUserDisplayName(newName) {
+    var client = getSupabaseClient();
+    var user = getCurrentUser();
+    if (!client || !user || !user.id) {
+        return { ok: false, error: "No hay sesión activa." };
+    }
+
+    var trimmed = String(newName || "").trim().replace(/\s+/g, " ");
+    if (trimmed.length < 2) {
+        return { ok: false, error: "El nombre debe tener al menos 2 caracteres." };
+    }
+
+    try {
+        var profileUpdate = await client
+            .from("profiles")
+            .update({ full_name: trimmed })
+            .eq("id", user.id);
+        if (profileUpdate.error) throw profileUpdate.error;
+
+        var authUpdate = await client.auth.updateUser({
+            data: { full_name: trimmed }
+        });
+        if (authUpdate.error) throw authUpdate.error;
+
+        await loadCurrentUserFromSession();
+        return { ok: true };
+    } catch (error) {
+        console.error("[Profile] update display name failed", error);
+        return { ok: false, error: error.message || "No se pudo actualizar el nombre." };
+    }
+}
+
 function getDashboardAvatarInitials(name) {
     var cleaned = String(name || "").trim();
     if (!cleaned) return "CO";
@@ -5026,7 +5151,6 @@ function renderDashboard() {
     var user = getCurrentUser();
     var userName = formatDashboardUserName(user);
     var safeUserName = escapeHtml(userName);
-    var userAvatar = escapeHtml(getDashboardAvatarInitials(userName));
     var entrenamientos = getEntrenamientos();
     var nextEnt = getNextEntrenamiento();
     var weekSummary = getDashboardWeekSummary();
@@ -5039,13 +5163,6 @@ function renderDashboard() {
         '    <div class="dashboard-search-wrap">' +
         '      <input id="dashboard-global-search" class="dashboard-search-input" type="search" placeholder="Buscar en la app (ej: jugadores, pizarra, jugadas...)">' +
         '      <button type="button" id="dashboard-global-search-btn" class="dashboard-search-btn">Buscar</button>' +
-        "    </div>" +
-        '    <div class="dashboard-userbox">' +
-        '      <div class="dashboard-avatar">' + userAvatar + "</div>" +
-        '      <div class="dashboard-user-meta">' +
-        '        <span class="dashboard-user-role">Coach</span>' +
-        "        <strong>" + safeUserName + "</strong>" +
-        "      </div>" +
         "    </div>" +
         "  </div>" +
         '  <p id="dashboard-search-hint" class="dashboard-search-hint" aria-live="polite"></p>' +
