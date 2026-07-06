@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "migrate:player-domain": "node scripts/migrate-player-domain.mjs",
-    "reconcile:player-domain": "node scripts/reconcile-player-domain.mjs"
+    "reconcile:player-domain": "node scripts/reconcile-player-domain.mjs",
+    "repair:players": "node scripts/repair-player-duplicates.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.2",

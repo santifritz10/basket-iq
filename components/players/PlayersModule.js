@@ -22,6 +22,7 @@ import {
   sessionTotalShots,
   zoneStats
 } from "@/lib/shooting-zones";
+import { syncAuthCookiesFromBrowserSession } from "@/lib/client/sync-auth-cookies";
 
 const schema = [
   { group: "Dribbling", items: [{ key: "drib_control", label: "Control" }, { key: "drib_weak_hand", label: "Mano débil" }] },
@@ -58,12 +59,16 @@ export default function PlayersModule({
   playerDomainRead = false,
   playerDomainWrite = false,
   playerDomainEnabled = false,
-  playerDomainRealtime = false
+  playerDomainRealtime = false,
+  supabaseUrl = "",
+  supabaseAnonKey = ""
 }) {
   const [players, setPlayers] = useState(Array.isArray(initialItems) ? initialItems : []);
   const [shootingPayload, setShootingPayload] = useState(initialShootingPayload || {});
   const [selectedId, setSelectedId] = useState(initialItems?.[0]?.id || null);
   const [tab, setTab] = useState("fundamentals");
+  const [loadState, setLoadState] = useState(initialItems?.length ? "ready" : "loading");
+  const [addingPlayer, setAddingPlayer] = useState(false);
   const refetchTimer = useRef(null);
 
   const refetchFromApi = useCallback(async () => {
@@ -72,16 +77,30 @@ export default function PlayersModule({
         fetch("/api/players", { credentials: "same-origin" }),
         fetch("/api/shooting", { credentials: "same-origin" })
       ]);
+      if (playersRes.status === 401) {
+        setLoadState("unauthorized");
+        return false;
+      }
       const playersJson = await playersRes.json();
       const shootingJson = await shootingRes.json();
       if (playersJson.ok && Array.isArray(playersJson.items)) {
         setPlayers(playersJson.items);
+        setSelectedId((prev) => {
+          if (prev && playersJson.items.some((p) => p.id === prev)) return prev;
+          return playersJson.items[0]?.id || null;
+        });
+        setLoadState(playersJson.items.length ? "ready" : "empty");
+      } else {
+        setLoadState("error");
       }
       if (shootingJson.ok && shootingJson.payload) {
         setShootingPayload(shootingJson.payload);
       }
+      return playersJson.ok === true;
     } catch (e) {
       console.warn("[PlayersModule] refetch failed", e);
+      setLoadState("error");
+      return false;
     }
   }, []);
 
@@ -91,6 +110,29 @@ export default function PlayersModule({
       refetchFromApi();
     }, 300);
   }, [refetchFromApi]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (supabaseUrl && supabaseAnonKey) {
+        await syncAuthCookiesFromBrowserSession({ url: supabaseUrl, anonKey: supabaseAnonKey });
+      }
+      if (cancelled) return;
+
+      if (!playerDomainRead && initialItems?.length) {
+        setLoadState("ready");
+        return;
+      }
+
+      if (!initialItems?.length) setLoadState("loading");
+      await refetchFromApi();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabaseUrl, supabaseAnonKey, playerDomainRead, initialItems?.length, refetchFromApi]);
 
   useEffect(() => {
     if (!(playerDomainRealtime || playerDomainEnabled) || !selectedId) return undefined;
@@ -122,13 +164,17 @@ export default function PlayersModule({
   }
 
   async function addPlayer() {
+    if (addingPlayer) return;
     if (playerDomainWrite) {
+      setAddingPlayer(true);
       try {
         const created = await createPlayer({ display_name: "Nuevo jugador", name: "Nuevo jugador" });
         await refetchFromApi();
         if (created?.id) setSelectedId(created.id);
       } catch (e) {
         alert(e.message || "No se pudo crear el jugador.");
+      } finally {
+        setAddingPlayer(false);
       }
       return;
     }
@@ -319,13 +365,43 @@ export default function PlayersModule({
         <h1 style={{ marginTop: 0 }}>Seguimiento de Jugadores</h1>
         <p>Herramienta de evaluación y evolución individual para entrenadores.</p>
         <div className="players-actions">
-          <button className="toolbar-button toolbar-button-accent" onClick={addPlayer} type="button">
-            Agregar jugador
+          <button
+            className="toolbar-button toolbar-button-accent"
+            onClick={addPlayer}
+            type="button"
+            disabled={addingPlayer}
+          >
+            {addingPlayer ? "Agregando…" : "Agregar jugador"}
           </button>
         </div>
       </div>
 
-      {!selected ? (
+      {loadState === "loading" ? (
+        <div className="player-tab-card">
+          <p className="text-muted">Cargando jugadores…</p>
+        </div>
+      ) : null}
+
+      {loadState === "unauthorized" ? (
+        <div className="player-tab-card">
+          <p className="text-muted">No se pudo autenticar la sesión para cargar jugadores.</p>
+          <p className="text-muted">
+            Volvé a <a href="/">Basket Lab</a>, iniciá sesión y abrí Seguimiento de Jugadores de nuevo.
+          </p>
+        </div>
+      ) : null}
+
+      {loadState === "empty" ? (
+        <div className="player-tab-card">
+          <p className="text-muted">No hay jugadores activos en tu cuenta.</p>
+          <p className="text-muted">
+            Si los ves en Supabase, verificá que tengan <code>status = active</code> y membresía en{" "}
+            <code>player_members</code> para tu usuario.
+          </p>
+        </div>
+      ) : null}
+
+      {loadState === "ready" && !selected ? (
         <div className="player-tab-card">
           <p className="text-muted">No hay jugadores cargados todavía.</p>
         </div>

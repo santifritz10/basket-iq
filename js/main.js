@@ -779,6 +779,7 @@ async function pullRemoteDataType(dataType) {
         (dataType === APP_DATA_TYPES.playersTracking || dataType === APP_DATA_TYPES.shootingHeatmap)
     ) {
         try {
+            await syncAuthCookiesFromClient();
             if (dataType === APP_DATA_TYPES.playersTracking) {
                 var playersRes = await fetch("/api/players", { credentials: "same-origin" });
                 var playersJson = await playersRes.json();
@@ -2421,6 +2422,7 @@ async function upsertPlayer(player) {
                 await api.patchPlayer(player.id, player);
             } else {
                 var created = await api.createPlayer({
+                    legacy_id: player.id,
                     display_name: player.name,
                     name: player.name,
                     position: player.position,
@@ -2645,8 +2647,17 @@ function renderPlayerCreateForm() {
 
     var form = document.getElementById("player-create-form");
     if (!form) return;
+    var draftLegacyId = "player_" + Date.now() + "_" + Math.round(Math.random() * 1000);
+    var submitting = false;
     form.onsubmit = async function (ev) {
         ev.preventDefault();
+        if (submitting) return;
+        submitting = true;
+        var submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Guardando…";
+        }
         var fd = new FormData(form);
         var photoFile = fd.get("photo_file");
         var shieldFile = fd.get("club_shield_file");
@@ -2657,25 +2668,38 @@ function renderPlayerCreateForm() {
             shieldDataUrl = await readImageFileAsDataUrl(shieldFile && shieldFile.size ? shieldFile : null);
         } catch (photoErr) {
             alert(photoErr.message || "No se pudo procesar la imagen.");
+            submitting = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Guardar jugador";
+            }
             return;
         }
-        var player = normalizePlayer({
-            id: "player_" + Date.now() + "_" + Math.round(Math.random() * 1000),
-            name: fd.get("name"),
-            position: fd.get("position"),
-            age: fd.get("age"),
-            height: fd.get("height"),
-            level: fd.get("level"),
-            team: fd.get("team"),
-            category: fd.get("category"),
-            photo_url: photoDataUrl,
-            club_shield_url: shieldDataUrl,
-            created_at: nowIso(),
-            updated_at: nowIso()
-        });
-        pushPlayerEvolution(player, "Jugador creado");
-        await upsertPlayer(player);
-        renderPlayerProfile(player.id);
+        try {
+            var player = normalizePlayer({
+                id: draftLegacyId,
+                name: fd.get("name"),
+                position: fd.get("position"),
+                age: fd.get("age"),
+                height: fd.get("height"),
+                level: fd.get("level"),
+                team: fd.get("team"),
+                category: fd.get("category"),
+                photo_url: photoDataUrl,
+                club_shield_url: shieldDataUrl,
+                created_at: nowIso(),
+                updated_at: nowIso()
+            });
+            pushPlayerEvolution(player, "Jugador creado");
+            await upsertPlayer(player);
+            renderPlayerProfile(player.id);
+        } finally {
+            submitting = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Guardar jugador";
+            }
+        }
     };
 }
 

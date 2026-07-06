@@ -1,6 +1,7 @@
 import "server-only";
 import { createSupabaseServiceServerClient } from "@/lib/server/supabase";
-import { listPlayerIdsForUser, requirePlayerAccess } from "@/services/server/player-permissions";
+import { isUuid } from "@/lib/player-domain/is-uuid.js";
+import { listPlayerIdsForUser, requirePlayerAccess, getPlayerMembership, accessLevelSatisfies } from "@/services/server/player-permissions";
 import { recordActivityEvent } from "@/services/server/activity-service";
 
 function pickPlayerFields(row) {
@@ -64,6 +65,8 @@ export async function createPlayer(userId, body) {
     throw err;
   }
 
+  const legacyId = String(body?.legacy_id || (!isUuid(body?.id) ? body?.id : "") || "").trim();
+
   const playerRow = {
     display_name: displayName,
     position: body?.position || null,
@@ -81,10 +84,71 @@ export async function createPlayer(userId, body) {
     updated_by_user_id: userId
   };
 
+  if (legacyId) {
+    const mapResult = await service
+      .from("player_legacy_id_map")
+      .select("player_id")
+      .eq("legacy_id", legacyId)
+      .eq("migrated_from_user_id", userId)
+      .maybeSingle();
+
+    if (mapResult.data?.player_id) {
+      const existingId = mapResult.data.player_id;
+      await requirePlayerAccess(userId, existingId, "editor");
+      const updateResult = await service
+        .from("players")
+        .update({
+          display_name: playerRow.display_name,
+          position: playerRow.position,
+          age: playerRow.age,
+          height: playerRow.height,
+          level: playerRow.level,
+          team: playerRow.team,
+          category: playerRow.category,
+          photo_url: playerRow.photo_url,
+          club_shield_url: playerRow.club_shield_url,
+          fundamentals: playerRow.fundamentals,
+          game_stats: playerRow.game_stats,
+          status: "active",
+          updated_by_user_id: userId
+        })
+        .eq("id", existingId)
+        .select("*")
+        .single();
+      if (updateResult.error) throw updateResult.error;
+
+      await service.from("player_members").upsert(
+        {
+          player_id: existingId,
+          user_id: userId,
+          relationship_type: asSelf ? "player" : body?.relationship_type || "coach",
+          access_level: asSelf ? "admin" : body?.access_level || "editor",
+          status: "active",
+          accepted_at: new Date().toISOString(),
+          created_by_user_id: userId,
+          updated_by_user_id: userId
+        },
+        { onConflict: "player_id,user_id" }
+      );
+
+      return pickPlayerFields(updateResult.data);
+    }
+  }
+
   const playerResult = await service.from("players").insert(playerRow).select("*").single();
   if (playerResult.error) throw playerResult.error;
 
   const player = playerResult.data;
+
+  if (legacyId) {
+    const mapInsert = await service.from("player_legacy_id_map").upsert({
+      legacy_id: legacyId,
+      player_id: player.id,
+      migrated_from_user_id: userId
+    });
+    if (mapInsert.error) throw mapInsert.error;
+  }
+
   const membership = {
     player_id: player.id,
     user_id: userId,
@@ -96,7 +160,7 @@ export async function createPlayer(userId, body) {
     updated_by_user_id: userId
   };
 
-  const memberResult = await service.from("player_members").insert(membership).select("*").single();
+  const memberResult = await service.from("player_members").upsert(membership, { onConflict: "player_id,user_id" }).select("*").single();
   if (memberResult.error) throw memberResult.error;
 
   await recordActivityEvent({
@@ -146,8 +210,29 @@ export async function updatePlayer(userId, playerId, patch) {
 }
 
 export async function archivePlayer(userId, playerId) {
-  await requirePlayerAccess(userId, playerId, "admin");
+  const membership = await getPlayerMembership(userId, playerId);
+  if (!membership) {
+    const err = new Error("Forbidden");
+    err.status = 403;
+    throw err;
+  }
+
   const service = createSupabaseServiceServerClient();
+  const playerResult = await service
+    .from("players")
+    .select("created_by_user_id")
+    .eq("id", playerId)
+    .maybeSingle();
+  if (playerResult.error) throw playerResult.error;
+
+  const isCreator = playerResult.data?.created_by_user_id === userId;
+  const isAdmin = accessLevelSatisfies(membership.access_level, "admin");
+  if (!isAdmin && !isCreator) {
+    const err = new Error("Forbidden");
+    err.status = 403;
+    throw err;
+  }
+
   const result = await service
     .from("players")
     .update({ status: "archived", updated_by_user_id: userId })
