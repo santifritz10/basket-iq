@@ -284,8 +284,6 @@ function showApp() {
     var appContainer = document.getElementById("app-container");
     if (authScreen) authScreen.classList.add("hidden");
     if (appContainer) appContainer.hidden = false;
-    initAppUserMenu();
-    updateAppUserMenuUi();
     syncAuthCookiesFromClient();
     bootstrapUserDataSync()
         .finally(function () {
@@ -298,11 +296,9 @@ function showApp() {
 function showAuthScreen() {
     var authScreen = document.getElementById("auth-screen");
     var appContainer = document.getElementById("app-container");
-    var appTopbar = document.getElementById("app-topbar");
     if (authScreen) authScreen.classList.remove("hidden");
     if (appContainer) appContainer.hidden = true;
-    if (appTopbar) appTopbar.hidden = true;
-    closeAppUserMenu();
+    closeDashboardUserMenu();
     document.getElementById("auth-login-error").textContent = "";
     document.getElementById("auth-register-error").textContent = "";
     attachAuthListeners();
@@ -4988,78 +4984,61 @@ function formatDashboardUserName(user) {
         .join(" ");
 }
 
-var appUserMenuBound = false;
+var dashboardUserMenuDocBound = false;
 
-function closeAppUserMenu() {
-    var trigger = document.getElementById("app-user-menu-trigger");
-    var dropdown = document.getElementById("app-user-menu-dropdown");
+function closeDashboardUserMenu() {
+    var trigger = document.getElementById("dashboard-user-menu-trigger");
+    var dropdown = document.getElementById("dashboard-user-menu-dropdown");
     if (dropdown) dropdown.hidden = true;
     if (trigger) trigger.setAttribute("aria-expanded", "false");
 }
 
-function toggleAppUserMenu() {
-    var trigger = document.getElementById("app-user-menu-trigger");
-    var dropdown = document.getElementById("app-user-menu-dropdown");
+function toggleDashboardUserMenu(ev) {
+    if (ev) ev.stopPropagation();
+    var trigger = document.getElementById("dashboard-user-menu-trigger");
+    var dropdown = document.getElementById("dashboard-user-menu-dropdown");
     if (!trigger || !dropdown) return;
     var willOpen = dropdown.hidden;
     dropdown.hidden = !willOpen;
     trigger.setAttribute("aria-expanded", willOpen ? "true" : "false");
 }
 
-function updateAppUserMenuUi() {
-    var topbar = document.getElementById("app-topbar");
-    var nameEl = document.getElementById("app-user-menu-name");
-    var avatarEl = document.getElementById("app-user-avatar");
-    var user = getCurrentUser();
-    if (!user) {
-        if (topbar) topbar.hidden = true;
-        return;
-    }
-    var displayName = formatDashboardUserName(user);
-    if (topbar) topbar.hidden = false;
-    if (nameEl) nameEl.textContent = displayName;
-    if (avatarEl) avatarEl.textContent = getDashboardAvatarInitials(displayName);
-}
+function bindDashboardUserMenu() {
+    var trigger = document.getElementById("dashboard-user-menu-trigger");
+    var editBtn = document.getElementById("dashboard-user-menu-edit-name");
+    var logoutBtn = document.getElementById("dashboard-user-menu-logout");
+    var menu = document.getElementById("dashboard-user-menu");
+    if (!trigger || !menu) return;
 
-function initAppUserMenu() {
-    updateAppUserMenuUi();
-    if (appUserMenuBound) return;
-    appUserMenuBound = true;
-
-    var trigger = document.getElementById("app-user-menu-trigger");
-    var editBtn = document.getElementById("app-user-menu-edit-name");
-    var logoutBtn = document.getElementById("app-user-menu-logout");
-    var menu = document.getElementById("app-user-menu");
-
-    if (trigger) {
-        trigger.addEventListener("click", function (ev) {
-            ev.stopPropagation();
-            toggleAppUserMenu();
-        });
-    }
+    trigger.onclick = function (ev) {
+        toggleDashboardUserMenu(ev);
+    };
 
     if (editBtn) {
-        editBtn.addEventListener("click", function () {
-            closeAppUserMenu();
+        editBtn.onclick = function () {
+            closeDashboardUserMenu();
             openEditDisplayNameDialog();
-        });
+        };
     }
 
     if (logoutBtn) {
-        logoutBtn.addEventListener("click", function () {
-            closeAppUserMenu();
+        logoutBtn.onclick = function () {
+            closeDashboardUserMenu();
             logout();
-        });
+        };
     }
 
-    document.addEventListener("click", function (ev) {
-        if (!menu || menu.contains(ev.target)) return;
-        closeAppUserMenu();
-    });
-
-    document.addEventListener("keydown", function (ev) {
-        if (ev.key === "Escape") closeAppUserMenu();
-    });
+    if (!dashboardUserMenuDocBound) {
+        dashboardUserMenuDocBound = true;
+        document.addEventListener("click", function (ev) {
+            var activeMenu = document.getElementById("dashboard-user-menu");
+            if (!activeMenu || activeMenu.contains(ev.target)) return;
+            closeDashboardUserMenu();
+        });
+        document.addEventListener("keydown", function (ev) {
+            if (ev.key === "Escape") closeDashboardUserMenu();
+        });
+    }
 }
 
 function openEditDisplayNameDialog() {
@@ -5073,9 +5052,7 @@ function openEditDisplayNameDialog() {
             alert((result && result.error) || "No se pudo actualizar el nombre.");
             return;
         }
-        updateAppUserMenuUi();
-        var contentDiv = document.getElementById("content");
-        if (contentDiv && contentDiv.querySelector(".dashboard")) {
+        if (document.getElementById("content") && document.getElementById("content").querySelector(".dashboard")) {
             renderDashboard();
         }
     });
@@ -5151,6 +5128,7 @@ function renderDashboard() {
     var user = getCurrentUser();
     var userName = formatDashboardUserName(user);
     var safeUserName = escapeHtml(userName);
+    var userAvatar = escapeHtml(getDashboardAvatarInitials(userName));
     var entrenamientos = getEntrenamientos();
     var nextEnt = getNextEntrenamiento();
     var weekSummary = getDashboardWeekSummary();
@@ -5163,6 +5141,20 @@ function renderDashboard() {
         '    <div class="dashboard-search-wrap">' +
         '      <input id="dashboard-global-search" class="dashboard-search-input" type="search" placeholder="Buscar en la app (ej: jugadores, pizarra, jugadas...)">' +
         '      <button type="button" id="dashboard-global-search-btn" class="dashboard-search-btn">Buscar</button>' +
+        "    </div>" +
+        '    <div class="dashboard-user-menu" id="dashboard-user-menu">' +
+        '      <button type="button" class="dashboard-userbox dashboard-user-menu-trigger" id="dashboard-user-menu-trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="dashboard-user-menu-dropdown">' +
+        '        <div class="dashboard-avatar">' + userAvatar + "</div>" +
+        '        <div class="dashboard-user-meta">' +
+        '          <span class="dashboard-user-role">Coach</span>' +
+        "          <strong>" + safeUserName + "</strong>" +
+        "        </div>" +
+        '        <span class="dashboard-user-chevron" aria-hidden="true">▾</span>' +
+        "      </button>" +
+        '      <div class="dashboard-user-menu-dropdown" id="dashboard-user-menu-dropdown" role="menu" hidden>' +
+        '        <button type="button" class="dashboard-user-menu-item" id="dashboard-user-menu-edit-name" role="menuitem">Cambiar nombre</button>' +
+        '        <button type="button" class="dashboard-user-menu-item dashboard-user-menu-item-danger" id="dashboard-user-menu-logout" role="menuitem">Cerrar sesión</button>' +
+        "      </div>" +
         "    </div>" +
         "  </div>" +
         '  <p id="dashboard-search-hint" class="dashboard-search-hint" aria-live="polite"></p>' +
@@ -5286,6 +5278,7 @@ function renderDashboard() {
     }
 
     attachDashboardWeekEvents();
+    bindDashboardUserMenu();
 }
 
 
