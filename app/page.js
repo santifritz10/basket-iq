@@ -39,7 +39,8 @@ const sidebarUiEnhancerScript = `
       planilla: 'clipboard-list',
       'planificacion-menu': 'calendar-range',
       'player-tracking-menu': 'users',
-      jugadas: 'library'
+      jugadas: 'library',
+      'asistente-ia': 'bot'
     };
 
     var toggles = sidebar.querySelectorAll('.sidebar-toggle[data-group]');
@@ -101,7 +102,9 @@ const sidebarUiEnhancerScript = `
         '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="planilla" onclick="loadContent(\\'planilla_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Planilla</span></div></div>',
         '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="planificacion-menu" onclick="loadContent(\\'planificacion_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Planificación</span></div></div>',
         '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="player-tracking-menu" onclick="${playerTrackingNavAction}"><span class="sidebar-toggle-icon">▶</span><span>Seguimiento de Jugadores</span></div></div>',
-        '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="jugadas" onclick="loadContent(\\'jugadas_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Jugadas Guardadas</span></div></div>'
+        '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="jugadas" onclick="loadContent(\\'jugadas_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Jugadas Guardadas</span></div></div>',
+        '<p class="sidebar-section-title">Inteligencia</p>',
+        '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="asistente-ia" onclick="window.location.href=\\'/assistant\\'"><span class="sidebar-toggle-icon">▶</span><span>Asistente IA</span></div></div>'
       ].join('');
     }
 
