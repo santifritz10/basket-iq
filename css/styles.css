@@ -4997,6 +4997,8 @@ table th {
     max-width: 1220px;
     margin-left: auto;
     margin-right: auto;
+    /* Evita que las vistas se compriman dentro del flex column y corten su contenido (permite el scroll vertical) */
+    flex-shrink: 0;
 }
 
 .manual-section,

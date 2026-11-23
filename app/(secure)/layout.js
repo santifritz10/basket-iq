@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function SecureLayout({ children }) {
   return (
-    <div className="app-container" style={{ display: "block", minHeight: "100vh" }}>
+    <div className="app-container" style={{ display: "block", height: "100dvh", overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}>
       <header
         style={{
           padding: "12px 20px",
