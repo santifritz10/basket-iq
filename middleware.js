@@ -4,6 +4,7 @@ const STATIC_FILE_REGEX = /\.[^/]+$/;
 
 const APP_ROUTE_PREFIXES = [
   "/players",
+  "/assistant",
   "/invitations",
   "/shooting",
   "/plays",

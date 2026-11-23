@@ -12,6 +12,7 @@
     "repair:players": "node scripts/repair-player-duplicates.mjs"
   },
   "dependencies": {
+    "@google/genai": "^2.32.0",
     "@supabase/supabase-js": "^2.57.2",
     "next": "^15.4.0",
     "react": "^19.1.0",
