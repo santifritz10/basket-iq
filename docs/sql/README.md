@@ -7,6 +7,12 @@ Ejecutar en **Supabase SQL Editor** en este orden:
 3. `003-player-domain-realtime.sql` — checklist Realtime (dashboard o SQL)
 4. `004-legacy-archive.sql` — *(opcional, post-cutover)* marcar blobs archivados
 
+## Asistente IA
+
+- `007-assistant-conversations.sql` — historial persistente de conversaciones del asistente
+  (tablas `assistant_conversations` y `assistant_messages`, con RLS). Solo crea tablas nuevas.
+  Mientras no se ejecute, `/assistant` sigue funcionando pero sin guardar los chats.
+
 ## Staging primero
 
 Probar en proyecto de staging antes de producción.

@@ -49,7 +49,7 @@ export async function POST(req) {
   try {
     const { mode, messages } = parsed.data;
     const contextSections = await buildCoachContext({ userId: user.id });
-    const systemInstruction = buildSystemInstruction(mode, contextSections);
+    const systemInstruction = buildSystemInstruction(mode, contextSections, { persistent: false });
     const reply = await generateAssistantReply({ systemInstruction, messages });
     return NextResponse.json({
       ok: true,
