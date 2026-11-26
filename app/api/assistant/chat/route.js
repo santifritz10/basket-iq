@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { parseChatRequest, ASSISTANT_LIMITS } from "@/lib/server/assistant/validation";
 import { checkRateLimit } from "@/lib/server/assistant/rate-limit";
 import { buildSystemInstruction } from "@/lib/server/assistant/prompts";
-import { buildCoachContext } from "@/lib/server/assistant/context";
+import { buildCoachContext, describeAcademyContext } from "@/lib/server/assistant/context";
 import { generateAssistantReply } from "@/lib/server/assistant/gemini";
 import {
   createConversation,
   deleteMessage,
+  getAcademyContext,
   getConversation,
+  setAcademyContext,
   insertMessage,
   listMessages,
   touchConversation
@@ -33,7 +35,12 @@ export async function POST(req) {
   try {
     const parsed = parseChatRequest(await readJson(req, 50_000));
     if (!parsed.ok) return errorResponse(400, parsed.error, "invalid_request");
-    const { conversationId, mode, action, text } = parsed.data;
+    const { conversationId, mode, action, text, academy: requestedAcademy } = parsed.data;
+    let academy = requestedAcademy;
+    let academyPersisted = null;
+    if (requestedAcademy && !describeAcademyContext(requestedAcademy)) {
+      return errorResponse(404, "No encontramos ese contenido de Academy.", "academy_not_found");
+    }
 
     if (conversationId) {
       conversation = await getConversation(user.id, conversationId);
@@ -51,6 +58,8 @@ export async function POST(req) {
 
     if (action === "send") {
       if (!conversation) conversation = await createConversation(user.id, { firstMessage: text, mode });
+      // Un mensaje enviado desde Academy fija (o cambia) el contexto de la conversación.
+      if (requestedAcademy) academyPersisted = await setAcademyContext(user.id, conversation.id, requestedAcademy);
       userMessage = await insertMessage(user.id, conversation.id, { role: "user", text, mode });
       conversation = (await touchConversation(user.id, conversation.id, { mode })) || conversation;
     }
@@ -73,7 +82,13 @@ export async function POST(req) {
       maxMessages: ASSISTANT_LIMITS.maxHistoryMessages,
       maxChars: ASSISTANT_LIMITS.maxTotalChars
     });
-    const contextSections = await buildCoachContext({ userId: user.id, projectId: conversation.projectId });
+    if (!academy) {
+      const saved = await getAcademyContext(user.id, conversation.id);
+      academy = saved.value;
+    }
+    // Un contexto guardado que ya no pasa la validación (contenido eliminado) se ignora.
+    if (academy && !describeAcademyContext(academy)) academy = null;
+    const contextSections = await buildCoachContext({ userId: user.id, projectId: conversation.projectId, academy });
     const systemInstruction = buildSystemInstruction(mode, contextSections);
     const reply = await generateAssistantReply({ systemInstruction, messages: history });
 
@@ -93,7 +108,8 @@ export async function POST(req) {
       userMessage,
       message,
       replacedMessageId: replaced?.id || null,
-      model: reply.model
+      model: reply.model,
+      academy: academy ? { label: describeAcademyContext(academy), persisted: academyPersisted } : null
     });
   } catch (error) {
     // Si el mensaje del entrenador ya se guardó, se devuelve igual para que

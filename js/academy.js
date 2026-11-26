@@ -337,7 +337,9 @@
             (ex.board ? '<div class="ac-board-slot" data-board="' + esc(ex.board) + '"></div>' : "") +
             '<dl class="ac-ex-grid">' + rows + "</dl>" +
             '<p class="ac-ex-basis"><strong>Fuente o fundamento técnico:</strong> ' + fmt(ex.basis) + "</p>" +
-            (ctx.canAdd ? '<div class="ac-ex-actions"><button type="button" class="tb-btn tb-btn--accent" data-add-exercise="' + esc(ex.id) + '">Añadir al entrenamiento</button>' +
+            (ctx.canAdd || ctx.canAsk ? '<div class="ac-ex-actions">' +
+                (ctx.canAdd ? '<button type="button" class="tb-btn tb-btn--accent" data-add-exercise="' + esc(ex.id) + '">Añadir al entrenamiento</button>' : "") +
+                (ctx.canAsk ? '<button type="button" class="tb-btn" data-ask-exercise="' + esc(ex.id) + '">Analizar con mi Asistente IA</button>' : "") +
                 (ctx.canLibrary ? '<button type="button" class="tb-btn" data-open-library>Ver biblioteca de ejercicios</button>' : "") + "</div>" : "") +
             "</article>";
     }
@@ -653,6 +655,7 @@
             '<div class="ac-meta">' + (article.meta || []).map(function (m) { return "<span>" + esc(m) + "</span>"; }).join("") + "</div>" +
             '<div class="ac-hero-actions">' +
             '<button type="button" class="tb-btn ac-fav' + (isFav ? " is-on" : "") + '" aria-pressed="' + (isFav ? "true" : "false") + '">' + (isFav ? "★ En favoritos" : "☆ Guardar en favoritos") + "</button>" +
+            (host.onAskAssistant ? '<button type="button" class="tb-btn tb-btn--accent ac-ask" data-ask-article>Analizar con mi Asistente IA</button>' : "") +
             "</div>" +
             '<div class="ac-resume" hidden></div>' +
             "</header>" +
@@ -677,7 +680,7 @@
             });
             activeViewers.forEach(function (v) { v.stop(); });
             activeViewers = [];
-            var ctx = { boardsById: boardsById, canAdd: !!host.onAddExercise, canLibrary: !!host.onOpenLibrary };
+            var ctx = { boardsById: boardsById, canAdd: !!host.onAddExercise, canLibrary: !!host.onOpenLibrary, canAsk: !!host.onAskAssistant };
             content.innerHTML = renderTab(article, tab, ctx);
             var secs = tabSections(article, tab);
             toc.innerHTML = '<p class="ac-toc-title">En esta pestaña</p><ol>' + secs.map(function (s) {
@@ -697,6 +700,9 @@
                             host.onOpenInBoard(doc, { title: meta.name, description: meta.description, tags: meta.tags });
                         } : null,
                         onSaveAsPlay: host.onSaveAsPlay || null,
+                        onAskAssistant: host.onAskAssistant ? function (sel, button) {
+                            host.onAskAssistant(article, { variantId: sel.variant, positionId: sel.position, returnFocus: button });
+                        } : null,
                         onShowExercises: (article.exercises || []).length ? function () {
                             showTab("entrenar");
                             container.querySelector(".ac-tabs").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -788,6 +794,16 @@
                         setTimeout(function () { el.classList.remove("is-flash"); }, 1600);
                     }
                 }, 50);
+                return;
+            }
+            var askArticle = e.target.closest("[data-ask-article]");
+            if (askArticle && host.onAskAssistant) {
+                host.onAskAssistant(article, { returnFocus: askArticle });
+                return;
+            }
+            var askEx = e.target.closest("[data-ask-exercise]");
+            if (askEx && host.onAskAssistant) {
+                host.onAskAssistant(article, { exerciseId: askEx.getAttribute("data-ask-exercise"), returnFocus: askEx });
                 return;
             }
             var addEx = e.target.closest("[data-add-exercise]");

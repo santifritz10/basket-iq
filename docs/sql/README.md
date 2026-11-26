@@ -12,6 +12,10 @@ Ejecutar en **Supabase SQL Editor** en este orden:
 - `007-assistant-conversations.sql` — historial persistente de conversaciones del asistente
   (tablas `assistant_conversations` y `assistant_messages`, con RLS). Solo crea tablas nuevas.
   Mientras no se ejecute, `/assistant` sigue funcionando pero sin guardar los chats.
+- `009-assistant-academy-context.sql` — agrega la columna opcional `academy_context` a
+  `assistant_conversations` para que "Analizar con mi Asistente IA" mantenga el contexto de la guía
+  en las preguntas de seguimiento. Solo agrega una columna; no toca datos. Sin ella, la primera
+  respuesta usa el contexto igual, pero las siguientes ya no.
 
 ## Basket Lab Academy
 

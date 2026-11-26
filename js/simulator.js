@@ -387,6 +387,7 @@
             (host.onOpenInBoard ? '<button type="button" class="tb-btn tb-btn--small tb-btn--accent" data-v="open">Abrir en pizarra táctica</button>' : "") +
             (host.onSaveAsPlay ? '<button type="button" class="tb-btn tb-btn--small" data-v="save">Guardar como jugada propia</button>' : "") +
             (host.onShowExercises ? '<button type="button" class="tb-btn tb-btn--small" data-v="exercises">Ejercicios relacionados</button>' : "") +
+            (host.onAskAssistant ? '<button type="button" class="tb-btn tb-btn--small" data-v="ai">Analizar con mi Asistente IA</button>' : "") +
             "</div>" +
             '<p class="sim-seq ac-muted"></p>' +
             '<p class="sim-msg" role="status" hidden></p>' +
@@ -758,6 +759,10 @@
                 var res = host.onSaveAsPlay(historyDoc(), historyMeta()) || {};
                 if (res.ok) flash("Guardada en Jugadas guardadas como «" + historyMeta().name + "».", true);
                 else flash(res.error || "No se pudo guardar la jugada.", false);
+            } else if (v === "ai" && host.onAskAssistant) {
+                stopAll();
+                if (state.fullscreen) toggleFullscreen();
+                host.onAskAssistant({ variant: state.variant, position: state.position }, b);
             } else if (v === "exercises" && host.onShowExercises) {
                 stopAll();
                 if (state.fullscreen) toggleFullscreen();

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import {
   deleteConversation,
+  getAcademyContext,
   getConversation,
   listMessages,
   updateConversation
 } from "@/lib/server/assistant/conversations";
 import { parseConversationPatch } from "@/lib/server/assistant/validation";
+import { describeAcademyContext } from "@/lib/server/assistant/context";
 import { errorResponse, handleRouteError, readJson, requireUser, unauthorized } from "@/lib/server/assistant/http";
 
 export const runtime = "nodejs";
@@ -22,8 +24,12 @@ export async function GET(_req, { params }) {
     const { conversationId } = await params;
     const conversation = await getConversation(user.id, conversationId);
     if (!conversation) return notFound();
-    const messages = await listMessages(user.id, conversation.id);
-    return NextResponse.json({ ok: true, conversation, messages });
+    const [messages, academy] = await Promise.all([
+      listMessages(user.id, conversation.id),
+      getAcademyContext(user.id, conversation.id)
+    ]);
+    const academyLabel = academy.value ? describeAcademyContext(academy.value) : null;
+    return NextResponse.json({ ok: true, conversation: { ...conversation, academyLabel }, messages });
   } catch (error) {
     return handleRouteError(error);
   }
