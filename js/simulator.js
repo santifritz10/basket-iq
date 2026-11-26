@@ -227,6 +227,8 @@
     /** Revisión de coherencia para las pruebas: posiciones dentro de la cancha, sin superposiciones, textos completos. */
     function validateScenario(scenario) {
         var errors = [];
+        // Cancha completa: 28 m de largo; media cancha: 14 m (reglas FIBA).
+        var maxX = scenario.view && scenario.view.court === "full" ? 28 : 14;
         var ids = Object.keys(scenario.players);
         var defenders = ids.filter(function (id) { return scenario.players[id].team === "defense"; });
         var posIds = scenario.positions.map(function (p) { return p.id; });
@@ -244,7 +246,7 @@
                 ids.forEach(function (id) {
                     var p = st.pos[id];
                     if (!p) { if (!scenario.optionalPlayers) errors.push(where + ": falta " + id); return; }
-                    if (!(p[0] >= 0 && p[0] <= 14 && p[1] >= 0 && p[1] <= 15)) errors.push(where + ": " + id + " fuera de media cancha");
+                    if (!(p[0] >= 0 && p[0] <= maxX && p[1] >= 0 && p[1] <= 15)) errors.push(where + ": " + id + " fuera de la cancha");
                 });
                 for (var i = 0; i < ids.length; i++) {
                     for (var j = i + 1; j < ids.length; j++) {
@@ -269,7 +271,7 @@
                 });
                 if (st.options && (!st.optionsText || st.optionsText.length !== st.options.length)) errors.push(where + ": cada opción necesita su explicación");
                 (st.vulnerable || []).forEach(function (z) {
-                    if (z.x < 0 || z.y < 0 || z.x + z.w > 14.01 || z.y + z.h > 15.01) errors.push(where + ": espacio vulnerable fuera de la cancha");
+                    if (z.x < 0 || z.y < 0 || z.x + z.w > maxX + 0.01 || z.y + z.h > 15.01) errors.push(where + ": espacio vulnerable fuera de la cancha");
                 });
             });
         });

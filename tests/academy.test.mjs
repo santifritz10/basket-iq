@@ -237,8 +237,9 @@ test("la biblioteca reúne los ejercicios de las tres zonas sin claves repetidas
 const pnr = require("../js/academy-content/pick-and-roll.js");
 const superioridades = require("../js/academy-content/superioridades.js");
 const spacing = require("../js/academy-content/spacing.js");
+const presion = require("../js/academy-content/presion.js");
 
-for (const art of [pnr, superioridades, spacing]) {
+for (const art of [pnr, superioridades, spacing, presion]) {
   test(`${art.id}: contenido válido, completo y con fuentes`, () => {
     assert.deepEqual(Academy.validateArticle(art), []);
     const ids = art.tabs.aprender.map((s) => s.id);
@@ -253,9 +254,10 @@ for (const art of [pnr, superioridades, spacing]) {
     for (const b of art.boards) {
       const doc = Academy.boardFromSpec(b.spec, Board);
       assert.ok(doc.phases.length >= 2, b.id);
+      const maxX = b.spec.view.court === "full" ? 28 : 14;
       doc.phases.forEach((ph, i) => {
         const ps = ph.objects.filter((o) => o.kind === "player" && !o.hidden);
-        ps.forEach((p) => assert.ok(p.x >= 0 && p.x <= 14 && p.y >= 0 && p.y <= 15, `${b.id} ${p.id}`));
+        ps.forEach((p) => assert.ok(p.x >= 0 && p.x <= maxX && p.y >= 0 && p.y <= 15, `${b.id} ${p.id}`));
         for (let a = 0; a < ps.length; a++) for (let c = a + 1; c < ps.length; c++) {
           assert.ok(Math.hypot(ps[a].x - ps[c].x, ps[a].y - ps[c].y) >= 0.55, `${b.id} fase ${i}: ${ps[a].id}/${ps[c].id}`);
         }
@@ -317,9 +319,21 @@ test("spacing: el buen espacio deja una esquina libre en la penetración y el ma
   assert.ok(d(buena, "o5", "x5") > 4);
 });
 
-test("la biblioteca reúne los ejercicios de las seis guías sin claves repetidas", () => {
-  const list = Ex.collect([zona23, zona32, zona131, pnr, superioridades, spacing]);
-  assert.equal(list.length, 18);
-  assert.equal(new Set(list.map((i) => i.key)).size, 18);
+test("presión: simulador a toda la cancha con los cinco momentos y la 2-2-1 marcada como interpretación", () => {
+  const sc = presion.simulator;
+  assert.equal(sc.view.court, "full");
+  assert.deepEqual(sc.tour, ["saque", "recepcion", "trampa", "rotacion", "salida"]);
+  assert.equal(sc.variants.find((v) => v.id === "zona221").kind, "interpretation");
+  assert.ok(presion.unavailableSources.some((u) => /2-2-1/.test(u.title)));
+  // La validación usa el largo de la cancha completa.
+  const bad = JSON.parse(JSON.stringify(sc));
+  bad.variants[0].states.saque.pos.o4 = [29, 9.5];
+  assert.ok(Sim.validateScenario(bad).some((e) => /fuera de la cancha/.test(e)));
+});
+
+test("la biblioteca reúne los ejercicios de las siete guías sin claves repetidas", () => {
+  const list = Ex.collect([zona23, zona32, zona131, pnr, superioridades, spacing, presion]);
+  assert.equal(list.length, 21);
+  assert.equal(new Set(list.map((i) => i.key)).size, 21);
   assert.ok(Ex.filterList(list, { fundamento: "Spacing" }).length === 3);
 });

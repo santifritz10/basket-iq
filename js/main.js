@@ -3753,7 +3753,7 @@ var FUNDAMENTOS_CATEGORY_VIEWS = {
         title: "Sistemas de presión",
         subtitle: "Aplicaciones por contexto y objetivo táctico.",
         items: [
-            { id: "fullcourt", label: "Full Court" },
+            { id: "fullcourt", label: "Presión y salidas (guía Academy)" },
             { id: "press221", label: "2-2-1" },
             { id: "doubleteam", label: "Double Team" }
         ]
@@ -4071,63 +4071,8 @@ function loadContent(sectionId) {
             break;
 
         case "fullcourt":
-            contentDiv.innerHTML = `
-                <section class="manual-section">
-                    <h2>Presión Full Court</h2>
-                    <p>
-                        La <strong>presión a toda la cancha</strong> busca incomodar la salida del rival desde el saque de fondo,
-                        forzar errores, acelerar decisiones y robar balones antes de que crucen mitad de cancha.
-                    </p>
-
-                    <h3 class="section-title">Objetivos principales</h3>
-                    <ul>
-                        <li>Quitar ritmo al base rival desde la recepción.</li>
-                        <li>Forzar pases largos o arriesgados que puedan ser interceptados.</li>
-                        <li>Generar pérdidas rápidas para anotar en transición.</li>
-                        <li>Cansar físicamente y mentalmente al rival.</li>
-                    </ul>
-
-                    <h3 class="section-title">Fundamentos de la presión full court</h3>
-                    <ul>
-                        <li><strong>Posición defensiva baja</strong> y desplazamientos laterales constantes.</li>
-                        <li><strong>Orientar al atacante</strong> hacia la banda o hacia una trampa predefinida.</li>
-                        <li><strong>Comunicación</strong>: avisar cambios, ayudas, cortinas y líneas de pase.</li>
-                        <li><strong>No dejar girar cómodo</strong> al manejador de balón.</li>
-                        <li><strong>Volver rápido</strong> si el rival supera la presión, para no regalar bandejas fáciles.</li>
-                    </ul>
-
-                    <h3 class="section-title">Videos de referencia</h3>
-                    <div class="video-grid">
-                        <div class="video-card">
-                            <h4>Presión individual a toda la cancha</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/embed/2Vv-BfVoq4g"
-                                    title="Full court individual"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-
-                        <div class="video-card">
-                            <h4>Principios de presión a toda la cancha</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/embed/fRh_vgS2dFE"
-                                    title="Principios full court"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            `;
+            renderAcademyArticle("presion");
             break;
-
         case "doubleteam":
             contentDiv.innerHTML = `
                 <section class="manual-section">
