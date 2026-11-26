@@ -40,6 +40,8 @@ const sidebarUiEnhancerScript = `
       'planificacion-menu': 'calendar-range',
       'player-tracking-menu': 'users',
       jugadas: 'library',
+      desafios: 'target',
+      'mi-progreso': 'graduation-cap',
       'asistente-ia': 'bot'
     };
 
@@ -98,6 +100,9 @@ const sidebarUiEnhancerScript = `
         '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="ataques" onclick="loadContent(\\'ataques_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Ataques</span></div></div>',
         '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="defensas-zona" onclick="loadContent(\\'defensas_zona_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Defensas en Zona</span></div></div>',
         '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="presion" onclick="loadContent(\\'presion_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Presión</span></div></div>',
+        '<p class="sidebar-section-title">Aprendizaje</p>',
+        '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="desafios" onclick="loadContent(\\'desafios_tacticos\\')"><span class="sidebar-toggle-icon">▶</span><span>Desafíos tácticos</span></div></div>',
+        '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="mi-progreso" onclick="loadContent(\\'mi_progreso\\')"><span class="sidebar-toggle-icon">▶</span><span>Mi progreso</span></div></div>',
         '<p class="sidebar-section-title">Herramientas del coach</p>',
         '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="planilla" onclick="loadContent(\\'planilla_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Planilla</span></div></div>',
         '<div class="sidebar-group"><div class="sidebar-toggle sidebar-toggle-flat" data-group="planificacion-menu" onclick="loadContent(\\'planificacion_hub\\')"><span class="sidebar-toggle-icon">▶</span><span>Planificación</span></div></div>',
@@ -190,19 +195,21 @@ export default async function HomePage() {
       <Script src="/assets/js/player-domain-realtime.js?v=20260714" strategy="afterInteractive" />
       <Script src="/assets/js/shooting-zones-heatmap.js?v=20260714" strategy="afterInteractive" />
       <Script src="/assets/js/supabase-config.js" strategy="afterInteractive" />
-      <Script src="/assets/js/tactical-board.js?v=20261126h" strategy="afterInteractive" />
-      <Script src="/assets/js/simulator.js?v=20261126h" strategy="afterInteractive" />
-      <Script src="/assets/js/academy.js?v=20261126h" strategy="afterInteractive" />
-      <Script src="/assets/js/exercises.js?v=20261126h" strategy="afterInteractive" />
-      <Script src="/assets/js/assistant-bridge.js?v=20261126h" strategy="afterInteractive" />
-      <Script src="/assets/js/academy-content/zona-2-3.js?v=20261126h" strategy="afterInteractive" />
-      <Script src="/assets/js/academy-content/zona-3-2.js?v=20261126h" strategy="afterInteractive" />
-      <Script src="/assets/js/academy-content/zona-1-3-1.js?v=20261126h" strategy="afterInteractive" />
-      <Script src="/assets/js/academy-content/pick-and-roll.js?v=20261126h" strategy="afterInteractive" />
-      <Script src="/assets/js/academy-content/superioridades.js?v=20261126h" strategy="afterInteractive" />
-      <Script src="/assets/js/academy-content/spacing.js?v=20261126h" strategy="afterInteractive" />
-      <Script src="/assets/js/academy-content/presion.js?v=20261126h" strategy="afterInteractive" />
-      <Script src="/assets/js/main.js?v=20261126h" strategy="afterInteractive" />
+      <Script src="/assets/js/tactical-board.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/simulator.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/academy.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/exercises.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/assistant-bridge.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/challenges.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/zona-2-3.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/zona-3-2.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/zona-1-3-1.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/pick-and-roll.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/superioridades.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/spacing.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/presion.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/desafios.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/main.js?v=20261126i" strategy="afterInteractive" />
       <Script id="legacy-toggle-sidebar" strategy="afterInteractive">
         {toggleSidebarScript}
       </Script>

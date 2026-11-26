@@ -367,7 +367,19 @@
             '<section class="ac-section" id="ac-sec-origen" data-section="origen"><header class="ac-section-head"><h3>Cómo leer el origen de cada sección</h3></header><ul class="ac-list ac-prov-legend">' + legend + "</ul></section>";
     }
 
-    function tabSections(article, tab) {
+    /** Desafíos de la guía (vienen de BasketChallenges a través del host). */
+    function renderChallengeList(list, ctx) {
+        return '<section class="ac-section" id="ac-sec-desafios" data-section="desafios"><header class="ac-section-head"><h3>Desafíos tácticos</h3></header>' +
+            "<p>Situaciones de juego para decidir sobre la pizarra. Al responder, recibís el análisis de tu decisión, las alternativas y la pizarra que lo explica.</p>" +
+            '<ul class="ac-ch-list">' + list.map(function (c) {
+                return '<li><div><strong>' + esc(c.title) + '</strong><span class="ac-muted">' + esc(c.question) + (c.statusLabel ? " · " + esc(c.statusLabel) : "") + "</span></div>" +
+                    '<button type="button" class="tb-btn tb-btn--small tb-btn--accent" data-open-challenge="' + esc(c.id) + '">' + (c.statusLabel ? "Ver desafío" : "Responder") + "</button></li>";
+            }).join("") + "</ul>" +
+            (ctx.canStudy && !ctx.isStudied ? '<p class="ac-muted">Cuando termines la guía, marcala como estudiada para verla en «Mi progreso».</p><p><button type="button" class="tb-btn ac-studied" aria-pressed="false">Marcar como estudiada</button></p>' : "") +
+            "</section>";
+    }
+
+    function tabSections(article, tab, ctx) {
         if (tab === "fuentes") {
             var out = [{ id: "bibliografia", title: "Bibliografía verificable" }];
             if ((article.unavailableSources || []).length) out.push({ id: "no-consultadas", title: "Fuentes no consultadas" });
@@ -380,6 +392,7 @@
         });
         var secs = (article.tabs[tab] || []).map(function (s) { return { id: s.id, title: s.title, number: s.number }; });
         if (tab === "entrenar") secs = secs.concat((article.exercises || []).map(function (e) { return { id: e.id, title: e.name }; }));
+        if (tab === "evaluar" && ctx && ctx.challenges && ctx.challenges.length) secs.push({ id: "desafios", title: "Desafíos tácticos" });
         return secs;
     }
 
@@ -401,6 +414,7 @@
         }
         var html = (article.tabs[tab] || []).map(function (s) { return renderSection(s, ctx); }).join("");
         if (tab === "entrenar") html += (article.exercises || []).map(function (e) { return renderExercise(e, ctx); }).join("");
+        if (tab === "evaluar" && ctx.challenges && ctx.challenges.length) html += renderChallengeList(ctx.challenges, ctx);
         return html;
     }
 
@@ -423,7 +437,8 @@
             return null;
         }
         options = options || {};
-        var doc = boardFromSpec(boardDef.spec, Board);
+        // Un documento ya armado (por ejemplo, una secuencia del simulador) se usa tal cual.
+        var doc = boardDef.doc ? Board.normalizeDoc(JSON.parse(JSON.stringify(boardDef.doc))) : boardFromSpec(boardDef.spec, Board);
         var n = doc.phases.length;
         var state = { pos: 0, playing: false, target: null, hold: 0, speed: 1, arrows: true, raf: 0, last: 0, fullscreen: false };
 
@@ -644,6 +659,8 @@
         var progress = host.getProgress ? host.getProgress() : { favorites: {}, reading: {} };
         var reading = (progress.reading || {})[article.id] || null;
         var isFav = !!(progress.favorites || {})[article.id];
+        var isStudied = !!(progress.studied || {})[article.id];
+        var challenges = host.getChallenges ? (host.getChallenges(article.id) || []) : [];
         var current = { tab: opts.tab || "aprender" };
 
         container.innerHTML =
@@ -655,6 +672,7 @@
             '<div class="ac-meta">' + (article.meta || []).map(function (m) { return "<span>" + esc(m) + "</span>"; }).join("") + "</div>" +
             '<div class="ac-hero-actions">' +
             '<button type="button" class="tb-btn ac-fav' + (isFav ? " is-on" : "") + '" aria-pressed="' + (isFav ? "true" : "false") + '">' + (isFav ? "★ En favoritos" : "☆ Guardar en favoritos") + "</button>" +
+            (host.setStudied ? studiedButton() : "") +
             (host.onAskAssistant ? '<button type="button" class="tb-btn tb-btn--accent ac-ask" data-ask-article>Analizar con mi Asistente IA</button>' : "") +
             "</div>" +
             '<div class="ac-resume" hidden></div>' +
@@ -665,6 +683,10 @@
             }).join("") + "</nav>" +
             '<div class="ac-layout"><aside class="ac-toc" aria-label="Índice"></aside><div class="ac-content" role="tabpanel"></div></div>' +
             "</article>";
+
+        function studiedButton() {
+            return '<button type="button" class="tb-btn ac-studied' + (isStudied ? " is-on" : "") + '" aria-pressed="' + (isStudied ? "true" : "false") + '">' + (isStudied ? "✓ Estudiada" : "Marcar como estudiada") + "</button>";
+        }
 
         var content = container.querySelector(".ac-content");
         var toc = container.querySelector(".ac-toc");
@@ -680,9 +702,9 @@
             });
             activeViewers.forEach(function (v) { v.stop(); });
             activeViewers = [];
-            var ctx = { boardsById: boardsById, canAdd: !!host.onAddExercise, canLibrary: !!host.onOpenLibrary, canAsk: !!host.onAskAssistant };
+            var ctx = { boardsById: boardsById, canAdd: !!host.onAddExercise, canLibrary: !!host.onOpenLibrary, canAsk: !!host.onAskAssistant, challenges: host.onOpenChallenge ? challenges : [], canStudy: !!host.setStudied, isStudied: isStudied };
             content.innerHTML = renderTab(article, tab, ctx);
-            var secs = tabSections(article, tab);
+            var secs = tabSections(article, tab, ctx);
             toc.innerHTML = '<p class="ac-toc-title">En esta pestaña</p><ol>' + secs.map(function (s) {
                 return '<li><a href="#ac-sec-' + esc(s.id) + '" data-goto="' + esc(s.id) + '">' + (s.number ? '<span class="ac-toc-num">' + esc(s.number) + "</span>" : "") + fmt(s.title) + "</a></li>";
             }).join("") + "</ol>";
@@ -813,6 +835,22 @@
             }
             if (e.target.closest("[data-open-library]") && host.onOpenLibrary) {
                 host.onOpenLibrary();
+                return;
+            }
+            var openCh = e.target.closest("[data-open-challenge]");
+            if (openCh && host.onOpenChallenge) {
+                host.onOpenChallenge(openCh.getAttribute("data-open-challenge"));
+                return;
+            }
+            var stBtn = e.target.closest(".ac-studied");
+            if (stBtn && host.setStudied) {
+                isStudied = !isStudied;
+                container.querySelectorAll(".ac-studied").forEach(function (b) {
+                    b.classList.toggle("is-on", isStudied);
+                    b.setAttribute("aria-pressed", isStudied ? "true" : "false");
+                    b.textContent = isStudied ? "✓ Estudiada" : "Marcar como estudiada";
+                });
+                host.setStudied(article.id, isStudied);
                 return;
             }
             var fav = e.target.closest(".ac-fav");

@@ -3922,6 +3922,8 @@ var NAV_ROOT_SECTIONS = {
     jugadas_hub: true,
     ataques_hub: true,
     defensas_zona_hub: true,
+    desafios_tacticos: true,
+    mi_progreso: true,
     presion_hub: true,
     planilla_hub: true,
     fund_cat_dribbling: true,
@@ -4051,6 +4053,19 @@ function loadContent(sectionId) {
 
     if (sectionId === "biblioteca_ejercicios") {
         renderExerciseLibrary();
+        return;
+    }
+
+    if (sectionId === "desafios_tacticos") {
+        renderChallengesList();
+        return;
+    }
+    if (sectionId === "mi_progreso") {
+        renderMyProgress();
+        return;
+    }
+    if (sectionId.indexOf("desafio_") === 0) {
+        renderChallengeView(sectionId.slice("desafio_".length));
         return;
     }
 
@@ -5592,9 +5607,10 @@ function updateLearningProgress(articleId, patch) {
 }
 
 function getAcademyProgress() {
-    var out = { favorites: {}, reading: {} };
+    var out = { favorites: {}, reading: {}, studied: {} };
     getLearningProgressItems().forEach(function (x) {
         if (x.favorite) out.favorites[x.id] = true;
+        if (x.studied) out.studied[x.id] = true;
         if (x.tab) out.reading[x.id] = { tab: x.tab, section: x.section || null };
     });
     return out;
@@ -5641,6 +5657,9 @@ function renderAcademyArticle(articleId, opts) {
         getProgress: getAcademyProgress,
         setFavorite: function (id, on) { updateLearningProgress(id, { favorite: !!on }); },
         saveReading: function (id, where) { updateLearningProgress(id, { tab: where.tab, section: where.section }); },
+        setStudied: function (id, on) { updateLearningProgress(id, { studied: !!on, studiedAt: on ? new Date().toISOString() : null }); },
+        getChallenges: getArticleChallenges,
+        onOpenChallenge: window.BasketChallenges ? function (id) { loadContent("desafio_" + id); } : null,
         onOpenInBoard: function (doc, boardDef) { openAcademyBoardInEditor(doc, boardDef, article); },
         onSaveAsPlay: function (doc, meta) {
             var engine = getBoardEngine();
@@ -5702,6 +5721,81 @@ function openAcademyAssistant(article, sel) {
             getLatestConditions: getLatestTrainingConditions
         }
     });
+}
+
+// ===============================
+// DESAFÍOS TÁCTICOS Y MI PROGRESO (Basket Lab Academy)
+// ===============================
+
+function getLearningRecord(id) {
+    return getLearningProgressItems().find(function (x) { return x.id === id; }) || null;
+}
+
+/** Desafíos de una guía con el estado de la última respuesta, para la pestaña Evaluar. */
+function getArticleChallenges(articleId) {
+    var C = window.BasketChallenges;
+    if (!C) return [];
+    return C.forArticle(articleId).map(function (c) {
+        var rec = getLearningRecord(C.recordId(c.id));
+        var v = rec && C.VERDICTS[rec.verdict];
+        return { id: c.id, title: c.title, question: c.question, statusLabel: v ? "Última respuesta: " + v.label : "" };
+    });
+}
+
+function getChallengesHost() {
+    return {
+        getItems: getLearningProgressItems,
+        getRecord: getLearningRecord,
+        saveResult: function (id, patch) { updateLearningProgress(id, patch); },
+        openArticle: function (articleId, tab, section) {
+            var academy = window.BasketAcademy;
+            var article = academy && academy.get(articleId);
+            if (!article) return;
+            trackNavSection(article.sectionId || articleId);
+            renderAcademyArticle(articleId, tab ? { tab: tab, section: section || null } : {});
+        },
+        openChallenge: function (id) { loadContent("desafio_" + id); },
+        openList: function () { loadContent("desafios_tacticos"); },
+        openExercise: openAcademyExercise,
+        onOpenInBoard: function (doc, boardDef) { openAcademyBoardInEditor(doc, boardDef, null); }
+    };
+}
+
+function renderAcademyUnavailable(contentDiv) {
+    contentDiv.innerHTML = '<section class="manual-section"><p>No se pudo cargar Basket Lab Academy. Recargá la página e intentá de nuevo.</p></section>';
+}
+
+function renderChallengeView(challengeId) {
+    var contentDiv = document.getElementById("content");
+    if (!contentDiv) return;
+    if (!window.BasketChallenges || !window.BasketAcademy) { renderAcademyUnavailable(contentDiv); return; }
+    window.BasketChallenges.mount(contentDiv, challengeId, getChallengesHost());
+    injectNavBackButton();
+}
+
+function renderChallengesList() {
+    var contentDiv = document.getElementById("content");
+    if (!contentDiv) return;
+    if (!window.BasketChallenges || !window.BasketAcademy) { renderAcademyUnavailable(contentDiv); return; }
+    window.BasketChallenges.mountList(contentDiv, getChallengesHost());
+    injectNavBackButton();
+}
+
+function renderMyProgress() {
+    var contentDiv = document.getElementById("content");
+    if (!contentDiv) return;
+    if (!window.BasketChallenges || !window.BasketAcademy) { renderAcademyUnavailable(contentDiv); return; }
+    // Si hay sesión, se traen primero los datos guardados en la cuenta (otro dispositivo pudo actualizarlos).
+    var draw = function () {
+        if (currentNavSection !== "mi_progreso") return;
+        window.BasketChallenges.mountProgress(contentDiv, getChallengesHost());
+        injectNavBackButton();
+    };
+    draw();
+    if (typeof pullRemoteDataType === "function") {
+        var p = pullRemoteDataType(APP_DATA_TYPES.learningProgress);
+        if (p && typeof p.then === "function") p.then(draw, function () { /* sin conexión: queda lo local */ });
+    }
 }
 
 /** Abre un contenido de la Academy directamente en la ficha de un ejercicio. */
