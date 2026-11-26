@@ -383,9 +383,11 @@
     function renderTab(article, tab, ctx) {
         if (tab === "fuentes") return renderSources(article);
         if (tab === "simular") {
-            return '<section class="ac-section" id="ac-sec-simulador" data-section="simulador"><header class="ac-section-head"><h3>Simulador de la zona 2-3</h3></header>' +
-                '<p>El simulador interactivo (cambiar la ubicación del balón y ver los ajustes, rotaciones, ayudas y espacios vulnerables) se construye en la <strong>Etapa 3</strong> sobre este mismo contenido y el motor de la pizarra.</p>' +
-                '<p>Mientras tanto, en <strong>Visualizar</strong> tenés las mismas situaciones como secuencias animadas paso a paso, y podés abrir cualquiera en tu pizarra táctica para moverla a gusto.</p></section>';
+            if (article.simulator) {
+                return '<section class="ac-section ac-section--sim" id="ac-sec-simulador" data-section="simulador"><div class="ac-sim-slot"></div></section>';
+            }
+            return '<section class="ac-section" id="ac-sec-simulador" data-section="simulador"><header class="ac-section-head"><h3>Simulador</h3></header>' +
+                '<p>Este contenido todavía no tiene simulador. Las situaciones están animadas en <strong>Visualizar</strong>.</p></section>';
         }
         if (tab === "visualizar") {
             return (article.tabs.visualizar || []).map(function (id) {
@@ -684,6 +686,25 @@
                 var def = boardsById[slot.getAttribute("data-board")];
                 if (def) mountViewer(slot, def, { onOpenInBoard: host.onOpenInBoard });
             });
+            var simSlot = content.querySelector(".ac-sim-slot");
+            if (simSlot) {
+                if (root.BasketSim) {
+                    root.BasketSim.mount(simSlot, article.simulator, {
+                        fmt: fmt,
+                        provenanceBadge: provenanceBadge,
+                        onOpenInBoard: host.onOpenInBoard ? function (doc, meta) {
+                            host.onOpenInBoard(doc, { title: meta.name, description: meta.description, tags: meta.tags });
+                        } : null,
+                        onSaveAsPlay: host.onSaveAsPlay || null,
+                        onShowExercises: (article.exercises || []).length ? function () {
+                            showTab("entrenar");
+                            container.querySelector(".ac-tabs").scrollIntoView({ behavior: "smooth", block: "start" });
+                        } : null
+                    });
+                } else {
+                    simSlot.innerHTML = '<p class="ac-muted">No se pudo cargar el simulador. Recargá la página.</p>';
+                }
+            }
             restoreChecks();
             watchSections();
             if (sectionId) scrollToSection(sectionId);

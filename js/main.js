@@ -5622,9 +5622,9 @@ function openAcademyBoardInEditor(doc, boardDef, article) {
         doc: JSON.parse(JSON.stringify(doc)),
         meta: {
             name: boardDef.title,
-            description: "Copia de la pizarra educativa de Basket Lab Academy · " + (article ? article.title : ""),
+            description: boardDef.description || ("Copia de la pizarra educativa de Basket Lab Academy · " + (article ? article.title : "")),
             category: "Defensa zonal",
-            tags: ["Academy"]
+            tags: Array.isArray(boardDef.tags) ? boardDef.tags : ["Academy"]
         },
         userId: user && user.id ? user.id : "guest",
         categories: PLAY_CATEGORIES,
@@ -5649,7 +5649,19 @@ function renderAcademyArticle(articleId) {
         getProgress: getAcademyProgress,
         setFavorite: function (id, on) { updateLearningProgress(id, { favorite: !!on }); },
         saveReading: function (id, where) { updateLearningProgress(id, { tab: where.tab, section: where.section }); },
-        onOpenInBoard: function (doc, boardDef) { openAcademyBoardInEditor(doc, boardDef, article); }
+        onOpenInBoard: function (doc, boardDef) { openAcademyBoardInEditor(doc, boardDef, article); },
+        onSaveAsPlay: function (doc, meta) {
+            var engine = getBoardEngine();
+            var board = engine ? engine.normalizeDoc(JSON.parse(JSON.stringify(doc))) : doc;
+            return savePlayFromBoard({
+                name: meta.name,
+                description: meta.description || "",
+                category: "Defensa zonal",
+                tags: Array.isArray(meta.tags) ? meta.tags : ["Simulador"],
+                board: board,
+                steps: []
+            });
+        }
     });
     injectNavBackButton();
 }

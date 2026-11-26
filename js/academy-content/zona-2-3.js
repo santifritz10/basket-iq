@@ -392,7 +392,7 @@
             },
             explain: [
                 "Un ataque con un solo jugador arriba (frente impar) obliga a los dos bases a decidir quién lo toma. El dribbling al hueco y el dribbling que fija a un defensor son recursos que el manual de entrenadores FIBA-WABC describe como especialmente eficaces contra las zonas [S5].",
-                "Otras formas de atacarla: invertir el balón rápido, pases por encima de la zona (de ala a ala), sobrecargar un lado, cortes desde el lado débil y tiradores en las esquinas. Más adelante (Etapa 3) el simulador permitirá probarlas."
+                "Otras formas de atacarla: invertir el balón rápido, pases por encima de la zona (de ala a ala), sobrecargar un lado, cortes desde el lado débil y tiradores en las esquinas. En la pestaña **Simular** podés ver cómo responde la zona cuando el balón llega a cada uno de esos lugares."
             ]
         },
         {
@@ -1067,13 +1067,202 @@
         }
     ];
 
+    // ------------------------------------------------------------------
+    // Simulador (Etapa 3). Lado derecho de la pantalla = y chica; el izquierdo se arma por espejo.
+    // ------------------------------------------------------------------
+    var OFF = { o1: [9.0, 7.5], o2: [6.6, 2.4], o3: [6.6, 12.6], o4: [1.0, 0.7], o5: [1.0, 14.3] };
+    function P(off, def) { return merge(off, def); }
+
+    var SIM = {
+        id: "sim-zona-2-3",
+        title: "Simulador de la zona 2-3",
+        intro: "Elegí dónde está el balón y mirá cómo se ajustan los cinco defensores. Las flechas punteadas rojas son las rotaciones; las zonas rojas, los espacios que el ataque puede aprovechar. El criterio base sigue al manual WABC [S2]; las otras variantes son criterios alternativos.",
+        view: VIEW,
+        tags: ["Zona 2-3", "Academy"],
+        players: {
+            o1: O("1", 0, 0), o2: O("2", 0, 0), o3: O("3", 0, 0), o4: O("4", 0, 0), o5: O("5", 0, 0),
+            x1: D("1", 0, 0), x2: D("2", 0, 0), x3: D("3", 0, 0), x4: D("4", 0, 0), x5: D("5", 0, 0)
+        },
+        mirrorSwap: { x1: "x2", x2: "x1", x3: "x4", x4: "x3", o2: "o3", o3: "o2", o4: "o5", o5: "o4" },
+        positions: [
+            { id: "top", label: "Eje central", group: "Perímetro" },
+            { id: "wingR", label: "Ala derecha", group: "Perímetro" },
+            { id: "cornerR", label: "Esquina derecha", group: "Perímetro" },
+            { id: "wingL", label: "Ala izquierda", group: "Perímetro" },
+            { id: "cornerL", label: "Esquina izquierda", group: "Perímetro" },
+            { id: "highPost", label: "Poste alto", group: "Postes" },
+            { id: "lowPostR", label: "Poste bajo derecho", group: "Postes" },
+            { id: "lowPostL", label: "Poste bajo izquierdo", group: "Postes" }
+        ],
+        tour: ["top", "wingR", "cornerR", "lowPostR", "wingR", "top", "highPost", "top", "wingL", "cornerL", "lowPostL", "wingL", "top"],
+        variants: [
+            {
+                id: "base",
+                label: "Base: línea de recogida",
+                kind: "interpretation",
+                refs: ["S2"],
+                desc: "Por encima de la línea de recogida sale un base y por debajo un alero; el poste alto lo cierran los bases y el pívot se queda cerca del aro [S2].",
+                states: {
+                    top: {
+                        title: "Balón en el eje central",
+                        note: "Con un solo atacante arriba, uno de los bases sale al balón y el otro se cierra hacia el poste alto. Quién sale lo acuerda el equipo antes; acá sale X1.",
+                        ball: "o1",
+                        pos: P(OFF, { x1: [7.5, 6.6], x2: [6.1, 8.9], x3: [2.4, 3.6], x4: [2.4, 11.4], x5: [2.0, 7.5] }),
+                        resp: {
+                            x1: "Presiona al balón sin dejarlo penetrar por el centro.",
+                            x2: "Protege el poste alto y queda listo para salir al ala izquierda.",
+                            x3: "Cubre el costado derecho de la pintura y el corte por el fondo.",
+                            x4: "Cubre el costado izquierdo de la pintura y el corte por el fondo.",
+                            x5: "Centro de la pintura, delante del aro. Avisa los cortes."
+                        },
+                        help: "Si el balón penetra por el hueco entre los bases, los dos se cierran y X5 da un paso al frente sin despegarse del aro.",
+                        vulnerable: [
+                            { x: 4.2, y: 2.0, w: 1.8, h: 1.8, label: "Hueco", text: "El hueco entre X1 y X3 en el ala derecha." },
+                            { x: 4.2, y: 11.2, w: 1.8, h: 1.8, label: "Hueco", text: "El hueco entre X2 y X4 en el ala izquierda." }
+                        ]
+                    },
+                    wingR: {
+                        title: "Balón en el ala derecha",
+                        note: "El ala está por encima de la línea de recogida, así que la toma un base: X1. El resto de la zona se corre como un bloque hacia el lado del balón [S2].",
+                        ball: "o2",
+                        pos: P(OFF, { x1: [6.9, 3.4], x2: [5.6, 6.6], x3: [2.4, 2.6], x4: [2.6, 8.8], x5: [2.0, 5.8] }),
+                        resp: {
+                            x1: "Sale a cerrar al ala con los brazos arriba y le niega la penetración por el medio.",
+                            x2: "Se cierra al poste alto y al codo del lado del balón.",
+                            x3: "Se acerca a la esquina para llegar a tiempo si sale el pase.",
+                            x4: "Entra a la pintura desde el lado débil: protege el aro y el corte por detrás.",
+                            x5: "Se corre al poste bajo del lado del balón."
+                        },
+                        help: "Si el ala penetra por el fondo, X5 frena y X4 cubre el aro (ayuda a la ayuda). Si penetra por el medio, X2 cierra.",
+                        vulnerable: [
+                            { x: 5.6, y: 11.4, w: 2.4, h: 2.4, label: "Lado débil", text: "El ala izquierda, con un pase largo por encima de la zona." },
+                            { x: 0.1, y: 1.6, w: 1.4, h: 2.2, label: "Fondo", text: "El fondo detrás de X3, si el alero sube demasiado." }
+                        ]
+                    },
+                    cornerR: {
+                        title: "Balón en la esquina derecha",
+                        note: "La esquina está por debajo de la línea: la toma el alero X3. X1 baja para cortar el pase de vuelta y X5 queda en el poste bajo [S2].",
+                        ball: "o4",
+                        pos: P(OFF, { x1: [5.0, 3.0], x2: [4.7, 6.4], x3: [1.7, 1.6], x4: [2.0, 7.4], x5: [1.5, 3.9] }),
+                        resp: {
+                            x1: "Baja hacia el ala para molestar el pase de vuelta y ayudar en el codo.",
+                            x2: "Niega el poste alto y vigila el codo del lado del balón.",
+                            x3: "Sale a la esquina con pasos cortos al final y le cierra la línea de fondo.",
+                            x4: "Queda como último defensor cerca del aro, del lado débil.",
+                            x5: "Defiende el poste bajo del lado del balón, adelantado si hay un pívot ahí."
+                        },
+                        help: "Si la esquina penetra por el fondo, X5 frena y X4 cruza a cubrir el aro. Con el tiro, X3 bloquea al tirador.",
+                        vulnerable: [
+                            { x: 5.8, y: 9.6, w: 2.6, h: 3.4, label: "Lado débil", text: "El lado débil completo: la zona quedó cargada hacia la derecha." },
+                            { x: 4.0, y: 4.0, w: 1.6, h: 1.4, label: "Codo", text: "El codo, entre X1 y X2, si un atacante corta ahí." }
+                        ]
+                    },
+                    wingL: { mirrorOf: "wingR" },
+                    cornerL: { mirrorOf: "cornerR" },
+                    highPost: {
+                        title: "Balón en el poste alto",
+                        note: "Un atacante subió desde la esquina izquierda a la línea de libres y recibió. Los bases lo cierran desde arriba, con al menos un brazo por delante, y el pívot se queda entre el balón y el aro [S2].",
+                        ball: "o5",
+                        pos: P(merge(OFF, { o5: [5.4, 7.5] }), { x1: [6.4, 6.5], x2: [6.4, 8.5], x3: [2.0, 4.4], x4: [2.0, 10.6], x5: [2.6, 7.5] }),
+                        resp: {
+                            x1: "Se cierra sobre el poste alto desde arriba y vuelve si el balón sale al ala derecha.",
+                            x2: "Se cierra sobre el poste alto desde arriba y vuelve si el balón sale al ala izquierda.",
+                            x3: "Se hunde hacia el poste bajo derecho y protege el corte por el fondo.",
+                            x4: "Se hunde hacia el poste bajo izquierdo y protege el corte por el fondo.",
+                            x5: "Se queda entre el balón y el aro; no sale a la línea de libres."
+                        },
+                        help: "Si el poste alto se da vuelta y ataca el aro, X5 lo frena y los aleros cierran los postes bajos.",
+                        vulnerable: [
+                            { x: 5.8, y: 1.4, w: 2.2, h: 2.2, label: "Tiro", text: "El tiro desde el ala derecha si el balón sale rápido." },
+                            { x: 5.8, y: 11.4, w: 2.2, h: 2.2, label: "Tiro", text: "El tiro desde el ala izquierda si el balón sale rápido." }
+                        ]
+                    },
+                    lowPostR: {
+                        title: "Balón en el poste bajo derecho",
+                        note: "El atacante de la esquina se metió al poste bajo con el balón. X5 defiende detrás, del lado del aro, y X3 se cierra a ayudar desde arriba.",
+                        ball: "o4",
+                        pos: P(merge(OFF, { o4: [1.9, 4.4] }), { x1: [5.4, 3.2], x2: [4.6, 6.8], x3: [2.8, 3.2], x4: [1.9, 8.2], x5: [2.4, 5.1] }),
+                        resp: {
+                            x1: "Se hunde un paso para cerrar el pase al ala sin perderla de vista.",
+                            x2: "Protege el poste alto y el medio de la pintura.",
+                            x3: "Ayuda desde arriba sobre el poste y recupera si el balón sale al ala.",
+                            x4: "Queda cerca del aro del lado débil, listo para la ayuda y el rebote.",
+                            x5: "Defiende al poste del lado del aro y le niega el giro hacia el medio."
+                        },
+                        help: "Antes de que reciba, el poste del lado del balón se niega o se juega por delante [S2]. Una vez que recibió, la ayuda viene del defensor que está más cerca, y el lado débil vigila al que corta.",
+                        vulnerable: [
+                            { x: 5.6, y: 1.2, w: 2.2, h: 2.4, label: "Ala", text: "El ala derecha si X3 se va del todo a ayudar." },
+                            { x: 0.1, y: 10.4, w: 2.4, h: 3.2, label: "Corte débil", text: "El corte por el lado débil hacia el aro." }
+                        ]
+                    },
+                    lowPostL: { mirrorOf: "lowPostR" }
+                }
+            },
+            {
+                id: "esquinaBase",
+                label: "La esquina la toma el base",
+                kind: "variant",
+                inherits: "base",
+                desc: "Criterio alternativo: cuando el balón baja a la esquina, sale el base del lado del balón y el alero se queda abajo protegiendo el poste bajo. El base recorre más distancia, pero el poste bajo queda mejor cubierto.",
+                states: {
+                    cornerR: {
+                        title: "Balón en la esquina derecha (sale el base)",
+                        note: "X1 baja desde el ala hasta la esquina; X3 no sale y se queda en el poste bajo; X2 se abre para cubrir el ala que dejó X1.",
+                        ball: "o4",
+                        pos: P(OFF, { x1: [1.8, 1.6], x2: [5.6, 5.2], x3: [2.2, 3.6], x4: [2.4, 8.8], x5: [2.0, 5.8] }),
+                        resp: {
+                            x1: "Sale desde arriba hasta la esquina y le cierra la línea de fondo.",
+                            x2: "Se abre hacia el ala derecha para el pase de vuelta y vigila el codo.",
+                            x3: "Se queda abajo, en el poste bajo del lado del balón.",
+                            x4: "Protege el aro desde el lado débil.",
+                            x5: "Se corre hacia el centro de la pintura, entre el poste y el aro."
+                        },
+                        help: "Como X1 tiene que recorrer mucha distancia, la salida empieza cuando el pase sale del ala, no cuando llega a la esquina. Si llega tarde, X3 frena la penetración y X5 cubre el poste.",
+                        vulnerable: [
+                            { x: 6.2, y: 6.2, w: 2.4, h: 2.6, label: "Arriba", text: "El eje central: con X1 abajo, solo queda X2 arriba." },
+                            { x: 5.8, y: 11.0, w: 2.4, h: 2.8, label: "Lado débil", text: "El ala izquierda, con un pase largo." }
+                        ]
+                    },
+                    cornerL: { mirrorOf: "cornerR" }
+                }
+            },
+            {
+                id: "pivotSube",
+                label: "El pívot defiende el poste alto",
+                kind: "variant",
+                inherits: "base",
+                desc: "Criterio alternativo: cuando el balón entra al poste alto, X5 sube a defenderlo y los dos aleros se juntan delante del aro. Protege mejor el tiro del poste alto, pero expone el fondo.",
+                states: {
+                    highPost: {
+                        title: "Balón en el poste alto (sube el pívot)",
+                        note: "X5 sube a contener al poste; X3 y X4 se juntan delante del aro; los bases se abren para cortar los pases a las alas.",
+                        ball: "o5",
+                        pos: P(merge(OFF, { o5: [5.4, 7.5] }), { x1: [6.8, 4.4], x2: [6.8, 10.6], x3: [1.9, 5.8], x4: [1.9, 9.2], x5: [4.4, 7.5] }),
+                        resp: {
+                            x1: "Se abre hacia el ala derecha para cortar el pase y llegar al tiro.",
+                            x2: "Se abre hacia el ala izquierda para cortar el pase y llegar al tiro.",
+                            x3: "Se junta delante del aro, del lado derecho.",
+                            x4: "Se junta delante del aro, del lado izquierdo.",
+                            x5: "Sube a contener al poste alto y no lo deja girar cómodo."
+                        },
+                        help: "Si el poste alto pasa a un atacante que corta por el fondo, el alero de ese lado sale y el otro cubre el aro.",
+                        vulnerable: [
+                            { x: 0.1, y: 1.4, w: 1.6, h: 3.0, label: "Fondo", text: "El fondo derecho y el corte por la línea final." },
+                            { x: 0.1, y: 10.6, w: 1.6, h: 3.0, label: "Fondo", text: "El fondo izquierdo y el corte por la línea final." }
+                        ]
+                    }
+                }
+            }
+        ]
+    };
+
     return {
         id: "zona-2-3",
         sectionId: "zone23_defense",
         title: "Defensa zonal 2-3",
         subtitle: "Organización, responsabilidades, rotaciones, variantes, cómo atacarla y cómo entrenarla, con fuentes FIBA y WABC verificadas.",
         sectionLabel: "Defensa · Defensas en zona",
-        meta: ["Defensa de media cancha", "Desde U17 (según reglamento)", "9 pizarras animadas", "3 ejercicios"],
+        meta: ["Defensa de media cancha", "Desde U17 (según reglamento)", "9 pizarras animadas", "Simulador interactivo", "3 ejercicios"],
         updated: "2026-11-26",
         tabs: {
             aprender: aprender,
@@ -1084,6 +1273,7 @@
         boards: boards,
         exercises: exercises,
         sources: sources,
-        unavailableSources: unavailableSources
+        unavailableSources: unavailableSources,
+        simulator: SIM
     };
 });
