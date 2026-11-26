@@ -1247,7 +1247,15 @@ function buildEditorEntrenamiento(ent) {
                 <div class="bloque-card-body">
                     <span class="bloque-tipo">${escapeHtml(tipoLabel)}</span>
                     <h4>${escapeHtml(b.titulo || "Sin título")}</h4>
-                    ${b.descripcion ? `<p>${escapeHtml(b.descripcion)}</p>` : ""}
+                    ${b.academy_ref
+                        ? `<details class="bloque-ficha"><summary>Ver ficha del ejercicio</summary><p class="bloque-ficha-text">${escapeHtml(b.descripcion || "")}</p></details>`
+                        : (b.descripcion ? `<p>${escapeHtml(b.descripcion)}</p>` : "")}
+                    ${Array.isArray(b.incompatibilidades) && b.incompatibilidades.length
+                        ? `<p class="bloque-aviso">⚠ Añadido con incompatibilidades: ${escapeHtml(b.incompatibilidades.join(" "))}</p>`
+                        : ""}
+                    ${b.academy_ref && b.academy_ref.section_id
+                        ? `<button type="button" class="bloque-academy-link" onclick="openAcademyExercise('${escapeHtml(b.academy_ref.article_id)}', '${escapeHtml(b.academy_ref.exercise_id)}')">Ver en Basket Lab Academy</button>`
+                        : ""}
                     ${buildBloquePlaybookPreviewHtml(b)}
                     <span class="bloque-duracion">${Number(b.duracion_minutos) || 0} min</span>
                 </div>
@@ -1311,6 +1319,7 @@ function buildEditorEntrenamiento(ent) {
                                 <select name="categoria">${optionsCategoria}</select>
                             </div>
                         </div>
+                        ${buildCondicionesEntrenamientoHtml(ent)}
                         <div class="form-row">
                             <label>Ciclo (planificación anual)</label>
                             <select name="ciclo_id">${cicloOptions}</select>
@@ -1364,6 +1373,40 @@ function buildEditorEntrenamiento(ent) {
                 </form>
             </div>
         </div>
+    `;
+}
+
+const MATERIALES_ENTRENAMIENTO = ["Balones", "Conos"];
+
+/** Condiciones del entrenamiento: se usan para revisar si un ejercicio de la biblioteca es compatible. */
+function buildCondicionesEntrenamientoHtml(ent) {
+    var c = (ent && ent.condiciones) || {};
+    var mats = Array.isArray(c.materiales) ? c.materiales : [];
+    return `
+        <fieldset class="form-row cond-entrenamiento">
+            <legend>Condiciones (para revisar los ejercicios)</legend>
+            <div class="form-row-inline">
+                <div>
+                    <label>Jugadores</label>
+                    <input type="number" name="cond_jugadores" min="1" max="40" value="${c.jugadores != null ? c.jugadores : ""}" placeholder="Ej: 10">
+                </div>
+                <div>
+                    <label>Espacio</label>
+                    <select name="cond_espacio">
+                        <option value="">Sin indicar</option>
+                        <option value="half" ${c.espacio === "half" ? "selected" : ""}>Media cancha</option>
+                        <option value="full" ${c.espacio === "full" ? "selected" : ""}>Cancha completa</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Aros</label>
+                    <input type="number" name="cond_aros" min="1" max="12" value="${c.aros != null ? c.aros : ""}" placeholder="Ej: 2">
+                </div>
+            </div>
+            <div class="cond-materiales">
+                ${MATERIALES_ENTRENAMIENTO.map(m => `<label><input type="checkbox" name="cond_materiales" value="${m}" ${mats.indexOf(m) >= 0 ? "checked" : ""}> ${m}</label>`).join("")}
+            </div>
+        </fieldset>
     `;
 }
 
@@ -1567,7 +1610,7 @@ function buildEntrenamientoPrintHtml(ent) {
     }
     .bloquePdfBody{ padding:14px 16px; background:#fff; }
     .bloquePdfTitulo{ margin:0 0 8px; font-size:16px; color:#111; }
-    .bloquePdfDesc{ font-size:13px; line-height:1.5; color:#374151; }
+    .bloquePdfDesc{ font-size:13px; line-height:1.5; color:#374151; white-space:pre-line; }
     .bloquePdfDesc.muted{ color:var(--muted); font-style:italic; }
     .bloquePdfPlays{ margin-top:14px; padding-top:12px; border-top:1px dashed var(--border); }
     .bloquePdfPlay{ margin-bottom:14px; page-break-inside:avoid; }
@@ -1860,6 +1903,12 @@ function attachPlanificacionEvents(entrenamientoId) {
             ent.categoria = fd.get("categoria") || "";
             ent.ciclo_id = fd.get("ciclo_id") ? parseInt(fd.get("ciclo_id"), 10) : null;
             ent.notas_generales = fd.get("notas_generales") || "";
+            ent.condiciones = {
+                jugadores: fd.get("cond_jugadores") ? parseInt(fd.get("cond_jugadores"), 10) : null,
+                espacio: fd.get("cond_espacio") || null,
+                aros: fd.get("cond_aros") ? parseInt(fd.get("cond_aros"), 10) : null,
+                materiales: fd.getAll("cond_materiales")
+            };
             saveEntrenamientos();
             renderPlanificacionView(entrenamientoId);
         };
@@ -3726,6 +3775,7 @@ var FUNDAMENTOS_CATEGORY_VIEWS = {
         subtitle: "Entrenamientos de equipo y planificación anual.",
         items: [
             { id: "planificacion", label: "Planificar entrenamientos" },
+            { id: "biblioteca_ejercicios", label: "Biblioteca de ejercicios" },
             { id: "planificacion_anual", label: "Planificación anual" }
         ]
     },
@@ -3986,6 +4036,11 @@ function loadContent(sectionId) {
     if (sectionId.indexOf("planificacion_anual_") === 0) {
         var planId = parseInt(sectionId.replace("planificacion_anual_", ""), 10);
         if (!isNaN(planId)) renderPlanificacionAnualDetalleView(planId);
+        return;
+    }
+
+    if (sectionId === "biblioteca_ejercicios") {
+        renderExerciseLibrary();
         return;
     }
 
@@ -5636,7 +5691,7 @@ function openAcademyBoardInEditor(doc, boardDef, article) {
     injectNavBackButton();
 }
 
-function renderAcademyArticle(articleId) {
+function renderAcademyArticle(articleId, opts) {
     var contentDiv = document.getElementById("content");
     if (!contentDiv) return;
     var academy = window.BasketAcademy;
@@ -5646,6 +5701,8 @@ function renderAcademyArticle(articleId) {
         return;
     }
     academy.render(contentDiv, articleId, {
+        onAddExercise: function (art, exerciseId) { openAddExerciseModal(art.id, exerciseId); },
+        onOpenLibrary: function () { loadContent("biblioteca_ejercicios"); },
         getProgress: getAcademyProgress,
         setFavorite: function (id, on) { updateLearningProgress(id, { favorite: !!on }); },
         saveReading: function (id, where) { updateLearningProgress(id, { tab: where.tab, section: where.section }); },
@@ -5662,6 +5719,140 @@ function renderAcademyArticle(articleId) {
                 steps: []
             });
         }
-    });
+    }, opts || {});
     injectNavBackButton();
+}
+
+/** Abre un contenido de la Academy directamente en la ficha de un ejercicio. */
+function openAcademyExercise(articleId, exerciseId) {
+    var academy = window.BasketAcademy;
+    var article = academy && academy.get(articleId);
+    if (!article) return;
+    trackNavSection(article.sectionId || articleId);
+    renderAcademyArticle(articleId, { tab: "entrenar", section: exerciseId });
+}
+
+// ===============================
+// BIBLIOTECA DE EJERCICIOS Y "AÑADIR AL ENTRENAMIENTO"
+// ===============================
+
+var exerciseThumbCache = {};
+
+function getExercisesHost() {
+    return {
+        articles: function () {
+            return window.BasketAcademy ? window.BasketAcademy.list() : [];
+        },
+        isFavorite: function (key) {
+            var item = getLearningProgressItems().find(function (x) { return x.id === "ex:" + key; });
+            return !!(item && item.favorite);
+        },
+        setFavorite: function (key, on) {
+            updateLearningProgress("ex:" + key, { favorite: !!on });
+        },
+        getTrainings: function () {
+            return getEntrenamientos();
+        },
+        teams: function () {
+            return ["U13", "U15", "U17", "Primera", "Otro"];
+        },
+        renderBoardThumb: function (article, boardId) {
+            var cacheKey = article.id + ":" + boardId;
+            if (exerciseThumbCache[cacheKey]) return exerciseThumbCache[cacheKey];
+            var engine = getBoardEngine();
+            var def = (article.boards || []).find(function (b) { return b.id === boardId; });
+            if (!engine || !def || !window.BasketAcademy) return "";
+            var doc = window.BasketAcademy.boardFromSpec(def.spec, engine);
+            exerciseThumbCache[cacheKey] = engine.renderPhaseImage(doc, 0, { width: 420 });
+            return exerciseThumbCache[cacheKey];
+        },
+        addBlock: addExerciseBlockToTraining,
+        openTraining: function (id) {
+            trackNavSection("planificacion");
+            renderPlanificacionView(id);
+        },
+        openArticle: function (_sectionId, exerciseId) {
+            var list = window.BasketAcademy ? window.BasketAcademy.list() : [];
+            var art = list.find(function (a) { return (a.exercises || []).some(function (e) { return e.id === exerciseId; }); });
+            if (art) openAcademyExercise(art.id, exerciseId);
+        }
+    };
+}
+
+function renderExerciseLibrary() {
+    var contentDiv = document.getElementById("content");
+    if (!contentDiv) return;
+    if (!window.BasketExercises) {
+        contentDiv.innerHTML = '<section class="manual-section"><p>No se pudo cargar la biblioteca de ejercicios. Recargá la página.</p></section>';
+        return;
+    }
+    contentDiv.innerHTML = "";
+    var wrap = document.createElement("div");
+    contentDiv.appendChild(wrap);
+    window.BasketExercises.renderLibrary(wrap, getExercisesHost());
+    injectNavBackButton();
+}
+
+function openAddExerciseModal(articleId, exerciseId) {
+    var lib = window.BasketExercises;
+    var academy = window.BasketAcademy;
+    var article = academy && academy.get(articleId);
+    if (!lib || !article) return;
+    var item = lib.collect([article]).find(function (it) { return it.ex.id === exerciseId; });
+    if (item) lib.openAddModal(item, getExercisesHost());
+}
+
+/**
+ * Agrega el ejercicio como bloque (copia editable) a un entrenamiento existente o nuevo.
+ * La pizarra del ejercicio se guarda como jugada propia para poder modificarla sin tocar la original.
+ */
+function addExerciseBlockToTraining(payload) {
+    var block = payload.block;
+    var playIds = [];
+    if (payload.boardId && payload.article && window.BasketAcademy) {
+        var engine = getBoardEngine();
+        var def = (payload.article.boards || []).find(function (b) { return b.id === payload.boardId; });
+        if (engine && def) {
+            var saved = savePlayFromBoard({
+                name: block.titulo,
+                description: "Pizarra del ejercicio (copia) · Basket Lab Academy · " + payload.article.title,
+                category: "Ejercicio",
+                tags: ["Ejercicio", "Academy"],
+                board: window.BasketAcademy.boardFromSpec(def.spec, engine),
+                steps: []
+            });
+            if (saved && saved.ok && saved.play) playIds.push(saved.play.id);
+        }
+    }
+
+    entrenamientos = getEntrenamientos();
+    var ent = null;
+    if (payload.trainingId != null) {
+        ent = entrenamientos.find(function (e) { return String(e.id) === String(payload.trainingId); }) || null;
+        if (!ent) return { ok: false, error: "No se encontró ese entrenamiento. Recargá e intentá de nuevo." };
+    } else {
+        var id = Date.now();
+        while (entrenamientos.some(function (e) { return e.id === id; })) id++;
+        ent = {
+            id: id,
+            nombre: payload.newTraining.nombre || "",
+            fecha: payload.newTraining.fecha || "",
+            categoria: payload.newTraining.categoria || "",
+            ciclo_id: null,
+            notas_generales: "",
+            bloques: []
+        };
+        entrenamientos.push(ent);
+    }
+    ent.condiciones = payload.conditions;
+    if (!Array.isArray(ent.bloques)) ent.bloques = [];
+    ent.bloques.push(Object.assign({}, block, {
+        id: Date.now() + Math.random(),
+        entrenamiento_id: ent.id,
+        play_ids: playIds,
+        incompatibilidades: payload.incompatibilities && payload.incompatibilities.length ? payload.incompatibilities : undefined,
+        orden: ent.bloques.length
+    }));
+    saveEntrenamientos();
+    return { ok: true, trainingId: ent.id };
 }

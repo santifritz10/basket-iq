@@ -101,3 +101,62 @@ test("la transición dibuja rotaciones, pase y la secuencia se puede animar y gu
   }
   assert.equal(Board.isBoardPlay({ board: doc }), true);
 });
+
+const Ex = require("../js/exercises.js");
+
+test("los ejercicios tienen requisitos estructurados coherentes con la ficha", () => {
+  for (const ex of zona23.exercises) {
+    const m = ex.meta;
+    assert.ok(m && m.minPlayers > 0 && (!m.maxPlayers || m.maxPlayers >= m.minPlayers), ex.id);
+    assert.ok(["half", "full"].includes(m.court), ex.id);
+    assert.ok(m.minutes[0] <= m.minutes[1], ex.id);
+    (ex.adaptations || []).forEach((a) => assert.ok(a.id && a.label && a.text && a.req, ex.id + "/" + a.id));
+  }
+});
+
+test("la compatibilidad avisa cancha y jugadores y propone una variante compatible", () => {
+  const reb = zona23.exercises.find((e) => e.id === "ej-rebote");
+  const r = Ex.checkCompatibility(reb, { players: 10, court: "half", hoops: 1, materials: ["Balones"] });
+  assert.equal(r.ok, false);
+  assert.ok(r.issues.some((i) => i.code === "court"));
+  assert.deepEqual(r.alternatives.map((a) => a.id), ["media-cancha", "tres-contra-tres"]);
+  assert.equal(Ex.checkCompatibility(reb, { players: 10, court: "half", hoops: 1, materials: ["Balones"] }, "media-cancha").ok, true);
+
+  const linea = zona23.exercises.find((e) => e.id === "ej-linea");
+  const few = Ex.checkCompatibility(linea, { players: 8, court: "half", hoops: 1, materials: ["Balones", "Conos"] });
+  assert.equal(few.ok, false);
+  assert.ok(few.issues[0].text.includes("al menos 9") && few.issues[0].text.includes("hay 8"));
+  assert.deepEqual(few.alternatives.map((a) => a.id), ["tres-contra-cuatro"]);
+
+  const unknown = Ex.checkCompatibility(linea, {});
+  assert.equal(unknown.ok, true);
+  assert.ok(unknown.unknown.length >= 3);
+});
+
+test("los filtros combinan jugadores, cancha y materiales", () => {
+  const list = Ex.collect([zona23]);
+  assert.equal(list.length, 3);
+  assert.equal(Ex.filterList(list, { cancha: "full" }).length, 1);
+  assert.equal(Ex.filterList(list, { cancha: "half" }).length, 3, "el de rebote entra por su versión de media cancha");
+  assert.deepEqual(Ex.filterList(list, { materiales: ["Balones"] }).map((i) => i.ex.id).sort(), ["ej-espejo", "ej-rebote"]);
+  assert.equal(Ex.filterList(list, { jugadores: 5 }).length, 0);
+  assert.equal(Ex.filterList(list, { jugadores: 7 }).length, 2);
+  assert.equal(Ex.filterList(list, { duracion: 9 }).length, 1);
+  assert.equal(Ex.filterList(list, { q: "rebote" }).length, 1);
+});
+
+test("el bloque del planificador es una copia con referencia al original", () => {
+  const list = Ex.collect([zona23]);
+  const it = list.find((i) => i.ex.id === "ej-rebote");
+  const before = JSON.stringify(it.ex);
+  const b = Ex.buildBlock(it, { adaptationId: "media-cancha", minutes: 12, notes: "Ojo con el 4", blockType: "tactica" });
+  assert.equal(b.duracion_minutos, 12);
+  assert.match(b.titulo, /Versión media cancha/);
+  assert.match(b.descripcion, /ORGANIZACIÓN/);
+  assert.match(b.descripcion, /ADAPTACIÓN ELEGIDA/);
+  assert.match(b.descripcion, /Ojo con el 4/);
+  assert.ok(!/\[S\d\]/.test(b.descripcion));
+  assert.deepEqual(b.academy_ref, { article_id: "zona-2-3", exercise_id: "ej-rebote", adaptation_id: "media-cancha", variant: null, section_id: "zone23_defense" });
+  b.descripcion = "editado";
+  assert.equal(JSON.stringify(it.ex), before, "el ejercicio original no cambia");
+});
