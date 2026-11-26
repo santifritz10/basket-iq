@@ -22,8 +22,16 @@
  *        resp: { x1: "texto", ... }, help: "texto", vulnerable: [{ x, y, w, h, label }]
  *     } }
  *   }],
- *   related: "texto para el enlace a ejercicios relacionados"
+ *   related: "texto para el enlace a ejercicios relacionados",
+ *   ui: { variants, positions, hint, resp, help, vulnerable, options, disclaimer }   // rótulos opcionales
+ *   optionalPlayers: true    // las situaciones pueden usar solo algunos de los jugadores (2c1, 3c2...)
  * }
+ *
+ * Campos opcionales de una situación (Etapa 5):
+ *   moves: { o5: "screen_on", o1: "dribble" }   // tipo de trazo al llegar a esta situación
+ *   options: [["pass", "o1", "o5"], ["shot", "o1", [1.575, 7.5]]]   // opciones que se dibujan al final
+ *   optionsText: ["Pase al bloqueador que continúa", ...]
+ *   resp puede omitir defensores que no participan (se valida que estén los que sí aparecen)
  */
 (function (root, factory) {
     var api = factory(root);
@@ -93,6 +101,11 @@
             pos: pos,
             resp: resp,
             help: mirrorText(state.help, swap),
+            moves: state.moves ? (function () { var m = {}; Object.keys(state.moves).forEach(function (id) { m[sw(id)] = state.moves[id]; }); return m; })() : undefined,
+            options: state.options ? state.options.map(function (o) {
+                return [o[0], typeof o[1] === "string" ? sw(o[1]) : [o[1][0], 15 - o[1][1]], typeof o[2] === "string" ? sw(o[2]) : [o[2][0], 15 - o[2][1]]];
+            }) : undefined,
+            optionsText: state.optionsText ? state.optionsText.map(function (t) { return mirrorText(t, swap); }) : undefined,
             vulnerable: (state.vulnerable || []).map(function (z) {
                 return { x: z.x, y: Math.round((15 - z.y - z.h) * 100) / 100, w: z.w, h: z.h, label: mirrorText(z.label, swap) };
             })
@@ -164,7 +177,7 @@
             var d = Math.hypot(b[0] - a[0], b[1] - a[1]);
             if (d < 0.35) return;
             var team = scenario.players[id].team;
-            var type = team === "defense" ? "rotation" : (from.ball === id && to.ball === id ? "dribble" : "move");
+            var type = (to.moves && to.moves[id]) || (team === "defense" ? "rotation" : (from.ball === id && to.ball === id ? "dribble" : "move"));
             strokes.push({ id: "t" + k++, type: type, a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, c: null, from: id, to: null, color: null });
         });
         if (from.ball && to.ball && from.ball !== to.ball && from.pos[from.ball] && to.pos[to.ball]) {
@@ -173,6 +186,21 @@
             strokes.push({ id: "t" + k++, type: "pass", a: { x: pa[0], y: pa[1] }, b: { x: pb[0], y: pb[1] }, c: null, from: from.ball, to: to.ball, color: null });
         }
         return strokes;
+    }
+
+    /** Opciones de la situación (pases posibles, tiro, penetración) como trazos de la pizarra. */
+    function optionStrokes(state) {
+        var out = [];
+        (state.options || []).forEach(function (o, k) {
+            var a = typeof o[1] === "string" ? state.pos[o[1]] : o[1];
+            var b = typeof o[2] === "string" ? state.pos[o[2]] : o[2];
+            if (!a || !b) return;
+            out.push({
+                id: "op" + k, type: o[0], a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, c: null,
+                from: typeof o[1] === "string" ? o[1] : null, to: typeof o[2] === "string" ? o[2] : null, color: "#0d9488"
+            });
+        });
+        return out;
     }
 
     /** Documento de pizarra con una secuencia de situaciones (cada fase con los trazos hacia la siguiente). */
@@ -189,7 +217,7 @@
                 name: st.title,
                 note: st.note || "",
                 objects: makeObjects(scenario, st, {}),
-                strokes: next ? transitionStrokes(scenario, st, next) : []
+                strokes: next ? transitionStrokes(scenario, st, next) : optionStrokes(st)
             };
         });
         var doc = { version: 2, view: scenario.view || { court: "half", rotation: 90 }, phases: phases };
@@ -199,6 +227,8 @@
     /** Revisión de coherencia para las pruebas: posiciones dentro de la cancha, sin superposiciones, textos completos. */
     function validateScenario(scenario) {
         var errors = [];
+        // Cancha completa: 28 m de largo; media cancha: 14 m (reglas FIBA).
+        var maxX = scenario.view && scenario.view.court === "full" ? 28 : 14;
         var ids = Object.keys(scenario.players);
         var defenders = ids.filter(function (id) { return scenario.players[id].team === "defense"; });
         var posIds = scenario.positions.map(function (p) { return p.id; });
@@ -215,8 +245,8 @@
                 if (!st.pos[st.ball]) errors.push(where + ": el balón no tiene poseedor válido");
                 ids.forEach(function (id) {
                     var p = st.pos[id];
-                    if (!p) { errors.push(where + ": falta " + id); return; }
-                    if (!(p[0] >= 0 && p[0] <= 14 && p[1] >= 0 && p[1] <= 15)) errors.push(where + ": " + id + " fuera de media cancha");
+                    if (!p) { if (!scenario.optionalPlayers) errors.push(where + ": falta " + id); return; }
+                    if (!(p[0] >= 0 && p[0] <= maxX && p[1] >= 0 && p[1] <= 15)) errors.push(where + ": " + id + " fuera de la cancha");
                 });
                 for (var i = 0; i < ids.length; i++) {
                     for (var j = i + 1; j < ids.length; j++) {
@@ -226,10 +256,22 @@
                     }
                 }
                 defenders.forEach(function (id) {
+                    if (!st.pos[id]) return;
                     if (!st.resp || !st.resp[id]) errors.push(where + ": falta la responsabilidad de " + id);
                 });
+                Object.keys(st.moves || {}).forEach(function (id) {
+                    if (!st.pos[id]) errors.push(where + ": trazo para un jugador inexistente " + id);
+                    if (["move", "cut", "dribble", "screen_on", "screen_off", "rotation"].indexOf(st.moves[id]) < 0) errors.push(where + ": tipo de trazo inválido " + st.moves[id]);
+                });
+                (st.options || []).forEach(function (o) {
+                    [o[1], o[2]].forEach(function (end) {
+                        if (typeof end === "string" && !st.pos[end]) errors.push(where + ": opción con jugador inexistente " + end);
+                    });
+                    if (o[0] === "pass" && o[1] !== st.ball) errors.push(where + ": la opción de pase no sale del poseedor");
+                });
+                if (st.options && (!st.optionsText || st.optionsText.length !== st.options.length)) errors.push(where + ": cada opción necesita su explicación");
                 (st.vulnerable || []).forEach(function (z) {
-                    if (z.x < 0 || z.y < 0 || z.x + z.w > 14.01 || z.y + z.h > 15.01) errors.push(where + ": espacio vulnerable fuera de la cancha");
+                    if (z.x < 0 || z.y < 0 || z.x + z.w > maxX + 0.01 || z.y + z.h > 15.01) errors.push(where + ": espacio vulnerable fuera de la cancha");
                 });
             });
         });
@@ -265,6 +307,18 @@
         var fmt = host.fmt || fmtDefault;
         var badge = host.provenanceBadge || function () { return ""; };
         var tour = scenario.tour && scenario.tour.length ? scenario.tour : scenario.positions.map(function (p) { return p.id; });
+        var ui = scenario.ui || {};
+        var L = {
+            variants: ui.variants || "Variante defensiva",
+            positions: ui.positions || "Ubicación del balón",
+            hint: ui.hint || "Tocá un atacante para pasarle el balón, o un defensor para ver su responsabilidad.",
+            resp: ui.resp || "Responsabilidades",
+            help: ui.help || "Ayudas",
+            vulnerable: ui.vulnerable || "Espacios potencialmente vulnerables",
+            options: ui.options || "Opciones del ataque",
+            disclaimer: ui.disclaimer || "Es una respuesta posible, no la única correcta: depende del rival, del reglamento y de lo que el equipo haya entrenado.",
+            noTarget: ui.noTarget || "Desde esta ubicación del {p} no hay una situación preparada. Usá los botones de ubicación del balón."
+        };
 
         var state = {
             variant: scenario.variants[0].id,
@@ -298,14 +352,14 @@
             '<div class="sim">' +
             '<div class="sim-head"><div><span class="ac-board-kicker">Simulador táctico</span><h3>' + esc(scenario.title) + "</h3></div></div>" +
             (scenario.intro ? '<p class="sim-intro">' + fmt(scenario.intro) + "</p>" : "") +
-            '<div class="sim-variants" role="radiogroup" aria-label="Variante defensiva">' +
+            '<div class="sim-variants" role="radiogroup" aria-label="' + esc(L.variants) + '">' +
             scenario.variants.map(function (v) {
                 return '<button type="button" role="radio" class="sim-variant" data-variant="' + esc(v.id) + '" aria-checked="false">' + esc(v.label) + "</button>";
             }).join("") + "</div>" +
             '<div class="sim-variant-desc"></div>' +
             '<div class="sim-grid">' +
             '<div class="sim-stage-col">' +
-            '<div class="sim-balls" aria-label="Ubicación del balón">' +
+            '<div class="sim-balls" aria-label="' + esc(L.positions) + '">' +
             groups.map(function (g) {
                 return '<div class="sim-ball-group">' + (g ? '<span class="sim-ball-label">' + esc(g) + "</span>" : "") +
                     byGroup[g].map(function (p) {
@@ -314,7 +368,7 @@
             }).join("") +
             "</div>" +
             '<div class="sim-stage"><canvas aria-label="Simulador: tocá un atacante para pasarle el balón o un defensor para ver su responsabilidad"></canvas></div>' +
-            '<p class="sim-hint">Tocá un atacante para pasarle el balón, o un defensor para ver su responsabilidad.</p>' +
+            '<p class="sim-hint">' + esc(L.hint) + "</p>" +
             '<div class="ac-board-controls">' +
             '<button type="button" class="ac-pbtn" data-v="restart" aria-label="Reiniciar" title="Reiniciar">' + ICON.restart + "</button>" +
             '<button type="button" class="ac-pbtn" data-v="prev" aria-label="Paso anterior del recorrido" title="Paso anterior">' + ICON.prev + "</button>" +
@@ -362,10 +416,10 @@
                 var objsFrom = makeObjects(scenario, fromState, { vulnerable: false });
                 phases = [
                     { id: "a", name: fromState.title, note: "", objects: objsFrom, strokes: transitionStrokes(scenario, fromState, toState) },
-                    { id: "b", name: toState.title, note: "", objects: objsTo, strokes: [] }
+                    { id: "b", name: toState.title, note: "", objects: objsTo, strokes: optionStrokes(toState) }
                 ];
             } else {
-                phases = [{ id: "b", name: toState.title, note: "", objects: objsTo, strokes: [] }];
+                phases = [{ id: "b", name: toState.title, note: "", objects: objsTo, strokes: optionStrokes(toState) }];
             }
             return { version: 2, view: scenario.view || { court: "half", rotation: 90 }, phases: phases };
         }
@@ -459,8 +513,10 @@
             var atRest = state.pos >= state.doc.phases.length - 1;
             var strokes = [];
             var alpha = f.strokeAlpha;
+            var last = state.doc.phases[state.doc.phases.length - 1];
             if (state.arrows) {
                 if (!atRest) strokes = f.strokes;
+                else if (last.strokes.length) { strokes = last.strokes; alpha = 1; }
                 else if (state.doc.phases.length > 1) {
                     strokes = state.doc.phases[0].strokes;
                     alpha = 0.55;
@@ -507,14 +563,15 @@
                 '<h4 class="sim-title">' + fmt(st.title) + "</h4>" +
                 (inherited ? '<p class="ac-muted">En esta situación la variante «' + esc(v.label) + "» se juega igual que la base.</p>" : "") +
                 (st.note ? "<p>" + fmt(st.note) + "</p>" : "") +
-                '<h5>Responsabilidades</h5><ul class="sim-resp">' +
-                defenders.map(function (id) {
+                "<h5>" + esc(L.resp) + '</h5><ul class="sim-resp">' +
+                defenders.filter(function (id) { return st.pos[id] && st.resp && st.resp[id]; }).map(function (id) {
                     var p = scenario.players[id];
                     return '<li><button type="button" class="sim-resp-btn' + (state.highlight === id ? " is-on" : "") + '" data-highlight="' + esc(id) + '" aria-pressed="' + (state.highlight === id ? "true" : "false") + '"><span class="sim-tag">X' + esc(p.label) + "</span><span>" + fmt(st.resp[id]) + "</span></button></li>";
                 }).join("") + "</ul>" +
-                "<h5>Ayudas</h5><p>" + fmt(st.help) + "</p>" +
-                ((st.vulnerable || []).length ? '<h5>Espacios potencialmente vulnerables</h5><ul class="ac-list">' + st.vulnerable.map(function (z) { return "<li>" + fmt(z.text || z.label) + "</li>"; }).join("") + "</ul>" : "") +
-                '<p class="ac-muted sim-disclaimer">Es una respuesta posible, no la única correcta: depende del rival, del reglamento y de lo que el equipo haya entrenado.</p>';
+                "<h5>" + esc(L.help) + "</h5><p>" + fmt(st.help) + "</p>" +
+                ((st.optionsText || []).length ? '<h5>' + esc(L.options) + '</h5><ul class="ac-list sim-options">' + st.optionsText.map(function (t) { return "<li>" + fmt(t) + "</li>"; }).join("") + "</ul>" : "") +
+                ((st.vulnerable || []).length ? '<h5>' + esc(L.vulnerable) + '</h5><ul class="ac-list">' + st.vulnerable.map(function (z) { return "<li>" + fmt(z.text || z.label) + "</li>"; }).join("") + "</ul>" : "") +
+                '<p class="ac-muted sim-disclaimer">' + esc(L.disclaimer) + "</p>";
         }
 
         function flash(text, ok) {
@@ -594,7 +651,7 @@
                 stopAll();
                 go(target);
             } else if (!target) {
-                flash("Desde esta ubicación del " + p.label + " no hay una situación preparada. Usá los botones de ubicación del balón.", false);
+                flash(L.noTarget.replace("{p}", p.label), false);
             }
         });
 
@@ -742,6 +799,7 @@
         transitionStrokes: transitionStrokes,
         sequenceDoc: sequenceDoc,
         validateScenario: validateScenario,
+        optionStrokes: optionStrokes,
         makeObjects: makeObjects,
         mount: mount
     };

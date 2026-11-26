@@ -3695,7 +3695,17 @@ var FUNDAMENTOS_CATEGORY_VIEWS = {
         subtitle: "Seleccioná el bloque de ataque según el tipo de defensa rival.",
         items: [
             { id: "ataques_hub_zona", label: "Ataques vs zona" },
-            { id: "ataques_hub_hombre", label: "Ataques hombre a hombre" }
+            { id: "ataques_hub_hombre", label: "Ataques hombre a hombre" },
+            { id: "ataques_hub_conceptos", label: "Conceptos de ataque" }
+        ]
+    },
+    ataques_hub_conceptos: {
+        title: "Conceptos de ataque",
+        subtitle: "Guías de Basket Lab Academy con pizarras animadas, simulador y ejercicios.",
+        items: [
+            { id: "spacing_ataque", label: "Spacing" },
+            { id: "pick_and_roll", label: "Pick and roll" },
+            { id: "superioridades", label: "Superioridades (2c1, 3c2, 4c3)" }
         ]
     },
     ataques_hub_zona: {
@@ -3743,7 +3753,7 @@ var FUNDAMENTOS_CATEGORY_VIEWS = {
         title: "Sistemas de presión",
         subtitle: "Aplicaciones por contexto y objetivo táctico.",
         items: [
-            { id: "fullcourt", label: "Full Court" },
+            { id: "fullcourt", label: "Presión y salidas (guía Academy)" },
             { id: "press221", label: "2-2-1" },
             { id: "doubleteam", label: "Double Team" }
         ]
@@ -4050,94 +4060,19 @@ function loadContent(sectionId) {
             break;
 
         case "zone32_defense":
-            contentDiv.innerHTML = `
-                <section class="manual-section">
-                    <h2>Defensa en zona 3-2</h2>
-                    <p>
-                        La defensa 3-2 prioriza la presión sobre los tiradores exteriores, con tres jugadores en la parte alta
-                        del perímetro y dos cerca del aro. Es útil contra equipos que dependen mucho del tiro de 3 puntos.
-                    </p>
-                    <p>
-                        Próximamente podés ampliar esta sección con principios detallados, variantes y videos específicos
-                        según tus preferencias.
-                    </p>
-                </section>
-            `;
+            renderAcademyArticle("zona-3-2");
             break;
 
+        case "pick_and_roll": renderAcademyArticle("pick-and-roll"); break;
+        case "superioridades": renderAcademyArticle("superioridades"); break;
+        case "spacing_ataque": renderAcademyArticle("spacing"); break;
         case "zone131_defense":
-            contentDiv.innerHTML = `
-                <section class="manual-section">
-                    <h2>Defensa en zona 1-3-1</h2>
-                    <p>
-                        La 1-3-1 coloca un jugador arriba, tres en la línea media y uno protegiendo el aro. Genera muchas
-                        trampas en las bandas y esquinas, pero puede dejar espacios en el rebote y en la esquina contraria.
-                    </p>
-                    <p>
-                        Podés usar esta sección para documentar tus reglas, rotaciones y clips de video favoritos.
-                    </p>
-                </section>
-            `;
+            renderAcademyArticle("zona-1-3-1");
             break;
 
         case "fullcourt":
-            contentDiv.innerHTML = `
-                <section class="manual-section">
-                    <h2>Presión Full Court</h2>
-                    <p>
-                        La <strong>presión a toda la cancha</strong> busca incomodar la salida del rival desde el saque de fondo,
-                        forzar errores, acelerar decisiones y robar balones antes de que crucen mitad de cancha.
-                    </p>
-
-                    <h3 class="section-title">Objetivos principales</h3>
-                    <ul>
-                        <li>Quitar ritmo al base rival desde la recepción.</li>
-                        <li>Forzar pases largos o arriesgados que puedan ser interceptados.</li>
-                        <li>Generar pérdidas rápidas para anotar en transición.</li>
-                        <li>Cansar físicamente y mentalmente al rival.</li>
-                    </ul>
-
-                    <h3 class="section-title">Fundamentos de la presión full court</h3>
-                    <ul>
-                        <li><strong>Posición defensiva baja</strong> y desplazamientos laterales constantes.</li>
-                        <li><strong>Orientar al atacante</strong> hacia la banda o hacia una trampa predefinida.</li>
-                        <li><strong>Comunicación</strong>: avisar cambios, ayudas, cortinas y líneas de pase.</li>
-                        <li><strong>No dejar girar cómodo</strong> al manejador de balón.</li>
-                        <li><strong>Volver rápido</strong> si el rival supera la presión, para no regalar bandejas fáciles.</li>
-                    </ul>
-
-                    <h3 class="section-title">Videos de referencia</h3>
-                    <div class="video-grid">
-                        <div class="video-card">
-                            <h4>Presión individual a toda la cancha</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/embed/2Vv-BfVoq4g"
-                                    title="Full court individual"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-
-                        <div class="video-card">
-                            <h4>Principios de presión a toda la cancha</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/embed/fRh_vgS2dFE"
-                                    title="Principios full court"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            `;
+            renderAcademyArticle("presion");
             break;
-
         case "doubleteam":
             contentDiv.innerHTML = `
                 <section class="manual-section">
@@ -5678,7 +5613,7 @@ function openAcademyBoardInEditor(doc, boardDef, article) {
         meta: {
             name: boardDef.title,
             description: boardDef.description || ("Copia de la pizarra educativa de Basket Lab Academy · " + (article ? article.title : "")),
-            category: "Defensa zonal",
+            category: (article && article.playCategory) || "Defensa zonal",
             tags: Array.isArray(boardDef.tags) ? boardDef.tags : ["Academy"]
         },
         userId: user && user.id ? user.id : "guest",
@@ -5713,7 +5648,7 @@ function renderAcademyArticle(articleId, opts) {
             return savePlayFromBoard({
                 name: meta.name,
                 description: meta.description || "",
-                category: "Defensa zonal",
+                category: article.playCategory || "Defensa zonal",
                 tags: Array.isArray(meta.tags) ? meta.tags : ["Simulador"],
                 board: board,
                 steps: []
