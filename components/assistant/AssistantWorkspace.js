@@ -158,6 +158,7 @@ export default function AssistantWorkspace({ modes, supabaseUrl, supabaseAnonKey
 
   const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [academyLabel, setAcademyLabel] = useState(null);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [mode, setMode] = useState(modes[0].id);
   const [input, setInput] = useState("");
@@ -252,12 +253,14 @@ export default function AssistantWorkspace({ modes, supabaseUrl, supabaseAnonKey
       }
       setActiveId(id);
       setMessages([]);
+      setAcademyLabel(null);
       setLoadingConversation(true);
       try {
         const { res, data } = await api(`/api/assistant/conversations/${id}`);
         if (token !== viewTokenRef.current) return;
         if (res.ok && data.ok) {
           setMessages(data.messages || []);
+          setAcademyLabel(data.conversation?.academyLabel || null);
           setMode(data.conversation?.mode || modes[0].id);
           setConversations((list) => (list.some((c) => c.id === id) ? list : upsertConversation(list, data.conversation)));
           stickToBottomRef.current = true;
@@ -818,7 +821,7 @@ export default function AssistantWorkspace({ modes, supabaseUrl, supabaseAnonKey
           <div className={styles.topbarTitle}>
             <h1 title={headerTitle}>{headerTitle}</h1>
             <span className={styles.topbarSub}>
-              Sin proyecto
+              {academyLabel && activeId ? `Academy: ${academyLabel}` : "Sin proyecto"}
               {status.model ? ` · Gemini ${status.model}` : ""}
             </span>
           </div>

@@ -5653,9 +5653,55 @@ function renderAcademyArticle(articleId, opts) {
                 board: board,
                 steps: []
             });
-        }
+        },
+        onAskAssistant: window.BasketAssistantBridge ? function (art, sel) {
+            openAcademyAssistant(art, sel || {});
+        } : null
     }, opts || {});
     injectNavBackButton();
+}
+
+/** Categorías del entrenador: las de sus entrenamientos, planificaciones y jugadores. */
+function getCoachCategories() {
+    var seen = {};
+    var out = [];
+    function add(c) {
+        var v = String(c || "").trim();
+        if (!v || seen[v.toLowerCase()]) return;
+        seen[v.toLowerCase()] = true;
+        out.push(v);
+    }
+    getPlanificacionesAnuales().forEach(function (p) { add(p && p.categoria); });
+    getEntrenamientos().forEach(function (e) { add(e && e.categoria); });
+    try { (getPlayersTracking() || []).forEach(function (pl) { add(pl && pl.category); }); } catch (e) { /* sin jugadores */ }
+    return out.sort(function (a, b) { return a.localeCompare(b, "es", { numeric: true }); });
+}
+
+/** Último entrenamiento de la categoría con condiciones cargadas, para precompletar. */
+function getLatestTrainingConditions(categoria) {
+    var key = String(categoria || "").trim().toLowerCase();
+    var list = getEntrenamientos().filter(function (e) {
+        return e && String(e.categoria || "").trim().toLowerCase() === key && e.condiciones &&
+            (e.condiciones.jugadores != null || e.condiciones.espacio || e.condiciones.aros != null);
+    }).sort(function (a, b) { return String(b.fecha || "").localeCompare(String(a.fecha || "")); });
+    return list[0] ? { nombre: list[0].nombre, fecha: list[0].fecha, condiciones: list[0].condiciones } : null;
+}
+
+/** "Analizar con mi Asistente IA" desde una guía, un ejercicio o el simulador. */
+function openAcademyAssistant(article, sel) {
+    if (!window.BasketAssistantBridge || !article) return;
+    var exercise = sel.exerciseId ? (article.exercises || []).find(function (x) { return x.id === sel.exerciseId; }) : null;
+    window.BasketAssistantBridge.open({
+        article: article,
+        exercise: exercise || null,
+        variantId: sel.variantId || null,
+        positionId: sel.positionId || null,
+        returnFocus: sel.returnFocus || null,
+        host: {
+            getCategories: getCoachCategories,
+            getLatestConditions: getLatestTrainingConditions
+        }
+    });
 }
 
 /** Abre un contenido de la Academy directamente en la ficha de un ejercicio. */
