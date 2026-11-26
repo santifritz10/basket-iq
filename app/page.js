@@ -190,12 +190,14 @@ export default async function HomePage() {
       <Script src="/assets/js/player-domain-realtime.js?v=20260714" strategy="afterInteractive" />
       <Script src="/assets/js/shooting-zones-heatmap.js?v=20260714" strategy="afterInteractive" />
       <Script src="/assets/js/supabase-config.js" strategy="afterInteractive" />
-      <Script src="/assets/js/tactical-board.js?v=20261126d" strategy="afterInteractive" />
-      <Script src="/assets/js/simulator.js?v=20261126d" strategy="afterInteractive" />
-      <Script src="/assets/js/academy.js?v=20261126d" strategy="afterInteractive" />
-      <Script src="/assets/js/exercises.js?v=20261126d" strategy="afterInteractive" />
-      <Script src="/assets/js/academy-content/zona-2-3.js?v=20261126d" strategy="afterInteractive" />
-      <Script src="/assets/js/main.js?v=20261126d" strategy="afterInteractive" />
+      <Script src="/assets/js/tactical-board.js?v=20261126e" strategy="afterInteractive" />
+      <Script src="/assets/js/simulator.js?v=20261126e" strategy="afterInteractive" />
+      <Script src="/assets/js/academy.js?v=20261126e" strategy="afterInteractive" />
+      <Script src="/assets/js/exercises.js?v=20261126e" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/zona-2-3.js?v=20261126e" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/zona-3-2.js?v=20261126e" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/zona-1-3-1.js?v=20261126e" strategy="afterInteractive" />
+      <Script src="/assets/js/main.js?v=20261126e" strategy="afterInteractive" />
       <Script id="legacy-toggle-sidebar" strategy="afterInteractive">
         {toggleSidebarScript}
       </Script>

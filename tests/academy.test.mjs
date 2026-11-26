@@ -160,3 +160,73 @@ test("el bloque del planificador es una copia con referencia al original", () =>
   b.descripcion = "editado";
   assert.equal(JSON.stringify(it.ex), before, "el ejercicio original no cambia");
 });
+
+// ---------------------------------------------------------------
+// Etapa 5: zonas 3-2 y 1-3-1
+// ---------------------------------------------------------------
+const zona32 = require("../js/academy-content/zona-3-2.js");
+const zona131 = require("../js/academy-content/zona-1-3-1.js");
+const SECTION_IDS = ["introduccion", "definicion", "objetivos", "principios", "explicacion", "responsabilidades", "aplicacion", "ventajas", "limitaciones", "errores", "correcciones", "metodologia", "progresiones", "adaptaciones"];
+
+for (const art of [zona32, zona131]) {
+  test(`${art.id}: contenido válido, completo y con citas a fuentes listadas`, () => {
+    assert.deepEqual(Academy.validateArticle(art), []);
+    const ids = art.tabs.aprender.map((s) => s.id);
+    SECTION_IDS.forEach((id) => assert.ok(ids.includes(id), id));
+    assert.ok(art.exercises.length >= 3);
+    assert.ok(art.sources.length >= 5);
+    assert.ok(art.unavailableSources.length >= 1, "debe declarar las fuentes que no se pudieron leer");
+    art.tabs.visualizar.forEach((id) => assert.ok(art.boards.some((b) => b.id === id), id));
+  });
+
+  test(`${art.id}: pizarras animables, dentro de media cancha y sin jugadores superpuestos`, () => {
+    for (const b of art.boards) {
+      const doc = Academy.boardFromSpec(b.spec, Board);
+      assert.ok(doc.phases.length >= 2, b.id);
+      for (let pos = 0; pos <= doc.phases.length - 1; pos += 0.25) {
+        Board.sampleFrame(doc, pos).objects.forEach((o) => assert.ok(Number.isFinite(o.x) && Number.isFinite(o.y), `${b.id} @${pos}`));
+      }
+      doc.phases.forEach((ph, i) => {
+        const ps = ph.objects.filter((o) => o.kind === "player" && !o.hidden);
+        ps.forEach((p) => assert.ok(p.x >= 0 && p.x <= 14 && p.y >= 0 && p.y <= 15, `${b.id} ${p.id}`));
+        for (let a = 0; a < ps.length; a++) for (let c = a + 1; c < ps.length; c++) {
+          assert.ok(Math.hypot(ps[a].x - ps[c].x, ps[a].y - ps[c].y) >= 0.55, `${b.id} fase ${i}: ${ps[a].id}/${ps[c].id}`);
+        }
+      });
+    }
+  });
+
+  test(`${art.id}: simulador coherente, con variantes y secuencia animable`, () => {
+    const sc = art.simulator;
+    assert.deepEqual(Sim.validateScenario(sc), []);
+    assert.ok(sc.variants.length >= 3, "más de un criterio defensivo");
+    const doc = Sim.sequenceDoc(sc, sc.variants[1].id, sc.tour, Board);
+    assert.equal(doc.phases.length, sc.tour.length);
+    const r = Sim.resolveState(sc, "base", "cornerR").state;
+    const l = Sim.resolveState(sc, "base", "cornerL").state;
+    assert.equal(l.ball, "o5");
+    assert.match(l.title, /izquierda/);
+    Object.keys(sc.mirrorSwap).filter((k) => k[0] === "x").forEach((k) => {
+      assert.deepEqual(l.pos[sc.mirrorSwap[k]], [r.pos[k][0], 15 - r.pos[k][1]]);
+    });
+  });
+
+  test(`${art.id}: ejercicios con requisitos y adaptaciones compatibles`, () => {
+    for (const ex of art.exercises) {
+      const m = ex.meta;
+      assert.ok(m.minPlayers > 0 && m.maxPlayers >= m.minPlayers, ex.id);
+      const few = Ex.checkCompatibility(ex, { players: m.minPlayers - 1, court: "half", hoops: 1, materials: ["Balones", "Conos"] });
+      assert.equal(few.ok, false, ex.id);
+      assert.ok(few.alternatives.length >= 1, ex.id + " sin adaptación para menos jugadores");
+      const alt = few.alternatives[0].id;
+      assert.equal(Ex.checkCompatibility(ex, { players: m.minPlayers - 1, court: "half", hoops: 1, materials: ["Balones", "Conos"] }, alt).ok, true, ex.id + "/" + alt);
+    }
+  });
+}
+
+test("la biblioteca reúne los ejercicios de las tres zonas sin claves repetidas", () => {
+  const list = Ex.collect([zona23, zona32, zona131]);
+  assert.equal(list.length, 9);
+  assert.equal(new Set(list.map((i) => i.key)).size, 9);
+  assert.ok(Ex.filterList(list, { fundamento: "Ataque contra zona" }).length >= 2);
+});

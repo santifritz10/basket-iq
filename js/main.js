@@ -4050,34 +4050,11 @@ function loadContent(sectionId) {
             break;
 
         case "zone32_defense":
-            contentDiv.innerHTML = `
-                <section class="manual-section">
-                    <h2>Defensa en zona 3-2</h2>
-                    <p>
-                        La defensa 3-2 prioriza la presión sobre los tiradores exteriores, con tres jugadores en la parte alta
-                        del perímetro y dos cerca del aro. Es útil contra equipos que dependen mucho del tiro de 3 puntos.
-                    </p>
-                    <p>
-                        Próximamente podés ampliar esta sección con principios detallados, variantes y videos específicos
-                        según tus preferencias.
-                    </p>
-                </section>
-            `;
+            renderAcademyArticle("zona-3-2");
             break;
 
         case "zone131_defense":
-            contentDiv.innerHTML = `
-                <section class="manual-section">
-                    <h2>Defensa en zona 1-3-1</h2>
-                    <p>
-                        La 1-3-1 coloca un jugador arriba, tres en la línea media y uno protegiendo el aro. Genera muchas
-                        trampas en las bandas y esquinas, pero puede dejar espacios en el rebote y en la esquina contraria.
-                    </p>
-                    <p>
-                        Podés usar esta sección para documentar tus reglas, rotaciones y clips de video favoritos.
-                    </p>
-                </section>
-            `;
+            renderAcademyArticle("zona-1-3-1");
             break;
 
         case "fullcourt":
@@ -5713,7 +5690,7 @@ function renderAcademyArticle(articleId, opts) {
             return savePlayFromBoard({
                 name: meta.name,
                 description: meta.description || "",
-                category: "Defensa zonal",
+                category: article.playCategory || "Defensa zonal",
                 tags: Array.isArray(meta.tags) ? meta.tags : ["Simulador"],
                 board: board,
                 steps: []
