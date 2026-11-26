@@ -24,6 +24,21 @@ function renderInline(text, keyPrefix) {
   return out;
 }
 
+function splitTableRow(line) {
+  let row = line.trim();
+  if (row.startsWith("|")) row = row.slice(1);
+  if (row.endsWith("|")) row = row.slice(0, -1);
+  return row.split("|").map((cell) => cell.trim());
+}
+
+const TABLE_SEPARATOR = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+
+function isTableStart(lines, index) {
+  const line = lines[index];
+  const next = lines[index + 1];
+  return Boolean(line && next && line.includes("|") && TABLE_SEPARATOR.test(next));
+}
+
 export function renderMarkdown(source) {
   const lines = String(source || "").replace(/\r\n/g, "\n").split("\n");
   const blocks = [];
@@ -53,8 +68,94 @@ export function renderMarkdown(source) {
     list = null;
   };
 
-  for (const raw of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const raw = lines[index];
     const line = raw.trimEnd();
+
+    if (/^\s*```/.test(line)) {
+      flushParagraph();
+      flushList();
+      const code = [];
+      index += 1;
+      while (index < lines.length && !/^\s*```/.test(lines[index])) {
+        code.push(lines[index]);
+        index += 1;
+      }
+      blocks.push(
+        <pre key={`pre-${blocks.length}`}>
+          <code>{code.join("\n")}</code>
+        </pre>
+      );
+      continue;
+    }
+
+    if (isTableStart(lines, index)) {
+      flushParagraph();
+      flushList();
+      const header = splitTableRow(line);
+      const aligns = splitTableRow(lines[index + 1]).map((cell) =>
+        cell.startsWith(":") && cell.endsWith(":") ? "center" : cell.endsWith(":") ? "right" : undefined
+      );
+      const rows = [];
+      index += 2;
+      while (index < lines.length && lines[index].includes("|") && lines[index].trim()) {
+        rows.push(splitTableRow(lines[index]));
+        index += 1;
+      }
+      index -= 1;
+      const key = `t-${blocks.length}`;
+      blocks.push(
+        <div key={key} className="md-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                {header.map((cell, c) => (
+                  <th key={c} style={aligns[c] ? { textAlign: aligns[c] } : undefined}>
+                    {renderInline(cell, `${key}-h${c}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, r) => (
+                <tr key={r}>
+                  {header.map((_, c) => (
+                    <td key={c} style={aligns[c] ? { textAlign: aligns[c] } : undefined}>
+                      {renderInline(row[c] || "", `${key}-${r}-${c}`)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    const quote = line.match(/^\s*>\s?(.*)$/);
+    if (quote) {
+      flushParagraph();
+      flushList();
+      const quoted = [quote[1]];
+      while (index + 1 < lines.length && /^\s*>/.test(lines[index + 1])) {
+        index += 1;
+        quoted.push(lines[index].replace(/^\s*>\s?/, ""));
+      }
+      const key = `q-${blocks.length}`;
+      blocks.push(
+        <blockquote key={key}>
+          {quoted.map((q, i) => (
+            <Fragment key={i}>
+              {i > 0 && <br />}
+              {renderInline(q, `${key}-${i}`)}
+            </Fragment>
+          ))}
+        </blockquote>
+      );
+      continue;
+    }
+
     const heading = line.match(/^\s*(#{1,4})\s+(.*)$/);
     const bullet = line.match(/^\s*[-*•]\s+(.*)$/);
     const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
