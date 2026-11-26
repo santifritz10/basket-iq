@@ -1,5 +1,6 @@
 import "./globals.css";
 import "../css/styles.css";
+import "../css/tactical-board.css";
 
 export const metadata = {
   title: "Basket Lab",
