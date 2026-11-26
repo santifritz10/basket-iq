@@ -787,3 +787,255 @@
         font-size: 13.5px;
     }
 }
+
+/* ---------- Simulador táctico ---------- */
+.ac-section--sim {
+    padding: 14px;
+}
+
+.sim-head h3 {
+    margin: 0 0 4px;
+    font-size: 20px;
+}
+
+.sim-intro {
+    font-size: 14px;
+    color: var(--text-muted, #c4c4cf);
+}
+
+.sim-variants {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0 8px;
+}
+
+.sim-variant,
+.sim-ball {
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--tb-border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text, #e8e8ec);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.sim-variant:hover,
+.sim-ball:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.sim-variant.is-active {
+    border-color: #c084fc;
+    background: rgba(168, 85, 247, 0.18);
+    color: #f3e8ff;
+}
+
+.sim-ball.is-active {
+    border-color: transparent;
+    background: linear-gradient(135deg, #ffa726, #f57c00);
+    color: #1a1206;
+}
+
+.sim-variant-desc {
+    font-size: 14px;
+    margin-bottom: 12px;
+    color: var(--text-muted, #c4c4cf);
+}
+
+.sim-variant-desc .ac-prov {
+    margin-right: 4px;
+}
+
+.sim-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+}
+
+@media (min-width: 900px) {
+    .sim-grid {
+        grid-template-columns: minmax(0, 1fr) 320px;
+    }
+
+    .sim--no-panel .sim-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.sim-stage-col {
+    min-width: 0;
+}
+
+.sim-balls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.sim-ball-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.sim-ball-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted, #9a9aa8);
+    min-width: 82px;
+}
+
+.sim-stage {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.sim-stage canvas {
+    display: block;
+    max-width: 100%;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.sim-hint {
+    margin: 6px 0 0;
+    font-size: 12.5px;
+    color: var(--text-muted, #9a9aa8);
+}
+
+.sim-step {
+    font-size: 13px;
+    color: var(--text-muted, #9a9aa8);
+    margin: 0 4px;
+}
+
+.sim-seq {
+    margin: 4px 0;
+}
+
+.sim-msg {
+    margin: 6px 0 0;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(134, 239, 172, 0.4);
+    font-size: 14px;
+}
+
+.sim-msg.is-error {
+    background: rgba(220, 38, 38, 0.12);
+    border-color: rgba(252, 165, 165, 0.45);
+}
+
+.sim-msg[hidden],
+.sim-panel[hidden] {
+    display: none;
+}
+
+.sim-panel {
+    border: 1px solid var(--ac-border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    font-size: 14px;
+    align-self: start;
+}
+
+.sim-title {
+    margin: 0 0 6px;
+    font-size: 16px;
+    color: var(--accent-soft, #ffb74d);
+}
+
+.sim-panel h5 {
+    margin: 12px 0 4px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted, #9a9aa8);
+}
+
+.sim-resp {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sim-resp li {
+    margin: 3px 0;
+}
+
+.sim-resp-btn {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    width: 100%;
+    text-align: left;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text, #e8e8ec);
+    font: inherit;
+    font-size: 13.5px;
+    line-height: 1.45;
+    cursor: pointer;
+}
+
+.sim-resp-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.sim-resp-btn.is-on {
+    border-color: rgba(96, 165, 250, 0.6);
+    background: rgba(59, 130, 246, 0.12);
+}
+
+.sim-tag {
+    flex-shrink: 0;
+    min-width: 30px;
+    text-align: center;
+    font-weight: 800;
+    font-size: 12px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    border: 2px solid #dc2626;
+    background: #fff;
+    color: #dc2626;
+}
+
+.sim-disclaimer {
+    margin-top: 10px;
+}
+
+.sim--fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    overflow: auto;
+    background: var(--bg-dark, #0d0d0f);
+    padding: 12px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
+}
+
+.sim--fullscreen .sim-intro {
+    display: none;
+}
+
+@media (max-width: 560px) {
+    .sim-ball-label {
+        min-width: 100%;
+    }
+}

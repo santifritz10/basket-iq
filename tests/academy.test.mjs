@@ -59,3 +59,45 @@ test("el texto se escapa y las citas se enlazan", () => {
 test("FIBA 2024: semicírculo de no carga de 1,30 m", () => {
   assert.equal(Board.FIBA.noChargeRadius, 1.3);
 });
+
+const Sim = require("../js/simulator.js");
+
+test("el escenario del simulador de la zona 2-3 es coherente", () => {
+  assert.deepEqual(Sim.validateScenario(zona23.simulator), []);
+});
+
+test("las situaciones espejadas intercambian defensores y textos", () => {
+  const sc = zona23.simulator;
+  const r = Sim.resolveState(sc, "base", "wingR").state;
+  const l = Sim.resolveState(sc, "base", "wingL").state;
+  assert.deepEqual(l.pos.x2, [r.pos.x1[0], 15 - r.pos.x1[1]]);
+  assert.equal(l.ball, "o3");
+  assert.match(l.title, /izquierda/);
+  assert.equal(l.resp.x2, r.resp.x1);
+});
+
+test("las variantes heredan de la base y solo cambian sus situaciones", () => {
+  const sc = zona23.simulator;
+  const baseTop = Sim.resolveState(sc, "base", "top");
+  const varTop = Sim.resolveState(sc, "esquinaBase", "top");
+  assert.equal(varTop.state, baseTop.state);
+  assert.equal(varTop.own, false);
+  const varCorner = Sim.resolveState(sc, "esquinaBase", "cornerL").state;
+  const baseCorner = Sim.resolveState(sc, "base", "cornerL").state;
+  assert.notDeepEqual(varCorner.pos.x2, baseCorner.pos.x2);
+});
+
+test("la transición dibuja rotaciones, pase y la secuencia se puede animar y guardar", () => {
+  const sc = zona23.simulator;
+  const a = Sim.resolveState(sc, "base", "top").state;
+  const b = Sim.resolveState(sc, "base", "wingR").state;
+  const st = Sim.transitionStrokes(sc, a, b);
+  assert.ok(st.some((s) => s.type === "pass" && s.from === "o1" && s.to === "o2"));
+  assert.ok(st.some((s) => s.type === "rotation" && s.from === "x1"));
+  const doc = Sim.sequenceDoc(sc, "base", sc.tour, Board);
+  assert.equal(doc.phases.length, sc.tour.length);
+  for (let pos = 0; pos <= doc.phases.length - 1; pos += 0.25) {
+    Board.sampleFrame(doc, pos).objects.forEach((o) => assert.ok(Number.isFinite(o.x) && Number.isFinite(o.y)));
+  }
+  assert.equal(Board.isBoardPlay({ board: doc }), true);
+});
