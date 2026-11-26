@@ -459,13 +459,15 @@ const PLANIFICACION_ANUAL_STORAGE_KEY = "basketLab_planificacion_anual";
 const SHOOTING_HEATMAP_STORAGE_KEY = "basketLab_shootingHeatmap7";
 const PLAYERS_TRACKING_STORAGE_KEY = "basketLab_playersTracking";
 const COACH_SETTINGS_STORAGE_KEY = "basketLab_coach_settings";
+const LEARNING_PROGRESS_STORAGE_KEY = "basketLab_learningProgress";
 
 const APP_DATA_TYPES = {
     plays: "plays",
     trainings: "trainings",
     annualPlans: "annual_plans",
     shootingHeatmap: "shooting_heatmap",
-    playersTracking: "players_tracking"
+    playersTracking: "players_tracking",
+    learningProgress: "learning_progress"
 };
 
 const APP_DATA_STORAGE_KEYS = {
@@ -473,8 +475,13 @@ const APP_DATA_STORAGE_KEYS = {
     [APP_DATA_TYPES.trainings]: ENTRENAMIENTOS_STORAGE_KEY,
     [APP_DATA_TYPES.annualPlans]: PLANIFICACION_ANUAL_STORAGE_KEY,
     [APP_DATA_TYPES.shootingHeatmap]: SHOOTING_HEATMAP_STORAGE_KEY,
-    [APP_DATA_TYPES.playersTracking]: PLAYERS_TRACKING_STORAGE_KEY
+    [APP_DATA_TYPES.playersTracking]: PLAYERS_TRACKING_STORAGE_KEY,
+    [APP_DATA_TYPES.learningProgress]: LEARNING_PROGRESS_STORAGE_KEY
 };
+
+// Tipos que la base todavía no acepta (por ejemplo, si falta correr una migración).
+// Se siguen guardando en el dispositivo y no frenan la sincronización del resto.
+var dataSyncUnsupportedTypes = {};
 
 let dataSyncFlushTimer = null;
 let dataSyncDirtyTypes = {};
@@ -675,6 +682,8 @@ async function upsertRemoteDataType(dataType) {
         return;
     }
 
+    if (dataSyncUnsupportedTypes[dataType]) return;
+
     const client = getSupabaseClient();
     const user = getCurrentUser();
     if (!client || !user || !user.id) return;
@@ -686,7 +695,15 @@ async function upsertRemoteDataType(dataType) {
         payload: payload
     }, { onConflict: "user_id,data_type" });
 
-    if (result.error) throw result.error;
+    if (result.error) {
+        // 23514 = la restricción CHECK de data_type no incluye este tipo (falta docs/sql/008).
+        if (dataType === APP_DATA_TYPES.learningProgress && String(result.error.code) === "23514") {
+            dataSyncUnsupportedTypes[dataType] = true;
+            console.warn("[DataSync] Supabase todavía no acepta " + dataType + "; se guarda solo en este dispositivo hasta correr docs/sql/008-learning-progress.sql");
+            return;
+        }
+        throw result.error;
+    }
 }
 
 async function flushPendingDataSync() {
@@ -792,7 +809,8 @@ async function bootstrapUserDataSync() {
             APP_DATA_TYPES.trainings,
             APP_DATA_TYPES.annualPlans,
             APP_DATA_TYPES.shootingHeatmap,
-            APP_DATA_TYPES.playersTracking
+            APP_DATA_TYPES.playersTracking,
+            APP_DATA_TYPES.learningProgress
         ];
 
         try {
@@ -3973,74 +3991,7 @@ function loadContent(sectionId) {
 
     switch (sectionId) {
         case "zone23_defense":
-            contentDiv.innerHTML = `
-                <section class="manual-section">
-                    <h2>Defensa en zona 2-3</h2>
-                    <p>
-                        La defensa <strong>2-3</strong> coloca a dos jugadores en la primera línea (perímetro alto)
-                        y tres jugadores en la segunda línea (cerca de la pintura y el rebote). Es una defensa muy
-                        utilizada para proteger la zona cercana al aro y obligar a tiros exteriores.
-                    </p>
-
-                    <h3 class="section-title">Principios clave de la 2-3</h3>
-                    <ul>
-                        <li><strong>Protección de la pintura</strong>: los tres jugadores de la segunda línea cuidan el aro, el rebote y las penetraciones.</li>
-                        <li><strong>Control del balón</strong>: los dos de arriba presionan al base y niegan pases cómodos al medio.</li>
-                        <li><strong>Desplazamientos en bloque</strong>: la zona se mueve como un bloque, no de forma individual.</li>
-                        <li><strong>Comunicación constante</strong>: hablar en cada corte, bloqueo y cambio de lado del balón.</li>
-                        <li><strong>Cerrar esquinas</strong>: reaccionar rápido a los pases a la esquina (corner) para evitar triples liberados.</li>
-                    </ul>
-
-                    <h3 class="section-title">Ventajas para el equipo defensor</h3>
-                    <ul>
-                        <li>Protege muy bien el juego interior y las penetraciones.</li>
-                        <li>Permite que jugadores más lentos sean eficientes si se mueven en sincronía.</li>
-                        <li>Castiga equipos que no tienen tiro exterior consistente.</li>
-                    </ul>
-
-                    <h3 class="section-title">Debilidades que el ataque puede castigar</h3>
-                    <ul>
-                        <li>Espacios entre los dos jugadores de arriba y los tres de abajo (zona de tiro libre / high post).</li>
-                        <li>Esquinas (corners), sobre todo si la rotación llega tarde.</li>
-                        <li>Rebote ofensivo si la defensa no bloquea bien.</li>
-                        <li>Rotaciones tardías ante circulación rápida de balón y cambios de lado.</li>
-                    </ul>
-
-                    <h3 class="section-title">Videos: ataques contra zona 2-3</h3>
-                    <p>
-                        Estos videos muestran ideas y sistemas para atacar una defensa 2-3. Podés usarlos como referencia
-                        y luego recrear las jugadas en la pizarra virtual.
-                    </p>
-
-                    <div class="video-grid">
-                        <div class="video-card">
-                            <h4>Sistema básico vs 2-3</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/watch?v=zFE8jaPHVvE"
-                                    title="Ataque básico vs zona 2-3"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-
-                        <div class="video-card">
-                            <h4>Uso del high post</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/watch?v=efu6uh8c_W0"
-                                    title="High post vs 2-3"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            `;
+            renderAcademyArticle("zona-2-3");
             break;
 
         case "zone32_defense":
@@ -5320,7 +5271,7 @@ function savePlayFromBoard(record) {
 var playsLibraryFilter = { q: "", category: "", team: "", tag: "" };
 
 function normalizeSearchText(str) {
-    return String(str || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
 function getFilteredPlays() {
@@ -5625,4 +5576,80 @@ function openEditPlayModal(playId) {
         closeAppModal();
         renderPlaysLibrary();
     });
+}
+
+
+// ===============================
+// BASKET LAB ACADEMY (contenidos educativos)
+// ===============================
+
+function getLearningProgressItems() {
+    var data = getLocalDataByType(APP_DATA_TYPES.learningProgress);
+    return Array.isArray(data) ? data.filter(function (x) { return x && x.id; }) : [];
+}
+
+function updateLearningProgress(articleId, patch) {
+    var items = getLearningProgressItems();
+    var item = items.find(function (x) { return x.id === articleId; });
+    if (!item) {
+        item = { id: articleId, favorite: false, tab: null, section: null };
+        items.push(item);
+    }
+    Object.keys(patch).forEach(function (k) { item[k] = patch[k]; });
+    item.updated_at = new Date().toISOString();
+    setLocalDataByType(APP_DATA_TYPES.learningProgress, items);
+    markDataTypeDirty(APP_DATA_TYPES.learningProgress);
+}
+
+function getAcademyProgress() {
+    var out = { favorites: {}, reading: {} };
+    getLearningProgressItems().forEach(function (x) {
+        if (x.favorite) out.favorites[x.id] = true;
+        if (x.tab) out.reading[x.id] = { tab: x.tab, section: x.section || null };
+    });
+    return out;
+}
+
+/** Abre una pizarra educativa como copia editable: la plantilla original no se modifica. */
+function openAcademyBoardInEditor(doc, boardDef, article) {
+    var engine = getBoardEngine();
+    var contentDiv = document.getElementById("content");
+    if (!engine || !contentDiv) return;
+    trackNavSection("pizarra_virtual");
+    contentDiv.innerHTML = "";
+    var user = getCurrentUser();
+    engine.mount(contentDiv, {
+        doc: JSON.parse(JSON.stringify(doc)),
+        meta: {
+            name: boardDef.title,
+            description: "Copia de la pizarra educativa de Basket Lab Academy · " + (article ? article.title : ""),
+            category: "Defensa zonal",
+            tags: ["Academy"]
+        },
+        userId: user && user.id ? user.id : "guest",
+        categories: PLAY_CATEGORIES,
+        teams: getKnownTeams(),
+        onSave: savePlayFromBoard,
+        onPrint: printPlayRecord,
+        onOpenLibrary: function () { loadContent("plays_library"); }
+    });
+    injectNavBackButton();
+}
+
+function renderAcademyArticle(articleId) {
+    var contentDiv = document.getElementById("content");
+    if (!contentDiv) return;
+    var academy = window.BasketAcademy;
+    var article = academy && academy.get(articleId);
+    if (!article) {
+        contentDiv.innerHTML = '<section class="manual-section"><p>No se pudo cargar este contenido. Recargá la página e intentá de nuevo.</p></section>';
+        return;
+    }
+    academy.render(contentDiv, articleId, {
+        getProgress: getAcademyProgress,
+        setFavorite: function (id, on) { updateLearningProgress(id, { favorite: !!on }); },
+        saveReading: function (id, where) { updateLearningProgress(id, { tab: where.tab, section: where.section }); },
+        onOpenInBoard: function (doc, boardDef) { openAcademyBoardInEditor(doc, boardDef, article); }
+    });
+    injectNavBackButton();
 }
