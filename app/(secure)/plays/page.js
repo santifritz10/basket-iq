@@ -10,7 +10,7 @@ export default async function PlaysPage() {
       title="Jugadas"
       description="Biblioteca de jugadas con persistencia segura."
       endpoint="/api/plays"
-      initialItems={Array.isArray(items) ? items : []}
+      initialItems={Array.isArray(items) ? items.filter((it) => !it?.deleted) : []}
       createItem={() => ({
         id: Date.now(),
         name: "Jugada nueva",

@@ -450,76 +450,9 @@ if (document.readyState === "loading") {
 // VARIABLES GLOBALES
 // ===============================
 
-let courtImage = new Image();
-courtImage.src = "images/cancha.svg";
-
-let canvas, ctx;
-let players = [];
-let selectedPlayer = null;
-let ball = null;
-let lines = [];
-let lineStart = null;
-let currentLineType = "normal";
-let dragging = false;
-let isLineMode = false;
-let isDrawingLine = false;
-let currentLinePath = [];
-let boardHistory = [];
-let boardHistoryDragSaved = false;
-
-function snapshotBoardState() {
-    return {
-        players: JSON.parse(JSON.stringify(players)),
-        lines: JSON.parse(JSON.stringify(lines)),
-        ball: ball ? { x: ball.x, y: ball.y } : null
-    };
-}
-
-function pushBoardHistory() {
-    boardHistory.push(snapshotBoardState());
-    if (boardHistory.length > 80) boardHistory.shift();
-    updateBoardToolbarUI();
-}
-
-function undoBoardAction() {
-    if (!boardHistory.length) return;
-    var state = boardHistory.pop();
-    players = state.players;
-    lines = state.lines;
-    ball = state.ball;
-    lineStart = null;
-    isDrawingLine = false;
-    currentLinePath = [];
-    drawCourt();
-    updateBoardToolbarUI();
-}
-
-function updateBoardToolbarUI() {
-    var toolbar = document.querySelector(".board-toolbar");
-    if (!toolbar) return;
-    var activeTool = isLineMode ? currentLineType : "move";
-    toolbar.querySelectorAll("[data-board-tool]").forEach(function (btn) {
-        btn.classList.toggle("is-active", btn.getAttribute("data-board-tool") === activeTool);
-    });
-    var undoBtn = document.getElementById("board-undo-btn");
-    if (undoBtn) undoBtn.disabled = boardHistory.length === 0;
-}
-
-function setBoardTool(tool) {
-    if (tool === "move") {
-        isLineMode = false;
-        lineStart = null;
-        isDrawingLine = false;
-        currentLinePath = [];
-        updateBoardToolbarUI();
-        return;
-    }
-    setLineType(tool);
-}
-
 // Jugadas
-let currentPlaySteps = [];
 let savedPlays = [];
+let deletedPlayTombstones = [];
 const PLAYS_STORAGE_KEY = "basketIQ_plays";
 const ENTRENAMIENTOS_STORAGE_KEY = "basketLab_entrenamientos";
 const PLANIFICACION_ANUAL_STORAGE_KEY = "basketLab_planificacion_anual";
@@ -669,11 +602,18 @@ function getStorageKeyForCurrentUser(baseStorageKey) {
     return baseStorageKey + "__" + userId;
 }
 
+// Si localStorage se llena, los datos quedan en memoria durante la sesión y se
+// siguen sincronizando con Supabase (en vez de perderse en silencio).
+const localDataMemoryFallback = {};
+
 function getLocalDataByType(dataType) {
     const baseStorageKey = APP_DATA_STORAGE_KEYS[dataType];
     if (!baseStorageKey) return getDefaultDataForType(dataType);
 
     const scopedKey = getStorageKeyForCurrentUser(baseStorageKey);
+    if (Object.prototype.hasOwnProperty.call(localDataMemoryFallback, scopedKey)) {
+        return localDataMemoryFallback[scopedKey];
+    }
     const scopedRaw = localStorage.getItem(scopedKey);
     if (scopedRaw != null) {
         return readJsonStorageValue(scopedKey, getDefaultDataForType(dataType));
@@ -698,7 +638,15 @@ function setLocalDataByType(dataType, value) {
     const baseStorageKey = APP_DATA_STORAGE_KEYS[dataType];
     if (!baseStorageKey) return;
     const scopedKey = getStorageKeyForCurrentUser(baseStorageKey);
-    localStorage.setItem(scopedKey, JSON.stringify(value));
+    try {
+        localStorage.setItem(scopedKey, JSON.stringify(value));
+        delete localDataMemoryFallback[scopedKey];
+        return true;
+    } catch (e) {
+        console.warn("[DataSync] localStorage lleno o bloqueado; se usa memoria para", dataType, e);
+        localDataMemoryFallback[scopedKey] = value;
+        return false;
+    }
 }
 
 function markDataTypeDirty(dataType) {
@@ -901,14 +849,19 @@ window.BasketLabDataSync = {
 // UTILIDAD: JUGADAS GUARDADAS
 // ===============================
 
+// Las jugadas borradas se guardan como marcas { id, deleted: true, updated_at }
+// para que la sincronización entre dispositivos no las vuelva a traer.
 function loadSavedPlaysFromStorage() {
     const parsed = getLocalDataByType(APP_DATA_TYPES.plays);
-    savedPlays = Array.isArray(parsed) ? parsed : [];
+    const all = Array.isArray(parsed) ? parsed : [];
+    savedPlays = all.filter(function (p) { return p && !p.deleted; });
+    deletedPlayTombstones = all.filter(function (p) { return p && p.deleted; });
 }
 
 function savePlaysToStorage() {
-    setLocalDataByType(APP_DATA_TYPES.plays, savedPlays);
+    const storedLocally = setLocalDataByType(APP_DATA_TYPES.plays, savedPlays.concat(deletedPlayTombstones));
     markDataTypeDirty(APP_DATA_TYPES.plays);
+    return storedLocally;
 }
 
 // ===============================
@@ -1100,7 +1053,7 @@ function buildBloquePlaysPrintHtml(playIds) {
 
     return plays
         .map(function (play) {
-            const steps = Array.isArray(play.steps) ? play.steps : [];
+            const steps = getPlayStepImages(play, 900);
             const stepsHtml = steps.length
                 ? steps
                       .map(function (stepUrl, idx) {
@@ -1733,19 +1686,21 @@ function buildPlayPrintHtml(play) {
     const user = getCurrentUser();
     const coachName = (user && (user.name || user.username)) ? escapeHtml(user.name || user.username) : "—";
     const name = escapeHtml(play.name || "Jugada");
-    const steps = Array.isArray(play.steps) ? play.steps : [];
+    const steps = getPlayStepImages(play, 1100);
+    const phaseNames = play.board && Array.isArray(play.board.phases) ? play.board.phases : [];
     const stepsHtml = steps.length
         ? steps.map((stepUrl, idx) => {
             const src = typeof stepUrl === "string" ? stepUrl : "";
             return `
             <div class="jPaso">
               <div class="jPasoBar">
-                <span class="jPasoTit">Paso ${idx + 1}</span>
+                <span class="jPasoTit">${phaseNames[idx] ? "Fase " + (idx + 1) + " · " + escapeHtml(phaseNames[idx].name || "") : "Paso " + (idx + 1)}</span>
                 <span class="jPasoSub">de ${steps.length}</span>
               </div>
               <div class="jPasoImgWrap">
                 <img src="${src}" alt="Paso ${idx + 1}" />
               </div>
+              ${phaseNames[idx] && phaseNames[idx].note ? `<p class="jPasoNota">${escapeHtml(phaseNames[idx].note)}</p>` : ""}
             </div>`;
         }).join("")
         : `<p class="jEmpty">No hay pasos en esta jugada.</p>`;
@@ -1781,6 +1736,7 @@ function buildPlayPrintHtml(play) {
     .jPasoSub{font-size:13px;opacity:.9}
     .jPasoImgWrap{padding:12px;background:#f8fafc;text-align:center}
     .jPasoImgWrap img{max-width:100%;height:auto;display:block;margin:0 auto;border-radius:8px;border:1px solid #e5e7eb}
+    .jPasoNota{margin:0;padding:10px 16px 14px;background:#f8fafc;font-size:13px;line-height:1.5;color:#1f2937;white-space:pre-wrap}
     .jEmpty{color:#6b7280;padding:20px;text-align:center}
     .jDescripcion{margin:20px 0 24px;padding:16px 18px;background:#f0f7ff;border:2px solid #1e3a5f;border-radius:12px;page-break-inside:avoid}
     .jDescripcionTit{margin:0 0 10px;font-size:15px;font-weight:800;color:#1e3a5f;text-transform:uppercase;letter-spacing:.04em}
@@ -1822,8 +1778,12 @@ function buildPlayPrintHtml(play) {
 
 function printPlayPdf(playId) {
     loadSavedPlaysFromStorage();
-    const play = savedPlays.find(p => p.id === playId);
+    const play = savedPlays.find(p => String(p.id) === String(playId));
     if (!play) return;
+    printPlayRecord(play);
+}
+
+function printPlayRecord(play) {
     const html = buildPlayPrintHtml(play);
     const w = window.open("", "_blank");
     if (!w) {
@@ -3732,7 +3692,7 @@ var FUNDAMENTOS_CATEGORY_VIEWS = {
         title: "Herramientas",
         subtitle: "Usá recursos visuales y control de tiro.",
         items: [
-            { id: "pizarra_virtual", label: "Pizarra virtual" },
+            { id: "pizarra_virtual", label: "Pizarra táctica" },
             { id: "shooting_training", label: "Entrenamiento de tiro" }
         ]
     },
@@ -3776,7 +3736,8 @@ var FUNDAMENTOS_CATEGORY_VIEWS = {
         title: "Biblioteca de jugadas",
         subtitle: "Consulta y gestión de jugadas guardadas.",
         items: [
-            { id: "plays_library", label: "Ver jugadas guardadas" }
+            { id: "plays_library", label: "Ver jugadas guardadas" },
+            { id: "pizarra_virtual", label: "Crear jugada en la pizarra" }
         ]
     }
 };
@@ -4287,71 +4248,7 @@ function loadContent(sectionId) {
             break;
 
         case "plays_library":
-            loadSavedPlaysFromStorage();
-
-            if (!savedPlays.length) {
-                contentDiv.innerHTML = `
-                    <section class="manual-section">
-                        <h2>Biblioteca de jugadas</h2>
-                        <p>Todavía no hay jugadas guardadas. Diseñá una en la pizarra virtual y usá el botón "Guardar jugada" para que aparezca acá.</p>
-                    </section>
-                `;
-                break;
-            }
-
-            var playsSorted = savedPlays.slice().sort(function (a, b) {
-                return String(a.name || "").localeCompare(String(b.name || ""), "es");
-            });
-
-            let playsHtml = `
-                <section class="manual-section">
-                    <h2>Biblioteca de jugadas</h2>
-                    <p>Hacé clic en cada jugada para ver sus pasos. Ordenadas por título.</p>
-                    <div class="plays-library-accordion">
-            `;
-
-            playsSorted.forEach(function (play) {
-                var stepCount = (play.steps || []).length;
-                var stepsLabel = stepCount + " paso" + (stepCount === 1 ? "" : "s");
-                playsHtml += `
-                    <details class="play-library-item">
-                        <summary class="play-library-summary">
-                            <span class="play-library-title">${escapeHtml(play.name || "Jugada sin nombre")}</span>
-                            <span class="play-library-meta">${stepsLabel}</span>
-                            <span class="play-library-chevron" aria-hidden="true">▶</span>
-                        </summary>
-                        <div class="play-library-body">
-                            <div class="play-card-actions">
-                                <button type="button" class="toolbar-button" onclick="printPlayPdf(${play.id})">Descargar PDF</button>
-                                <button type="button" class="play-edit-button" onclick="openEditPlayModal(${play.id})">Editar</button>
-                                <button class="play-delete-button" onclick="deletePlay(${play.id})">Borrar</button>
-                            </div>
-                            ${play.description ? `<div class="play-card-desc">${escapeHtml(play.description)}</div>` : `<p class="play-card-desc-empty">Sin descripción — usá <strong>Editar</strong> para agregar texto (aparece en el PDF).</p>`}
-                            <div class="play-steps-grid">
-                `;
-
-                (play.steps || []).forEach(function (stepUrl, idx) {
-                    playsHtml += `
-                                <div class="play-step-card">
-                                    <span class="play-step-label">Paso ${idx + 1}</span>
-                                    <img src="${stepUrl}" alt="Paso ${idx + 1} de ${escapeHtml(play.name || "")}">
-                                </div>
-                    `;
-                });
-
-                playsHtml += `
-                            </div>
-                        </div>
-                    </details>
-                `;
-            });
-
-            playsHtml += `
-                    </div>
-                </section>
-            `;
-
-            contentDiv.innerHTML = playsHtml;
+            renderPlaysLibrary(contentDiv);
             break;
 
         case "vs23":
@@ -5283,996 +5180,449 @@ function renderDashboard() {
 
 
 // ===============================
-// CARGA DE PIZARRA
+// PIZARRA TÁCTICA (motor v2: js/tactical-board.js)
 // ===============================
 
-function loadBoard() {
+const PLAY_CATEGORIES = [
+    "Ataque",
+    "Ataque vs zona",
+    "Transición / contraataque",
+    "Saque de fondo o lateral",
+    "Final de partido",
+    "Defensa individual",
+    "Defensa zonal",
+    "Presión",
+    "Salida de presión",
+    "Ejercicio",
+    "Otra"
+];
+
+function getBoardEngine() {
+    return window.BasketBoard || null;
+}
+
+function isBoardPlayRecord(play) {
+    var engine = getBoardEngine();
+    return !!(engine && engine.isBoardPlay(play));
+}
+
+/** Imágenes de cada fase: se generan desde los datos si la jugada es v2. */
+function getPlayStepImages(play, width) {
+    var engine = getBoardEngine();
+    if (engine && play && engine.isBoardPlay(play)) {
+        try {
+            var doc = engine.normalizeDoc(play.board);
+            return doc.phases.map(function (_p, i) {
+                return engine.renderPhaseImage(doc, i, { width: width || 900 });
+            });
+        } catch (e) {
+            console.warn("[Pizarra] no se pudo generar la imagen de la jugada", e);
+        }
+    }
+    return (Array.isArray(play && play.steps) ? play.steps : []).filter(function (s) {
+        return typeof s === "string" && s;
+    });
+}
+
+function getPlayThumb(play) {
+    if (play && Array.isArray(play.steps) && typeof play.steps[0] === "string" && play.steps[0]) return play.steps[0];
+    var imgs = getPlayStepImages(play, 480);
+    return imgs[0] || "";
+}
+
+function getPlayPhaseCount(play) {
+    if (isBoardPlayRecord(play)) return play.board.phases.length;
+    return Array.isArray(play && play.steps) ? play.steps.length : 0;
+}
+
+function getKnownTeams() {
+    var set = {};
+    ["U13", "U15", "U17", "Primera"].forEach(function (t) { set[t] = true; });
+    try {
+        (getEntrenamientos() || []).forEach(function (e) {
+            var c = String((e && e.categoria) || "").trim();
+            if (c && c !== "Otro") set[c] = true;
+        });
+    } catch (e) { /* sin entrenamientos */ }
+    loadSavedPlaysFromStorage();
+    savedPlays.forEach(function (p) {
+        var t = String((p && p.team) || "").trim();
+        if (t) set[t] = true;
+    });
+    return Object.keys(set);
+}
+
+function loadBoard(playId) {
     const contentDiv = document.getElementById("content");
-
-    contentDiv.innerHTML = `
-        <h2>Pizarra Virtual</h2>
-
-        <div class="board-toolbar">
-            <button type="button" class="toolbar-button" data-board-tool="move" onclick="setBoardTool('move')">Mover</button>
-            <button type="button" class="toolbar-button" onclick="addAttackers()">Agregar Atacantes</button>
-            <button type="button" class="toolbar-button" onclick="addDefenders()">Agregar Defensores</button>
-            <button type="button" class="toolbar-button" onclick="addBall()">Agregar Pelota</button>
-
-            <span class="board-toolbar-divider" aria-hidden="true"></span>
-
-            <button type="button" class="toolbar-button" data-board-tool="normal" onclick="setLineType('normal')">Línea Normal</button>
-            <button type="button" class="toolbar-button" data-board-tool="dashed" onclick="setLineType('dashed')">Línea Punteada</button>
-            <button type="button" class="toolbar-button" data-board-tool="zigzag" onclick="setLineType('zigzag')">Línea Víbora</button>
-            <button type="button" class="toolbar-button" data-board-tool="screen" onclick="setLineType('screen')">Línea Bloqueo</button>
-
-            <span class="board-toolbar-divider" aria-hidden="true"></span>
-
-            <button type="button" id="board-undo-btn" class="toolbar-button" onclick="undoBoardAction()" disabled>Deshacer</button>
-            <button type="button" class="toolbar-button" onclick="clearBoard()">Limpiar Pizarra</button>
-
-            <span class="board-toolbar-divider" aria-hidden="true"></span>
-
-            <button type="button" class="toolbar-button toolbar-button-accent" onclick="capturePlayStep()">Guardar paso</button>
-            <button type="button" class="toolbar-button toolbar-button-accent" onclick="saveCurrentPlay()">Guardar jugada</button>
-            <button type="button" class="toolbar-button" onclick="clearCurrentPlaySteps()">Borrar pasos jugada</button>
-        </div>
-
-        <div class="play-description-field">
-            <label for="play-description-input">Descripción de la jugada</label>
-            <p class="play-description-hint">Opcional. Se guarda con la jugada y aparece en el PDF (objetivo, variantes, lecturas defensivas, etc.).</p>
-            <textarea id="play-description-input" class="play-description-textarea" rows="5" placeholder="Ej.: Salida desde esquina, prioridad al tiro en esquina si el defensor baja..."></textarea>
-        </div>
-
-        <div class="board-layout">
-            <div class="board-canvas-wrapper">
-                <canvas id="cancha" width="800" height="600"
-                    style="border:2px solid black;">
-                </canvas>
-            </div>
-            <aside id="current-play-steps" class="play-steps-container"></aside>
-        </div>
-    `;
-
-    currentPlaySteps = [];
-    boardHistory = [];
-    const descIn = document.getElementById("play-description-input");
-    if (descIn) descIn.value = "";
-
-    isLineMode = false;
-    currentLineType = "normal";
-    initBoard();
-    renderCurrentPlaySteps();
-    updateBoardToolbarUI();
+    if (!contentDiv) return;
+    var engine = getBoardEngine();
+    if (!engine) {
+        contentDiv.innerHTML = '<section class="manual-section"><h2>Pizarra táctica</h2><p>No se pudo cargar la pizarra. Recargá la página e intentá de nuevo.</p></section>';
+        return;
+    }
+    var play = null;
+    if (playId != null) {
+        loadSavedPlaysFromStorage();
+        play = savedPlays.find(function (p) { return String(p.id) === String(playId); }) || null;
+        if (play && !engine.isBoardPlay(play)) play = null;
+    }
+    contentDiv.innerHTML = "";
+    var user = getCurrentUser();
+    engine.mount(contentDiv, {
+        play: play,
+        userId: user && user.id ? user.id : "guest",
+        categories: PLAY_CATEGORIES,
+        teams: getKnownTeams(),
+        onSave: savePlayFromBoard,
+        onPrint: printPlayRecord,
+        onOpenLibrary: function () { loadContent("plays_library"); }
+    });
     injectNavBackButton();
 }
 
-
-// ===============================
-// INICIALIZAR CANVAS
-// ===============================
-
-function initBoard() {
-
-    canvas = document.getElementById("cancha");
-    ctx = canvas.getContext("2d");
-
-    // Ratón
-    canvas.addEventListener("mousedown", startDrag);
-    canvas.addEventListener("mousemove", drag);
-    canvas.addEventListener("mouseup", stopDrag);
-    canvas.addEventListener("mouseleave", stopDrag);
-    canvas.addEventListener("click", function (e) {
-        if (lineSuppressNextClick) {
-            lineSuppressNextClick = false;
-            return;
-        }
-        // Si el último evento fue táctil, ignoramos este click sintético
-        if (lineHandledByTouch) {
-            lineHandledByTouch = false;
-            return;
-        }
-        handleLineClick(e);
-    });
-
-    // Tactil (Android, iOS): mismos handlers con getEventCoords
-    canvas.addEventListener("touchstart", function (e) {
-        if (e.cancelable) e.preventDefault();
-        startDrag(e);
-    }, { passive: false });
-    canvas.addEventListener("touchmove", function (e) {
-        if (dragging && e.cancelable) e.preventDefault();
-        drag(e);
-    }, { passive: false });
-    canvas.addEventListener("touchend", function (e) {
-        if (isLineMode && !dragging && e.changedTouches && e.changedTouches.length > 0) {
-            // Solo modo dos toques: si hubo trazo libre (varios puntos), no llamar handleLineClick
-            // antes de stopDrag (evita segmento fantasma entre fin del trazo anterior y este).
-            var t = e.changedTouches[0];
-            var wasFreehand = isDrawingLine && currentLinePath.length > 1;
-            if (!wasFreehand) {
-                handleLineClick({ clientX: t.clientX, clientY: t.clientY, touches: [], changedTouches: e.changedTouches });
-                lineHandledByTouch = true;
-            }
-        }
-        stopDrag();
-    }, { passive: true });
-    canvas.addEventListener("touchcancel", stopDrag);
-
-    drawCourt();
-}
-
-
-// ===============================
-// AGREGAR JUGADORES
-// ===============================
-
-function addAttackers() {
-    pushBoardHistory();
-    players = players.filter(p => p.color !== "blue");
-
-    for (let i = 1; i <= 5; i++) {
-        players.push({
-            x: 200 + i * 60,
-            y: 450,
-            color: "blue",
-            number: i
-        });
-    }
-
-    drawCourt();
-}
-
-function addDefenders() {
-    pushBoardHistory();
-    players = players.filter(p => p.color !== "red");
-
-    for (let i = 1; i <= 5; i++) {
-        players.push({
-            x: 200 + i * 60,
-            y: 180,
-            color: "red",
-            number: i
-        });
-    }
-
-    drawCourt();
-}
-
-function addBall() {
-    pushBoardHistory();
-    ball = { x: 400, y: 300 };
-    drawCourt();
-}
-
-
-// ===============================
-// COORDENADAS CANVAS (responsive: canvas puede estar escalado por CSS)
-// ===============================
-
-function getCanvasCoords(clientX, clientY) {
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    return {
-        x: (clientX - rect.left) * scaleX,
-        y: (clientY - rect.top) * scaleY
-    };
-}
-
-function getEventCoords(e) {
-    if (e.touches && e.touches.length > 0) {
-        return getCanvasCoords(e.touches[0].clientX, e.touches[0].clientY);
-    }
-    if (e.changedTouches && e.changedTouches.length > 0) {
-        return getCanvasCoords(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
-    }
-    return getCanvasCoords(e.clientX, e.clientY);
-}
-
-// ===============================
-// DRAG & DROP
-// ===============================
-
-function startDrag(e) {
-    const { x, y } = getEventCoords(e);
-    boardHistoryDragSaved = false;
-
-    // En modo líneas: comenzar un trazo libre del usuario
-    if (isLineMode) {
-        isDrawingLine = true;
-        currentLinePath = [{ x, y }];
-        return;
-    }
-
-    players.forEach(p => {
-        const distance = Math.hypot(p.x - x, p.y - y);
-        if (distance < 18) {
-            pushBoardHistory();
-            boardHistoryDragSaved = true;
-            selectedPlayer = p;
-            dragging = true;
-        }
-    });
-
-    if (ball) {
-        const distance = Math.hypot(ball.x - x, ball.y - y);
-        if (distance < 10) {
-            if (!boardHistoryDragSaved) pushBoardHistory();
-            boardHistoryDragSaved = true;
-            selectedPlayer = ball;
-            dragging = true;
-        }
-    }
-}
-
-function drag(e) {
-    const { x, y } = getEventCoords(e);
-
-    if (isLineMode && isDrawingLine) {
-        // Agregar punto al trazo actual y redibujar la pizarra (incluyendo la línea en construcción)
-        currentLinePath.push({ x, y });
-        drawCourt();
-        return;
-    }
-
-    if (!dragging || !selectedPlayer) return;
-    selectedPlayer.x = x;
-    selectedPlayer.y = y;
-    drawCourt();
-}
-
-function stopDrag() {
-    if (isLineMode && isDrawingLine) {
-        if (currentLinePath.length > 1) {
-            pushBoardHistory();
-            const first = currentLinePath[0];
-            const last = currentLinePath[currentLinePath.length - 1];
-            lines.push({
-                type: currentLineType,
-                path: currentLinePath.slice(),
-                x1: first.x,
-                y1: first.y,
-                x2: last.x,
-                y2: last.y
-            });
-            lineSuppressNextClick = true; // evita que el click post-mouseup una este trazo con el siguiente
-        }
-        isDrawingLine = false;
-        currentLinePath = [];
-        drawCourt();
-    }
-
-    dragging = false;
-    selectedPlayer = null;
-}
-
-
-// ===============================
-// LÍNEAS (SIN MODO ACTIVAR)
-// ===============================
-
-function setLineType(type) {
-    // Si ya estaba ese tipo activo, desactivar el modo líneas
-    if (currentLineType === type && isLineMode) {
-        isLineMode = false;
-        lineStart = null;
-        isDrawingLine = false;
-        currentLinePath = [];
-        updateBoardToolbarUI();
-        return;
-    }
-
-    currentLineType = type;
-    lineStart = null;
-    isLineMode = true;
-    updateBoardToolbarUI();
-}
-
-var lineHandledByTouch = false;
-/** Tras soltar el mouse de un trazo libre, el navegador dispara un "click" que antes armaba una línea fantasma. */
-var lineSuppressNextClick = false;
-
-function handleLineClick(e) {
-    if (!isLineMode) return;
-    const { x, y } = getEventCoords(e);
-
-    if (!lineStart) {
-        lineStart = { x, y };
-    } else {
-        pushBoardHistory();
-        lines.push({
-            x1: lineStart.x,
-            y1: lineStart.y,
-            x2: x,
-            y2: y,
-            type: currentLineType
-        });
-
-        lineStart = null;
-        drawCourt();
-    }
-}
-
-function deleteLastLine() {
-    undoBoardAction();
-}
-
-function clearBoard() {
-    if (!players.length && !lines.length && !ball) return;
-    pushBoardHistory();
-    players = [];
-    lines = [];
-    ball = null;
-    drawCourt();
-}
-
-
-// ===============================
-// JUGADAS: CAPTURA Y GUARDADO
-// ===============================
-
-function capturePlayStep() {
-    if (!canvas) {
-        canvas = document.getElementById("cancha");
-    }
-    if (!canvas || !ctx) return;
-
-    const offCanvas = document.createElement("canvas");
-    offCanvas.width = canvas.width;
-    offCanvas.height = canvas.height;
-    const offCtx = offCanvas.getContext("2d");
-
-    drawCourtBackground(offCtx, offCanvas.width, offCanvas.height);
-    drawScene(offCtx);
-
-    const dataUrl = offCanvas.toDataURL("image/png");
-    currentPlaySteps.push(dataUrl);
-    renderCurrentPlaySteps();
-}
-
-function clearCurrentPlaySteps() {
-    currentPlaySteps = [];
-    renderCurrentPlaySteps();
-}
-
-function saveCurrentPlay() {
-    if (!currentPlaySteps.length) {
-        alert("No hay pasos guardados para esta jugada.");
-        return;
-    }
-
-    const name = prompt("Nombre de la jugada:");
-    if (!name) return;
-
-    const descEl = document.getElementById("play-description-input");
-    const description = descEl ? String(descEl.value || "").trim() : "";
-
-    const play = {
-        id: Date.now(),
-        name: name.trim(),
-        description,
-        steps: currentPlaySteps.slice()
-    };
-
+function savePlayFromBoard(record) {
     loadSavedPlaysFromStorage();
-    savedPlays.push(play);
-    savePlaysToStorage();
+    var now = new Date().toISOString();
+    var play = null;
+    if (record.id != null) {
+        play = savedPlays.find(function (p) { return String(p.id) === String(record.id); }) || null;
+    }
+    var fields = {
+        name: record.name,
+        description: record.description || "",
+        category: record.category || "",
+        team: record.team || "",
+        tags: Array.isArray(record.tags) ? record.tags : [],
+        board: record.board,
+        steps: Array.isArray(record.steps) ? record.steps : [],
+        updated_at: now
+    };
+    if (play) {
+        Object.keys(fields).forEach(function (k) { play[k] = fields[k]; });
+    } else {
+        var id = Date.now();
+        while (savedPlays.some(function (p) { return String(p.id) === String(id); })) id++;
+        play = Object.assign({ id: id, created_at: now }, fields);
+        savedPlays.push(play);
+    }
+    var stored = savePlaysToStorage();
+    var user = getCurrentUser();
+    if (!stored && !(user && user.id)) {
+        return { ok: false, error: "El almacenamiento del navegador está lleno. Iniciá sesión o borrá jugadas viejas para poder guardar." };
+    }
+    return { ok: true, play: play };
+}
 
-    currentPlaySteps = [];
-    if (descEl) descEl.value = "";
-    renderCurrentPlaySteps();
+// ===============================
+// JUGADAS GUARDADAS (biblioteca)
+// ===============================
 
-    alert("Jugada guardada en la biblioteca.");
+var playsLibraryFilter = { q: "", category: "", team: "", tag: "" };
+
+function normalizeSearchText(str) {
+    return String(str || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+function getFilteredPlays() {
+    loadSavedPlaysFromStorage();
+    var f = playsLibraryFilter;
+    var q = normalizeSearchText(f.q).trim();
+    return savedPlays
+        .filter(function (p) {
+            if (f.category && (p.category || "") !== f.category) return false;
+            if (f.team && (p.team || "") !== f.team) return false;
+            if (f.tag && !(Array.isArray(p.tags) && p.tags.indexOf(f.tag) >= 0)) return false;
+            if (q) {
+                var hay = normalizeSearchText([p.name, p.description, p.category, p.team, (p.tags || []).join(" ")].join(" "));
+                if (hay.indexOf(q) < 0) return false;
+            }
+            return true;
+        })
+        .sort(function (a, b) {
+            var ta = Date.parse(a.updated_at || a.created_at || 0) || Number(a.id) || 0;
+            var tb = Date.parse(b.updated_at || b.created_at || 0) || Number(b.id) || 0;
+            return tb - ta;
+        });
+}
+
+function buildFilterOptions(values, selected, emptyLabel) {
+    return '<option value="">' + escapeHtml(emptyLabel) + "</option>" + values.map(function (v) {
+        return '<option value="' + escapeHtml(v) + '"' + (v === selected ? " selected" : "") + ">" + escapeHtml(v) + "</option>";
+    }).join("");
+}
+
+function renderPlaysLibrary(contentDiv) {
+    contentDiv = contentDiv || document.getElementById("content");
+    if (!contentDiv) return;
+    loadSavedPlaysFromStorage();
+
+    var categories = {};
+    var teams = {};
+    var tags = {};
+    savedPlays.forEach(function (p) {
+        if (p.category) categories[p.category] = true;
+        if (p.team) teams[p.team] = true;
+        (Array.isArray(p.tags) ? p.tags : []).forEach(function (t) { tags[t] = true; });
+    });
+
+    var f = playsLibraryFilter;
+    contentDiv.innerHTML =
+        '<section class="manual-section pl-lib">' +
+        '  <div class="pl-head"><div><h2>Jugadas guardadas</h2><p>' + savedPlays.length + " jugada" + (savedPlays.length === 1 ? "" : "s") + " en tu biblioteca.</p></div>" +
+        '  <button type="button" class="tb-btn tb-btn--accent" onclick="loadBoard()">+ Nueva jugada en la pizarra</button></div>' +
+        (savedPlays.length
+            ? '  <div class="pl-filters">' +
+              '    <input type="search" id="pl-search" placeholder="Buscar por nombre, descripción o etiqueta" value="' + escapeHtml(f.q) + '" aria-label="Buscar jugadas">' +
+              '    <select id="pl-filter-category" aria-label="Filtrar por categoría">' + buildFilterOptions(Object.keys(categories).sort(), f.category, "Todas las categorías") + "</select>" +
+              '    <select id="pl-filter-team" aria-label="Filtrar por equipo">' + buildFilterOptions(Object.keys(teams).sort(), f.team, "Todos los equipos") + "</select>" +
+              '    <select id="pl-filter-tag" aria-label="Filtrar por etiqueta">' + buildFilterOptions(Object.keys(tags).sort(), f.tag, "Todas las etiquetas") + "</select>" +
+              "  </div>"
+            : "") +
+        '  <div id="pl-results"></div>' +
+        "</section>";
+
+    renderPlaysLibraryResults();
+
+    var search = document.getElementById("pl-search");
+    if (search) {
+        search.addEventListener("input", function () {
+            playsLibraryFilter.q = search.value;
+            renderPlaysLibraryResults();
+        });
+    }
+    [["pl-filter-category", "category"], ["pl-filter-team", "team"], ["pl-filter-tag", "tag"]].forEach(function (pair) {
+        var el = document.getElementById(pair[0]);
+        if (el) {
+            el.addEventListener("change", function () {
+                playsLibraryFilter[pair[1]] = el.value;
+                renderPlaysLibraryResults();
+            });
+        }
+    });
+}
+
+function renderPlaysLibraryResults() {
+    var box = document.getElementById("pl-results");
+    if (!box) return;
+    if (!savedPlays.length) {
+        box.innerHTML = '<div class="pl-empty"><p>Todavía no hay jugadas guardadas.</p><p>Diseñá una en la pizarra táctica y tocá <strong>Guardar</strong> para que aparezca acá.</p></div>';
+        return;
+    }
+    var list = getFilteredPlays();
+    if (!list.length) {
+        box.innerHTML = '<div class="pl-empty">No hay jugadas que coincidan con la búsqueda.</div>';
+        return;
+    }
+    box.innerHTML = '<div class="pl-grid">' + list.map(buildPlayCardHtml).join("") + "</div>";
+}
+
+function buildPlayCardHtml(play) {
+    var id = escapeHtml(String(play.id));
+    var isV2 = isBoardPlayRecord(play);
+    var count = getPlayPhaseCount(play);
+    var thumb = getPlayThumb(play);
+    var tags = Array.isArray(play.tags) ? play.tags : [];
+    var meta =
+        (play.category ? '<span class="pl-tag pl-tag--cat">' + escapeHtml(play.category) + "</span>" : "") +
+        (play.team ? '<span class="pl-tag">' + escapeHtml(play.team) + "</span>" : "") +
+        tags.map(function (t) { return '<span class="pl-tag">#' + escapeHtml(t) + "</span>"; }).join("") +
+        (!isV2 ? '<span class="pl-tag pl-tag--legacy" title="Guardada con la pizarra anterior: se conserva como imagen">Versión anterior</span>' : "");
+    var thumbAction = isV2 ? "loadBoard('" + id + "')" : "viewPlay('" + id + "')";
+    return (
+        '<article class="pl-card">' +
+        '  <button type="button" class="pl-thumb" onclick="' + thumbAction + '" aria-label="' + (isV2 ? "Abrir en la pizarra" : "Ver jugada") + '">' +
+        (thumb ? '<img src="' + thumb + '" alt="" loading="lazy">' : "") +
+        '    <span class="pl-thumb-badge">' + count + (isV2 ? " fase" : " paso") + (count === 1 ? "" : "s") + "</span>" +
+        "  </button>" +
+        '  <div class="pl-body">' +
+        '    <h3 class="pl-name">' + escapeHtml(play.name || "Jugada sin nombre") + "</h3>" +
+        (meta ? '<div class="pl-meta">' + meta + "</div>" : "") +
+        (play.description ? '<p class="pl-desc">' + escapeHtml(play.description) + "</p>" : "") +
+        "  </div>" +
+        '  <div class="pl-actions">' +
+        (isV2 ? '<button type="button" class="tb-btn tb-btn--accent" onclick="loadBoard(\'' + id + '\')">Abrir en pizarra</button>' : "") +
+        '    <button type="button" class="tb-btn" onclick="viewPlay(\'' + id + '\')">Ver</button>' +
+        '    <button type="button" class="tb-btn" onclick="openEditPlayModal(\'' + id + '\')">Editar datos</button>' +
+        '    <button type="button" class="tb-btn" onclick="duplicatePlay(\'' + id + '\')">Duplicar</button>' +
+        '    <button type="button" class="tb-btn" onclick="exportPlayPng(\'' + id + '\')">PNG</button>' +
+        '    <button type="button" class="tb-btn" onclick="printPlayPdf(\'' + id + '\')">PDF</button>' +
+        '    <button type="button" class="tb-btn tb-btn--danger" onclick="deletePlay(\'' + id + '\')">Borrar</button>' +
+        "  </div>" +
+        "</article>"
+    );
+}
+
+function findSavedPlay(id) {
+    loadSavedPlaysFromStorage();
+    return savedPlays.find(function (p) { return String(p.id) === String(id); }) || null;
+}
+
+function openAppModal(innerHtml) {
+    closeAppModal();
+    var overlay = document.createElement("div");
+    overlay.className = "tb-modal";
+    overlay.id = "app-modal";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.innerHTML = '<div class="tb-modal-card">' + innerHtml + "</div>";
+    overlay.addEventListener("click", function (e) {
+        if (e.target === overlay || e.target.closest("[data-modal-close]")) closeAppModal();
+    });
+    overlay._onEscape = function (ev) { if (ev.key === "Escape") closeAppModal(); };
+    document.addEventListener("keydown", overlay._onEscape);
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+function closeAppModal() {
+    var el = document.getElementById("app-modal");
+    if (!el) return;
+    if (el._onEscape) document.removeEventListener("keydown", el._onEscape);
+    el.remove();
+}
+
+function showConfirmModal(title, text, okLabel) {
+    return new Promise(function (resolve) {
+        var ov = openAppModal(
+            '<h3 class="tb-modal-title">' + escapeHtml(title) + "</h3>" +
+            '<p class="tb-modal-text">' + escapeHtml(text) + "</p>" +
+            '<div class="tb-modal-actions"><button type="button" class="tb-btn" data-modal-close>Cancelar</button>' +
+            '<button type="button" class="tb-btn tb-btn--danger-solid" id="app-modal-ok">' + escapeHtml(okLabel || "Confirmar") + "</button></div>"
+        );
+        var settled = false;
+        ov.querySelector("#app-modal-ok").addEventListener("click", function () {
+            settled = true;
+            closeAppModal();
+            resolve(true);
+        });
+        var obs = new MutationObserver(function () {
+            if (!ov.isConnected) {
+                obs.disconnect();
+                if (!settled) resolve(false);
+            }
+        });
+        obs.observe(document.body, { childList: true });
+        ov.querySelector("#app-modal-ok").focus();
+    });
 }
 
 function deletePlay(id) {
-    loadSavedPlaysFromStorage();
-    savedPlays = savedPlays.filter(p => p.id !== id);
-    savePlaysToStorage();
-    // Recargar la vista de biblioteca
-    loadContent("plays_library");
+    var play = findSavedPlay(id);
+    if (!play) return;
+    showConfirmModal(
+        "¿Borrar «" + (play.name || "Jugada") + "»?",
+        "Se elimina de Jugadas guardadas en todos tus dispositivos. Si estaba en algún entrenamiento, deja de aparecer ahí. Esta acción no se puede deshacer.",
+        "Borrar jugada"
+    ).then(function (ok) {
+        if (!ok) return;
+        loadSavedPlaysFromStorage();
+        savedPlays = savedPlays.filter(function (p) { return String(p.id) !== String(id); });
+        deletedPlayTombstones = deletedPlayTombstones.filter(function (p) { return String(p.id) !== String(id); });
+        deletedPlayTombstones.push({ id: play.id, deleted: true, updated_at: new Date().toISOString() });
+        savePlaysToStorage();
+        renderPlaysLibrary();
+    });
 }
 
+function duplicatePlay(id) {
+    var play = findSavedPlay(id);
+    if (!play) return;
+    var now = new Date().toISOString();
+    var copy = JSON.parse(JSON.stringify(play));
+    var newId = Date.now();
+    while (savedPlays.some(function (p) { return String(p.id) === String(newId); })) newId++;
+    copy.id = newId;
+    copy.name = (play.name || "Jugada") + " (copia)";
+    copy.created_at = now;
+    copy.updated_at = now;
+    savedPlays.push(copy);
+    savePlaysToStorage();
+    renderPlaysLibrary();
+}
+
+function exportPlayPng(id) {
+    var play = findSavedPlay(id);
+    var engine = getBoardEngine();
+    if (!play || !engine) return;
+    var imgs = getPlayStepImages(play, 900);
+    if (!imgs.length) return;
+    var count = imgs.length;
+    engine.composeSheet(imgs, play.name || "Jugada", count + (isBoardPlayRecord(play) ? " fase(s)" : " paso(s)") + " · Basket Lab").then(function (url) {
+        engine.downloadDataUrl(url, engine.safeFilename(play.name) + ".png");
+    });
+}
+
+function viewPlay(id) {
+    var play = findSavedPlay(id);
+    if (!play) return;
+    var imgs = getPlayStepImages(play, 900);
+    var phases = isBoardPlayRecord(play) ? play.board.phases : [];
+    var isV2 = isBoardPlayRecord(play);
+    openAppModal(
+        '<div class="tb-modal-head"><h3 class="tb-modal-title">' + escapeHtml(play.name || "Jugada") + '</h3><button type="button" class="tb-btn tb-btn--icon" data-modal-close aria-label="Cerrar">✕</button></div>' +
+        (play.description ? '<p class="tb-modal-text" style="white-space:pre-wrap">' + escapeHtml(play.description) + "</p>" : "") +
+        (!isV2 ? '<p class="tb-modal-text">Esta jugada se guardó con la pizarra anterior, así que se conserva como imágenes. Podés renombrarla, clasificarla, exportarla o duplicarla.</p>' : "") +
+        '<div class="pl-steps">' + imgs.map(function (src, i) {
+            var ph = phases[i];
+            return '<figure><img src="' + src + '" alt="Paso ' + (i + 1) + '"><figcaption>' +
+                (ph ? (i + 1) + ". " + escapeHtml(ph.name || "Fase") + (ph.note ? " — " + escapeHtml(ph.note) : "") : "Paso " + (i + 1)) +
+                "</figcaption></figure>";
+        }).join("") + "</div>" +
+        '<div class="tb-modal-actions">' +
+        (isV2 ? '<button type="button" class="tb-btn tb-btn--accent" onclick="closeAppModal(); loadBoard(\'' + escapeHtml(String(play.id)) + '\')">Abrir en pizarra</button>' : "") +
+        '<button type="button" class="tb-btn" data-modal-close>Cerrar</button></div>'
+    );
+    var card = document.querySelector("#app-modal .tb-modal-card");
+    if (card) card.style.width = "min(980px, 100%)";
+}
+
+// Compatibilidad: se mantiene el nombre usado por la biblioteca anterior.
 function closeEditPlayModal() {
-    const el = document.getElementById("play-edit-modal");
-    if (el && el._onEscape) {
-        document.removeEventListener("keydown", el._onEscape);
-    }
-    if (el) el.remove();
+    closeAppModal();
 }
 
 function openEditPlayModal(playId) {
-    loadSavedPlaysFromStorage();
-    const play = savedPlays.find(function (p) { return p.id === playId; });
+    var play = findSavedPlay(playId);
     if (!play) return;
-    closeEditPlayModal();
-
-    const overlay = document.createElement("div");
-    overlay.id = "play-edit-modal";
-    overlay.className = "play-edit-modal-overlay";
-    overlay.setAttribute("role", "dialog");
-    overlay.setAttribute("aria-modal", "true");
-    overlay.setAttribute("aria-labelledby", "play-edit-modal-title");
-
-    overlay.innerHTML =
-        '<div class="play-edit-modal">' +
-        '<h3 id="play-edit-modal-title">Editar jugada</h3>' +
-        '<label for="play-edit-name">Nombre</label>' +
-        '<input type="text" id="play-edit-name" class="play-edit-input" autocomplete="off" />' +
-        '<label for="play-edit-desc">Descripción</label>' +
-        '<p class="play-edit-hint">Aparece en la biblioteca y en el PDF. Podés dejarla vacía.</p>' +
-        '<textarea id="play-edit-desc" class="play-edit-textarea" rows="7" placeholder="Objetivo, variantes, lecturas..."></textarea>' +
-        '<div class="play-edit-modal-actions">' +
-        '<button type="button" class="play-edit-btn-cancel" id="play-edit-cancel">Cancelar</button>' +
-        '<button type="button" class="toolbar-button toolbar-button-accent" id="play-edit-save">Guardar</button>' +
-        "</div></div>";
-
-    overlay.addEventListener("click", function (e) {
-        if (e.target === overlay) closeEditPlayModal();
-    });
-
-    document.body.appendChild(overlay);
-
-    function onEscape(ev) {
-        if (ev.key === "Escape") closeEditPlayModal();
-    }
-    overlay._onEscape = onEscape;
-    document.addEventListener("keydown", onEscape);
-
-    document.getElementById("play-edit-name").value = play.name || "";
-    document.getElementById("play-edit-desc").value = play.description || "";
-
-    document.getElementById("play-edit-cancel").onclick = closeEditPlayModal;
-    document.getElementById("play-edit-save").onclick = function () {
-        var name = document.getElementById("play-edit-name").value.trim();
+    var tagsValue = (Array.isArray(play.tags) ? play.tags : []).join(", ");
+    var teams = getKnownTeams();
+    var ov = openAppModal(
+        '<h3 class="tb-modal-title">Editar datos de la jugada</h3>' +
+        '<form id="play-edit-form">' +
+        '<label class="tb-field"><span>Nombre *</span><input type="text" name="name" maxlength="80" required value="' + escapeHtml(play.name || "") + '"></label>' +
+        '<div class="tb-field-row">' +
+        '<label class="tb-field"><span>Categoría</span><select name="category">' + buildFilterOptions(PLAY_CATEGORIES.concat(play.category && PLAY_CATEGORIES.indexOf(play.category) < 0 ? [play.category] : []), play.category || "", "Sin categoría") + "</select></label>" +
+        '<label class="tb-field"><span>Equipo</span><input type="text" name="team" maxlength="40" list="play-edit-teams" value="' + escapeHtml(play.team || "") + '" placeholder="Ej.: U15"><datalist id="play-edit-teams">' +
+        teams.map(function (t) { return '<option value="' + escapeHtml(t) + '">'; }).join("") + "</datalist></label></div>" +
+        '<label class="tb-field"><span>Etiquetas</span><input type="text" name="tags" maxlength="160" value="' + escapeHtml(tagsValue) + '" placeholder="Separadas por coma"></label>' +
+        '<label class="tb-field"><span>Descripción</span><textarea name="description" rows="6" maxlength="2000" placeholder="Objetivo, variantes, lecturas...">' + escapeHtml(play.description || "") + "</textarea></label>" +
+        '<p class="tb-form-error" hidden></p>' +
+        '<div class="tb-modal-actions"><button type="button" class="tb-btn" data-modal-close>Cancelar</button>' +
+        '<button type="submit" class="tb-btn tb-btn--accent">Guardar</button></div>' +
+        "</form>"
+    );
+    var form = ov.querySelector("#play-edit-form");
+    form.querySelector("[name='name']").focus();
+    form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var fd = new FormData(form);
+        var name = String(fd.get("name") || "").trim();
         if (!name) {
-            alert("El nombre no puede estar vacío.");
+            var err = form.querySelector(".tb-form-error");
+            err.textContent = "El nombre no puede estar vacío.";
+            err.hidden = false;
             return;
         }
-        var desc = document.getElementById("play-edit-desc").value.trim();
-        loadSavedPlaysFromStorage();
-        var p = savedPlays.find(function (x) { return x.id === playId; });
+        var p = findSavedPlay(playId);
         if (!p) return;
         p.name = name;
-        p.description = desc;
+        p.category = String(fd.get("category") || "");
+        p.team = String(fd.get("team") || "").trim();
+        p.tags = String(fd.get("tags") || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 12);
+        p.description = String(fd.get("description") || "").trim();
+        p.updated_at = new Date().toISOString();
         savePlaysToStorage();
-        closeEditPlayModal();
-        loadContent("plays_library");
-    };
-
-    document.getElementById("play-edit-name").focus();
-}
-
-function renderCurrentPlaySteps() {
-    const container = document.getElementById("current-play-steps");
-    if (!container) return;
-
-    if (!currentPlaySteps.length) {
-        container.innerHTML = `<p>No hay pasos guardados todavía para esta jugada.</p>`;
-        return;
-    }
-
-    const total = currentPlaySteps.length;
-
-    let html = `<h3 class="section-title">Pasos de la jugada actual</h3>`;
-    html += `<div class="play-steps-grid">`;
-
-    currentPlaySteps.forEach((stepUrl, idx) => {
-        html += `
-            <div class="play-step-card">
-                <span class="play-step-label">Paso ${idx + 1} / ${total}</span>
-                <img src="${stepUrl}" alt="Paso ${idx + 1}">
-            </div>
-        `;
+        closeAppModal();
+        renderPlaysLibrary();
     });
-
-    html += `</div>`;
-    container.innerHTML = html;
-}
-
-
-// ===============================
-// DIBUJO CANCHA NBA PRO
-// ===============================
-
-function drawCourt() {
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    drawCourtBackground(ctx, canvas.width, canvas.height);
-    drawScene(ctx);
-}
-
-function drawCourtBackground(targetCtx, width, height) {
-    // Media cancha simple (solo un aro)
-    const marginSide = 40;
-    const marginBaseline = 40;
-
-    const sidelineLeft = marginSide;
-    const sidelineRight = width - marginSide;
-    const baselineY = height - marginBaseline;
-    const topY = 80;
-    const centerX = width / 2;
-
-    // Fondo madera
-    targetCtx.fillStyle = "#f5d7a1";
-    targetCtx.fillRect(0, 0, width, height);
-
-    targetCtx.strokeStyle = "#b07c3a";
-    targetCtx.lineWidth = 4;
-
-    // Rectángulo de media cancha
-    targetCtx.strokeRect(sidelineLeft, topY, sidelineRight - sidelineLeft, baselineY - topY);
-
-    // Línea de tres puntos: segmentos rectos separados de la banda (no tocan la línea lateral)
-    const rimY = baselineY - 40;
-    const threeInset = 14; // distancia chica entre la línea de triple y la banda
-    const leftThreeX = sidelineLeft + threeInset;
-    const rightThreeX = sidelineRight - threeInset;
-    const distToThreeVertical = centerX - leftThreeX;
-    const threeRadius = Math.max(220, distToThreeVertical + 6);
-
-    const dxLeft = leftThreeX - centerX;
-    const halfChord = Math.sqrt(Math.max(0, threeRadius * threeRadius - dxLeft * dxLeft));
-    const yMeetLeft = rimY - halfChord;
-    const yMeetRight = rimY - halfChord;
-
-    const angleLeft = Math.atan2(yMeetLeft - rimY, dxLeft);
-    const angleRight = Math.atan2(yMeetRight - rimY, rightThreeX - centerX);
-    const arcEnd = angleRight <= angleLeft ? angleRight + 2 * Math.PI : angleRight;
-
-    // Trazado continuo: recta izquierda → arco → recta derecha (con separación de la banda)
-    targetCtx.beginPath();
-    targetCtx.moveTo(leftThreeX, baselineY);
-    targetCtx.lineTo(leftThreeX, yMeetLeft);
-    targetCtx.arc(centerX, rimY, threeRadius, angleLeft, arcEnd);
-    targetCtx.lineTo(rightThreeX, baselineY);
-    targetCtx.stroke();
-
-    // Llave (zona pintada)
-    const laneWidth = 160;
-    const laneHeight = 190;
-    const laneX = centerX - laneWidth / 2;
-    const laneTopY = baselineY - laneHeight;
-
-    targetCtx.strokeRect(laneX, laneTopY, laneWidth, laneHeight);
-
-    // Línea de tiro libre (horizontal)
-    targetCtx.beginPath();
-    targetCtx.moveTo(laneX, laneTopY);
-    targetCtx.lineTo(laneX + laneWidth, laneTopY);
-    targetCtx.stroke();
-
-    // Círculo de tiro libre (solo la parte interior hacia el aro)
-    targetCtx.beginPath();
-    targetCtx.arc(centerX, laneTopY, 60, Math.PI, 2 * Math.PI);
-    targetCtx.stroke();
-
-    // Semicírculo restringido debajo del aro
-    const restrictedRadius = 40;
-    targetCtx.beginPath();
-    targetCtx.arc(centerX, rimY, restrictedRadius, Math.PI, 2 * Math.PI);
-    targetCtx.stroke();
-
-    // Aro
-    targetCtx.beginPath();
-    targetCtx.arc(centerX, rimY, 9, 0, Math.PI * 2);
-    targetCtx.stroke();
-}
-
-function drawScene(targetCtx) {
-    // Líneas tácticas
-    lines.forEach(line => {
-        targetCtx.strokeStyle = "black";
-        targetCtx.lineWidth = 2;
-        targetCtx.setLineDash([]);
-
-        if (line.type === "normal") {
-            drawCurvedOrFreehandLineOnContext(targetCtx, line);
-            drawArrowForLine(targetCtx, line);
-        } else if (line.type === "dashed") {
-            targetCtx.setLineDash([8, 6]);
-            drawCurvedOrFreehandLineOnContext(targetCtx, line);
-            targetCtx.setLineDash([]);
-            drawArrowForLine(targetCtx, line);
-        } else if (line.type === "zigzag") {
-            drawZigZagOnContext(targetCtx, line);
-        } else if (line.type === "screen") {
-            drawScreenLineOnContext(targetCtx, line);
-        }
-    });
-
-    // Jugadores
-    players.forEach(p => {
-        targetCtx.beginPath();
-        targetCtx.arc(p.x, p.y, 18, 0, Math.PI * 2);
-        targetCtx.fillStyle = p.color;
-        targetCtx.fill();
-
-        targetCtx.fillStyle = "white";
-        targetCtx.font = "bold 14px Arial";
-        targetCtx.textAlign = "center";
-        targetCtx.textBaseline = "middle";
-        targetCtx.fillText(p.number, p.x, p.y);
-    });
-
-    // Pelota
-    if (ball) {
-        targetCtx.beginPath();
-        targetCtx.arc(ball.x, ball.y, 12, 0, Math.PI * 2);
-        targetCtx.fillStyle = "#f57c00";
-        targetCtx.fill();
-        targetCtx.strokeStyle = "black";
-        targetCtx.lineWidth = 2;
-        targetCtx.stroke();
-
-        targetCtx.beginPath();
-        targetCtx.arc(ball.x, ball.y, 12, 0.5 * Math.PI, 1.5 * Math.PI);
-        targetCtx.stroke();
-
-        targetCtx.beginPath();
-        targetCtx.moveTo(ball.x - 12, ball.y);
-        targetCtx.lineTo(ball.x + 12, ball.y);
-        targetCtx.stroke();
-    }
-
-    // Línea en construcción (cuando el usuario está dibujando en modo líneas)
-    if (isLineMode && isDrawingLine && currentLinePath.length > 1) {
-        const preview = {
-            type: currentLineType,
-            path: currentLinePath,
-            x1: currentLinePath[0].x,
-            y1: currentLinePath[0].y,
-            x2: currentLinePath[currentLinePath.length - 1].x,
-            y2: currentLinePath[currentLinePath.length - 1].y
-        };
-        targetCtx.strokeStyle = "black";
-        targetCtx.lineWidth = 2;
-        if (currentLineType === "dashed") {
-            targetCtx.setLineDash([8, 6]);
-        }
-        if (currentLineType === "zigzag") {
-            drawZigZagOnContext(targetCtx, preview);
-        } else {
-            drawCurvedOrFreehandLineOnContext(targetCtx, preview);
-            if (currentLineType === "normal" || currentLineType === "dashed") {
-                drawArrowAtPathEnd(targetCtx, currentLinePath);
-            }
-        }
-        targetCtx.setLineDash([]);
-    }
-}
-
-// Dibuja la línea según el trazo del usuario si hay path; si no, usa una curva suave entre dos puntos
-function drawCurvedOrFreehandLineOnContext(targetCtx, line) {
-    if (line.path && line.path.length > 1) {
-        targetCtx.beginPath();
-        targetCtx.moveTo(line.path[0].x, line.path[0].y);
-        for (let i = 1; i < line.path.length; i++) {
-            targetCtx.lineTo(line.path[i].x, line.path[i].y);
-        }
-        targetCtx.stroke();
-        return;
-    }
-
-    // Fallback para líneas viejas: curva suave entre inicio y fin
-    const mx = (line.x1 + line.x2) / 2;
-    const my = (line.y1 + line.y2) / 2;
-    const dx = line.x2 - line.x1;
-    const dy = line.y2 - line.y1;
-    const dist = Math.hypot(dx, dy) || 1;
-    const offset = dist * 0.2;
-    const angle = Math.atan2(dy, dx);
-    const cx = mx - offset * Math.sin(angle);
-    const cy = my + offset * Math.cos(angle);
-
-    targetCtx.beginPath();
-    targetCtx.moveTo(line.x1, line.y1);
-    targetCtx.quadraticCurveTo(cx, cy, line.x2, line.y2);
-    targetCtx.stroke();
-}
-
-
-// ===============================
-// FLECHA
-// ===============================
-/** Flecha al final del trazo, apuntando en la dirección del último segmento (no inicio→fin global). */
-function drawArrowAtPathEnd(targetCtx, path) {
-    if (!path || path.length < 2) return;
-    const n = path.length;
-    const xTip = path[n - 1].x;
-    const yTip = path[n - 1].y;
-    let i = n - 2;
-    while (i >= 0 && Math.hypot(xTip - path[i].x, yTip - path[i].y) < 5) {
-        i--;
-    }
-    if (i < 0) i = 0;
-    drawArrowOnContext(targetCtx, path[i].x, path[i].y, xTip, yTip);
-}
-
-function drawArrowForLine(targetCtx, line) {
-    if (line.path && line.path.length > 1) {
-        drawArrowAtPathEnd(targetCtx, line.path);
-    } else {
-        drawArrowOnContext(targetCtx, line.x1, line.y1, line.x2, line.y2);
-    }
-}
-
-function drawArrowOnContext(targetCtx, x1, y1, x2, y2) {
-
-    const headlen = 12;
-    const angle = Math.atan2(y2 - y1, x2 - x1);
-
-    targetCtx.beginPath();
-    targetCtx.moveTo(x2, y2);
-    targetCtx.lineTo(
-        x2 - headlen * Math.cos(angle - Math.PI / 6),
-        y2 - headlen * Math.sin(angle - Math.PI / 6)
-    );
-    targetCtx.lineTo(
-        x2 - headlen * Math.cos(angle + Math.PI / 6),
-        y2 - headlen * Math.sin(angle + Math.PI / 6)
-    );
-    targetCtx.closePath();
-    targetCtx.fillStyle = "black";
-    targetCtx.fill();
-}
-
-function drawArrow(x1, y1, x2, y2) {
-    drawArrowOnContext(ctx, x1, y1, x2, y2);
-}
-
-
-// ===============================
-// LÍNEA VÍBORA (onda suave sobre el trazo)
-// ===============================
-
-function pathLength(path) {
-    if (!path || path.length < 2) return 0;
-    var total = 0;
-    for (var i = 1; i < path.length; i++) {
-        total += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
-    }
-    return total;
-}
-
-function simplifyPath(path, minDist) {
-    if (!path || path.length <= 2) return path || [];
-    minDist = minDist || 3;
-    var out = [path[0]];
-    for (var i = 1; i < path.length; i++) {
-        var last = out[out.length - 1];
-        if (Math.hypot(path[i].x - last.x, path[i].y - last.y) >= minDist) {
-            out.push(path[i]);
-        }
-    }
-    var end = path[path.length - 1];
-    var tail = out[out.length - 1];
-    if (Math.hypot(end.x - tail.x, end.y - tail.y) > 1) out.push(end);
-    return out;
-}
-
-function resamplePathByLength(path, spacing) {
-    if (!path || path.length < 2) return path || [];
-    spacing = spacing || 5;
-    var total = pathLength(path);
-    if (total < spacing) return path.slice();
-
-    var result = [{ x: path[0].x, y: path[0].y }];
-    var nextSample = spacing;
-    var segIndex = 0;
-    var segStart = 0;
-
-    while (nextSample < total && segIndex < path.length - 1) {
-        while (segIndex < path.length - 1) {
-            var segLen = Math.hypot(
-                path[segIndex + 1].x - path[segIndex].x,
-                path[segIndex + 1].y - path[segIndex].y
-            );
-            if (segStart + segLen >= nextSample) break;
-            segStart += segLen;
-            segIndex++;
-        }
-        if (segIndex >= path.length - 1) break;
-        var dx = path[segIndex + 1].x - path[segIndex].x;
-        var dy = path[segIndex + 1].y - path[segIndex].y;
-        var segLen = Math.hypot(dx, dy) || 1;
-        var t = (nextSample - segStart) / segLen;
-        result.push({
-            x: path[segIndex].x + dx * t,
-            y: path[segIndex].y + dy * t
-        });
-        nextSample += spacing;
-    }
-
-    var last = path[path.length - 1];
-    var prev = result[result.length - 1];
-    if (Math.hypot(last.x - prev.x, last.y - prev.y) > 2) {
-        result.push({ x: last.x, y: last.y });
-    }
-    return result;
-}
-
-function smoothPathChaikin(path, iterations) {
-    if (!path || path.length < 3) return path || [];
-    iterations = iterations || 1;
-    var pts = path.slice();
-    for (var iter = 0; iter < iterations; iter++) {
-        var next = [pts[0]];
-        for (var i = 0; i < pts.length - 1; i++) {
-            var p0 = pts[i];
-            var p1 = pts[i + 1];
-            next.push(
-                { x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y },
-                { x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y }
-            );
-        }
-        next.push(pts[pts.length - 1]);
-        pts = next;
-    }
-    return pts;
-}
-
-function getCenterlineFromLine(line) {
-    if (line.path && line.path.length > 1) {
-        var simplified = simplifyPath(line.path, 3);
-        var smoothed = smoothPathChaikin(simplified, 1);
-        return resamplePathByLength(smoothed, 5);
-    }
-
-    var dist = Math.hypot(line.x2 - line.x1, line.y2 - line.y1);
-    var steps = Math.max(10, Math.ceil(dist / 6));
-    var path = [];
-    for (var i = 0; i <= steps; i++) {
-        var t = i / steps;
-        path.push({
-            x: line.x1 + t * (line.x2 - line.x1),
-            y: line.y1 + t * (line.y2 - line.y1)
-        });
-    }
-    return path;
-}
-
-function buildSnakePoints(centerline, amplitude, wavelength) {
-    if (!centerline || centerline.length < 2) return centerline || [];
-
-    amplitude = amplitude || 10;
-    wavelength = wavelength || 28;
-
-    var cumLen = [0];
-    for (var i = 1; i < centerline.length; i++) {
-        cumLen.push(
-            cumLen[i - 1] + Math.hypot(
-                centerline[i].x - centerline[i - 1].x,
-                centerline[i].y - centerline[i - 1].y
-            )
-        );
-    }
-
-    var snake = [];
-    for (var j = 0; j < centerline.length; j++) {
-        var tx;
-        var ty;
-        if (j === 0) {
-            tx = centerline[1].x - centerline[0].x;
-            ty = centerline[1].y - centerline[0].y;
-        } else if (j === centerline.length - 1) {
-            tx = centerline[j].x - centerline[j - 1].x;
-            ty = centerline[j].y - centerline[j - 1].y;
-        } else {
-            tx = centerline[j + 1].x - centerline[j - 1].x;
-            ty = centerline[j + 1].y - centerline[j - 1].y;
-        }
-
-        var len = Math.hypot(tx, ty) || 1;
-        var nx = -ty / len;
-        var ny = tx / len;
-        var phase = (2 * Math.PI * cumLen[j]) / wavelength;
-        var offset = amplitude * Math.sin(phase);
-
-        snake.push({
-            x: centerline[j].x + nx * offset,
-            y: centerline[j].y + ny * offset
-        });
-    }
-    return snake;
-}
-
-function drawSnakePathOnContext(targetCtx, points) {
-    if (!points || points.length < 2) return;
-    targetCtx.beginPath();
-    targetCtx.moveTo(points[0].x, points[0].y);
-    for (var i = 1; i < points.length; i++) {
-        targetCtx.lineTo(points[i].x, points[i].y);
-    }
-    targetCtx.stroke();
-}
-
-function getSnakePointsFromLine(line) {
-    var centerline = getCenterlineFromLine(line);
-    var total = pathLength(centerline);
-    var amplitude = Math.min(12, Math.max(7, total / 18));
-    var wavelength = Math.min(34, Math.max(22, total / 5));
-    return buildSnakePoints(centerline, amplitude, wavelength);
-}
-
-function drawZigZag(line) {
-    var snake = getSnakePointsFromLine(line);
-    drawSnakePathOnContext(ctx, snake);
-    drawArrowAtPathEnd(ctx, snake);
-}
-
-function drawZigZagOnContext(targetCtx, line) {
-    var snake = getSnakePointsFromLine(line);
-    drawSnakePathOnContext(targetCtx, snake);
-    drawArrowAtPathEnd(targetCtx, snake);
-}
-
-// ===============================
-// LÍNEA BLOQUEO (SCREEN)
-// ===============================
-
-function drawScreenLine(line) {
-
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 3;
-
-    // Línea principal
-    ctx.beginPath();
-    ctx.moveTo(line.x1, line.y1);
-    ctx.lineTo(line.x2, line.y2);
-    ctx.stroke();
-
-    // Calcular ángulo de la línea
-    const angle = Math.atan2(line.y2 - line.y1, line.x2 - line.x1);
-
-    // Longitud de la línea perpendicular
-    const size = 15;
-
-    // Punto final
-    const x = line.x2;
-    const y = line.y2;
-
-    // Dibujar línea perpendicular (la "T")
-    ctx.beginPath();
-    ctx.moveTo(
-        x - size * Math.sin(angle),
-        y + size * Math.cos(angle)
-    );
-    ctx.lineTo(
-        x + size * Math.sin(angle),
-        y - size * Math.cos(angle)
-    );
-    ctx.stroke();
-}
-
-function drawScreenLineOnContext(targetCtx, line) {
-    targetCtx.strokeStyle = "black";
-    targetCtx.lineWidth = 3;
-
-    // Línea principal
-    targetCtx.beginPath();
-    targetCtx.moveTo(line.x1, line.y1);
-    targetCtx.lineTo(line.x2, line.y2);
-    targetCtx.stroke();
-
-    // Calcular ángulo de la línea
-    const angle = Math.atan2(line.y2 - line.y1, line.x2 - line.x1);
-
-    const size = 15;
-    const x = line.x2;
-    const y = line.y2;
-
-    // Dibujar línea perpendicular (la "T")
-    targetCtx.beginPath();
-    targetCtx.moveTo(
-        x - size * Math.sin(angle),
-        y + size * Math.cos(angle)
-    );
-    targetCtx.lineTo(
-        x + size * Math.sin(angle),
-        y - size * Math.cos(angle)
-    );
-    targetCtx.stroke();
 }

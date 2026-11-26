@@ -9,6 +9,7 @@
     <title>Basket Lab</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/tactical-board.css">
 </head>
 <body class="app-body">
 
@@ -544,7 +545,7 @@
                     <span>Planilla</span>
                 </div>
                 <ul class="sidebar-submenu" id="planilla">
-                    <li onclick="loadBoard()">Pizarra Virtual</li>
+                    <li onclick="loadBoard()">Pizarra táctica</li>
                     <li onclick="loadContent('shooting_training')">Entrenamiento de tiro</li>
                 </ul>
             </div>
@@ -603,6 +604,7 @@
 <script src="js/shooting-zones-heatmap.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-config.js"></script>
+<script src="js/tactical-board.js"></script>
 <script src="js/main.js"></script>
 <script>
     function toggleSidebarGroup(elm) {
