@@ -38,7 +38,7 @@
         ftCircleRadius: 1.8,
         threeRadius: 6.75,
         threeSideDist: 0.9, // rectas del triple a 0,90 m de la banda
-        noChargeRadius: 1.25,
+        noChargeRadius: 1.3, // Reglas Oficiales FIBA 2024, art. 2.5.7
         centerCircleRadius: 1.8,
         throwInX: 8.325 // línea de saque, medida desde la línea de fondo
     };
@@ -3510,6 +3510,7 @@
         toWorld: toWorld,
         buildTemplate: buildTemplate,
         renderScene: renderScene,
+        ICONS: ICONS,
         renderPhaseImage: renderPhaseImage,
         composeSheet: composeSheet,
         downloadDataUrl: downloadDataUrl,

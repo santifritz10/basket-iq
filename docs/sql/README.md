@@ -13,6 +13,12 @@ Ejecutar en **Supabase SQL Editor** en este orden:
   (tablas `assistant_conversations` y `assistant_messages`, con RLS). Solo crea tablas nuevas.
   Mientras no se ejecute, `/assistant` sigue funcionando pero sin guardar los chats.
 
+## Basket Lab Academy
+
+- `008-learning-progress.sql` — permite guardar en `user_app_data` el tipo `learning_progress`
+  (favoritos y punto de lectura de los contenidos educativos). Solo amplía la restricción CHECK
+  de `data_type`; no toca datos. Mientras no se ejecute, favoritos y lectura quedan solo en el dispositivo.
+
 ## Staging primero
 
 Probar en proyecto de staging antes de producción.
