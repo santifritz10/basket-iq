@@ -934,6 +934,28 @@
         {
             id: "ej-espejo",
             name: "Zona espejo con cuatro pasadores",
+            meta: {
+                fundamento: "Defensa zonal",
+                objetivo: "Desplazamientos defensivos",
+                categories: ["U17", "Primera"],
+                level: "Inicial",
+                minPlayers: 9,
+                maxPlayers: 12,
+                minutes: [8, 10],
+                court: "half",
+                hoops: 1,
+                materials: ["Balones"],
+                optionalMaterials: ["Conos"],
+                blockType: "tactica"
+            },
+            adaptations: [
+                {
+                    id: "tres-pasadores",
+                    label: "Con tres pasadores (8 jugadores)",
+                    text: "Regresión: solo tres pasadores (arriba, ala y esquina del mismo lado) contra los cinco defensores. Se trabaja un lado por vez.",
+                    req: { minPlayers: 8 }
+                }
+            ],
             kind: "method",
             board: "ejercicio-espejo",
             objective: "Automatizar los desplazamientos colectivos de la 2-3 con cada pase.",
@@ -961,6 +983,28 @@
         {
             id: "ej-linea",
             name: "4 contra 5 con línea de recogida",
+            meta: {
+                fundamento: "Defensa zonal",
+                objetivo: "Línea de recogida y comunicación",
+                categories: ["U17", "Primera"],
+                level: "Intermedio",
+                minPlayers: 9,
+                maxPlayers: 14,
+                minutes: [10, 12],
+                court: "half",
+                hoops: 1,
+                materials: ["Balones", "Conos"],
+                optionalMaterials: [],
+                blockType: "tactica"
+            },
+            adaptations: [
+                {
+                    id: "tres-contra-cuatro",
+                    label: "3 contra 4 en un lado (7 jugadores)",
+                    text: "Regresión: tres atacantes contra cuatro defensores (un base, el pívot y los dos defensores del lado del balón) jugando en un solo lado de la cancha.",
+                    req: { minPlayers: 7 }
+                }
+            ],
             kind: "interpretation",
             refs: ["S2"],
             board: "ejercicio-linea",
@@ -989,6 +1033,34 @@
         {
             id: "ej-rebote",
             name: "Tiro, búsqueda y bloqueo desde la zona",
+            meta: {
+                fundamento: "Rebote",
+                objetivo: "Rebote defensivo",
+                categories: ["U17", "Primera"],
+                level: "Intermedio",
+                minPlayers: 10,
+                maxPlayers: 15,
+                minutes: [10, 10],
+                court: "full",
+                hoops: 1,
+                materials: ["Balones"],
+                optionalMaterials: [],
+                blockType: "tactica"
+            },
+            adaptations: [
+                {
+                    id: "media-cancha",
+                    label: "Versión media cancha",
+                    text: "Sin contraataque: la defensa suma su punto cuando asegura el rebote y da el primer pase de salida a un entrenador ubicado en la mitad de la cancha.",
+                    req: { court: "half" }
+                },
+                {
+                    id: "tres-contra-tres",
+                    label: "3 contra 3 con la línea de atrás (6 jugadores)",
+                    text: "Regresión: solo la línea de atrás de la zona (dos aleros y pívot) contra tres atacantes, con tiros del entrenador.",
+                    req: { minPlayers: 6, court: "half" }
+                }
+            ],
             kind: "method",
             board: "poste-bajo-rebote",
             objective: "Asegurar el rebote defensivo cuando se defiende en zona.",

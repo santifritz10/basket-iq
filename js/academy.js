@@ -337,7 +337,8 @@
             (ex.board ? '<div class="ac-board-slot" data-board="' + esc(ex.board) + '"></div>' : "") +
             '<dl class="ac-ex-grid">' + rows + "</dl>" +
             '<p class="ac-ex-basis"><strong>Fuente o fundamento técnico:</strong> ' + fmt(ex.basis) + "</p>" +
-            '<p class="ac-muted">Añadir al entrenamiento llega con la biblioteca de ejercicios (Etapa 4).</p>' +
+            (ctx.canAdd ? '<div class="ac-ex-actions"><button type="button" class="tb-btn tb-btn--accent" data-add-exercise="' + esc(ex.id) + '">Añadir al entrenamiento</button>' +
+                (ctx.canLibrary ? '<button type="button" class="tb-btn" data-open-library>Ver biblioteca de ejercicios</button>' : "") + "</div>" : "") +
             "</article>";
     }
 
@@ -676,7 +677,7 @@
             });
             activeViewers.forEach(function (v) { v.stop(); });
             activeViewers = [];
-            var ctx = { boardsById: boardsById };
+            var ctx = { boardsById: boardsById, canAdd: !!host.onAddExercise, canLibrary: !!host.onOpenLibrary };
             content.innerHTML = renderTab(article, tab, ctx);
             var secs = tabSections(article, tab);
             toc.innerHTML = '<p class="ac-toc-title">En esta pestaña</p><ol>' + secs.map(function (s) {
@@ -787,6 +788,15 @@
                         setTimeout(function () { el.classList.remove("is-flash"); }, 1600);
                     }
                 }, 50);
+                return;
+            }
+            var addEx = e.target.closest("[data-add-exercise]");
+            if (addEx && host.onAddExercise) {
+                host.onAddExercise(article, addEx.getAttribute("data-add-exercise"));
+                return;
+            }
+            if (e.target.closest("[data-open-library]") && host.onOpenLibrary) {
+                host.onOpenLibrary();
                 return;
             }
             var fav = e.target.closest(".ac-fav");
