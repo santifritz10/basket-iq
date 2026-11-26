@@ -3695,7 +3695,17 @@ var FUNDAMENTOS_CATEGORY_VIEWS = {
         subtitle: "Seleccioná el bloque de ataque según el tipo de defensa rival.",
         items: [
             { id: "ataques_hub_zona", label: "Ataques vs zona" },
-            { id: "ataques_hub_hombre", label: "Ataques hombre a hombre" }
+            { id: "ataques_hub_hombre", label: "Ataques hombre a hombre" },
+            { id: "ataques_hub_conceptos", label: "Conceptos de ataque" }
+        ]
+    },
+    ataques_hub_conceptos: {
+        title: "Conceptos de ataque",
+        subtitle: "Guías de Basket Lab Academy con pizarras animadas, simulador y ejercicios.",
+        items: [
+            { id: "spacing_ataque", label: "Spacing" },
+            { id: "pick_and_roll", label: "Pick and roll" },
+            { id: "superioridades", label: "Superioridades (2c1, 3c2, 4c3)" }
         ]
     },
     ataques_hub_zona: {
@@ -4053,6 +4063,9 @@ function loadContent(sectionId) {
             renderAcademyArticle("zona-3-2");
             break;
 
+        case "pick_and_roll": renderAcademyArticle("pick-and-roll"); break;
+        case "superioridades": renderAcademyArticle("superioridades"); break;
+        case "spacing_ataque": renderAcademyArticle("spacing"); break;
         case "zone131_defense":
             renderAcademyArticle("zona-1-3-1");
             break;
@@ -5655,7 +5668,7 @@ function openAcademyBoardInEditor(doc, boardDef, article) {
         meta: {
             name: boardDef.title,
             description: boardDef.description || ("Copia de la pizarra educativa de Basket Lab Academy · " + (article ? article.title : "")),
-            category: "Defensa zonal",
+            category: (article && article.playCategory) || "Defensa zonal",
             tags: Array.isArray(boardDef.tags) ? boardDef.tags : ["Academy"]
         },
         userId: user && user.id ? user.id : "guest",

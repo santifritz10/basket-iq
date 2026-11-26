@@ -230,3 +230,96 @@ test("la biblioteca reúne los ejercicios de las tres zonas sin claves repetidas
   assert.equal(new Set(list.map((i) => i.key)).size, 9);
   assert.ok(Ex.filterList(list, { fundamento: "Ataque contra zona" }).length >= 2);
 });
+
+// ---------------------------------------------------------------
+// Etapa 5B: pick and roll, superioridades y spacing
+// ---------------------------------------------------------------
+const pnr = require("../js/academy-content/pick-and-roll.js");
+const superioridades = require("../js/academy-content/superioridades.js");
+const spacing = require("../js/academy-content/spacing.js");
+
+for (const art of [pnr, superioridades, spacing]) {
+  test(`${art.id}: contenido válido, completo y con fuentes`, () => {
+    assert.deepEqual(Academy.validateArticle(art), []);
+    const ids = art.tabs.aprender.map((s) => s.id);
+    SECTION_IDS.forEach((id) => assert.ok(ids.includes(id), id));
+    assert.ok(art.exercises.length >= 3);
+    assert.ok(art.sources.length >= 3);
+    assert.ok(art.unavailableSources.length >= 1);
+    art.tabs.visualizar.forEach((id) => assert.ok(art.boards.some((b) => b.id === id), id));
+  });
+
+  test(`${art.id}: pizarras animables, dentro de la cancha y sin superposiciones`, () => {
+    for (const b of art.boards) {
+      const doc = Academy.boardFromSpec(b.spec, Board);
+      assert.ok(doc.phases.length >= 2, b.id);
+      doc.phases.forEach((ph, i) => {
+        const ps = ph.objects.filter((o) => o.kind === "player" && !o.hidden);
+        ps.forEach((p) => assert.ok(p.x >= 0 && p.x <= 14 && p.y >= 0 && p.y <= 15, `${b.id} ${p.id}`));
+        for (let a = 0; a < ps.length; a++) for (let c = a + 1; c < ps.length; c++) {
+          assert.ok(Math.hypot(ps[a].x - ps[c].x, ps[a].y - ps[c].y) >= 0.55, `${b.id} fase ${i}: ${ps[a].id}/${ps[c].id}`);
+        }
+      });
+    }
+  });
+
+  test(`${art.id}: simulador válido, con variantes, opciones y secuencia`, () => {
+    const sc = art.simulator;
+    assert.deepEqual(Sim.validateScenario(sc), []);
+    assert.ok(sc.variants.length >= 3);
+    sc.variants.forEach((v) => {
+      const doc = Sim.sequenceDoc(sc, v.id, sc.tour, Board);
+      assert.equal(doc.phases.length, sc.tour.length, v.id);
+    });
+    assert.ok(sc.ui && sc.ui.disclaimer, "aclara que no es un resultado garantizado");
+  });
+
+  test(`${art.id}: ejercicios con adaptación para menos jugadores`, () => {
+    for (const ex of art.exercises) {
+      const m = ex.meta;
+      const env = { players: m.minPlayers - 1, court: "half", hoops: 1, materials: ["Balones", "Conos"] };
+      const few = Ex.checkCompatibility(ex, env);
+      assert.equal(few.ok, false, ex.id);
+      assert.ok(few.alternatives.length >= 1, ex.id);
+      assert.equal(Ex.checkCompatibility(ex, env, few.alternatives[0].id).ok, true, ex.id);
+    }
+  });
+}
+
+test("pick and roll: las cinco coberturas pedidas", () => {
+  const ids = pnr.simulator.variants.map((v) => v.id);
+  ["drop", "switch", "hedge", "blitz", "ice"].forEach((id) => assert.ok(ids.includes(id), id));
+  const lectura = Sim.resolveState(pnr.simulator, "blitz", "lectura").state;
+  assert.ok(lectura.options.length >= 1 && lectura.options.length === lectura.optionsText.length);
+});
+
+test("superioridades: cada situación usa solo sus jugadores y ofrece decisiones", () => {
+  const sc = superioridades.simulator;
+  const dos = Sim.resolveState(sc, "dos-cierra", "inicio").state;
+  assert.deepEqual(Object.keys(dos.pos).sort(), ["o1", "o2", "x1"]);
+  const cuatro = Sim.resolveState(sc, "cuatro", "inicio").state;
+  assert.equal(Object.keys(cuatro.pos).length, 7);
+  ["pasar", "penetrar", "finalizar", "spacing", "fijar"].forEach((p) => {
+    assert.ok(sc.positions.some((x) => x.id === p), p);
+    assert.ok(Sim.resolveState(sc, "tres-espera", p).state.help, p);
+  });
+  // El 3c2 en el que el primer defensor no sale muestra el pase de vuelta al base.
+  const pasar = Sim.resolveState(sc, "tres-espera", "pasar").state;
+  assert.deepEqual(pasar.options[0], ["pass", "o2", "o1"]);
+});
+
+test("spacing: el buen espacio deja una esquina libre en la penetración y el malo no", () => {
+  const sc = spacing.simulator;
+  const buena = Sim.resolveState(sc, "base", "penetracion").state;
+  const mala = Sim.resolveState(sc, "agrupados", "penetracion").state;
+  const d = (s, a, b) => Math.hypot(s.pos[a][0] - s.pos[b][0], s.pos[a][1] - s.pos[b][1]);
+  assert.ok(d(buena, "o5", "x5") > d(mala, "o4", "x4"));
+  assert.ok(d(buena, "o5", "x5") > 4);
+});
+
+test("la biblioteca reúne los ejercicios de las seis guías sin claves repetidas", () => {
+  const list = Ex.collect([zona23, zona32, zona131, pnr, superioridades, spacing]);
+  assert.equal(list.length, 18);
+  assert.equal(new Set(list.map((i) => i.key)).size, 18);
+  assert.ok(Ex.filterList(list, { fundamento: "Spacing" }).length === 3);
+});
