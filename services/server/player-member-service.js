@@ -78,73 +78,7 @@ export async function createInvitation(userId, playerId, body) {
   return { invitation: result.data, token };
 }
 
-export async function acceptInvitation(userId, userEmail, token) {
-  const service = createSupabaseServiceServerClient();
-  const tokenHash = hashToken(String(token || ""));
-  const inviteResult = await service
-    .from("player_invitations")
-    .select("*")
-    .eq("token_hash", tokenHash)
-    .eq("status", "pending")
-    .maybeSingle();
-  if (inviteResult.error) throw inviteResult.error;
-
-  const invitation = inviteResult.data;
-  if (!invitation) {
-    const err = new Error("Invalid or expired invitation");
-    err.status = 400;
-    throw err;
-  }
-
-  if (new Date(invitation.expires_at).getTime() < Date.now()) {
-    await service.from("player_invitations").update({ status: "expired" }).eq("id", invitation.id);
-    const err = new Error("Invitation expired");
-    err.status = 400;
-    throw err;
-  }
-
-  const normalizedEmail = String(userEmail || "").trim().toLowerCase();
-  if (normalizedEmail !== invitation.email) {
-    const err = new Error("Invitation email does not match authenticated user");
-    err.status = 403;
-    throw err;
-  }
-
-  const memberRow = {
-    player_id: invitation.player_id,
-    user_id: userId,
-    relationship_type: invitation.relationship_type,
-    access_level: invitation.access_level,
-    status: "active",
-    invited_by_user_id: invitation.invited_by_user_id,
-    accepted_at: new Date().toISOString(),
-    created_by_user_id: userId,
-    updated_by_user_id: userId
-  };
-
-  const memberResult = await service
-    .from("player_members")
-    .upsert(memberRow, { onConflict: "player_id,user_id" })
-    .select("*")
-    .single();
-  if (memberResult.error) throw memberResult.error;
-
-  await service
-    .from("player_invitations")
-    .update({ status: "accepted", accepted_at: new Date().toISOString() })
-    .eq("id", invitation.id);
-
-  await recordActivityEvent({
-    playerId: invitation.player_id,
-    actorUserId: userId,
-    eventType: "member.joined",
-    entityType: "player_member",
-    entityId: memberResult.data.id,
-    summary: "Nuevo miembro vinculado al perfil"
-  });
-
-  return memberResult.data;
-}
+// Aceptar invitaciones: lib/player-dev/invitations-core.js (por enlace o desde la lista de pendientes).
 
 export async function revokeMember(userId, playerId, memberId) {
   await requirePlayerAccess(userId, playerId, "admin");

@@ -12,6 +12,7 @@ import Compare from "./Compare";
 import Attendance from "./Attendance";
 import ReportPrint from "./ReportPrint";
 import DataHealth from "./DataHealth";
+import MyInvitations from "./Invitations";
 
 function viewFromUrl() {
   if (typeof window === "undefined") return { name: "roster" };
@@ -21,6 +22,8 @@ function viewFromUrl() {
   if (q.get("view") === "attendance") return { name: "attendance" };
   if (q.get("view") === "report" && q.get("id")) return { name: "report", id: q.get("id") };
   if (q.get("view") === "compare") return { name: "compare", ids: (q.get("ids") || "").split(",").filter(Boolean) };
+  // Enlace de invitación: /players?invite=<código> (o /invitations/accept?token=<código>, que redirige acá).
+  if (q.get("invite")) return { name: "roster", invite: q.get("invite") };
   return { name: "roster" };
 }
 
@@ -29,7 +32,8 @@ function urlFor(view) {
   if (view.name === "profile") {
     q.set("player", view.id);
     if (view.tab && view.tab !== "summary") q.set("tab", view.tab);
-  } else if (view.name === "new") q.set("view", "new");
+  } else if (view.name === "roster" && view.invite) q.set("invite", view.invite);
+  else if (view.name === "new") q.set("view", "new");
   else if (view.name === "attendance") q.set("view", "attendance");
   else if (view.name === "compare") {
     q.set("view", "compare");
@@ -134,6 +138,14 @@ export default function PlayersApp() {
           <>
             {view.name === "roster" ? (
               <>
+                <MyInvitations
+                  inviteToken={view.invite || null}
+                  onTokenDone={() => go({ name: "roster" }, { replace: true, scroll: false })}
+                  onAccepted={async (playerId) => {
+                    await load();
+                    if (playerId) go({ name: "profile", id: playerId, tab: "summary" });
+                  }}
+                />
                 <Roster roster={roster} onOpen={(id) => go({ name: "profile", id, tab: "summary" })} onNew={() => go({ name: "new" })} onReload={load} />
                 {roster.schema?.installed ? <DataHealth onChanged={load} /> : null}
               </>

@@ -8,10 +8,9 @@ export async function POST(req, { params }) {
     const { playerId } = await params;
     const body = await req.json();
     const result = await createInvitation(auth.user.id, playerId, body);
-    return jsonOk({
-      invitation: result.invitation,
-      token: result.token
-    });
+    // El hash del código no sale del servidor.
+    const { token_hash: _hash, ...invitation } = result.invitation || {};
+    return jsonOk({ invitation, token: result.token });
   } catch (error) {
     return handleApiError(error);
   }

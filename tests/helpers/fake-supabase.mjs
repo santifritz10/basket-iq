@@ -22,6 +22,7 @@ export function createFakeDb(seed = {}) {
   function insertRows(table, rows, { upsert = false, onConflict = null, ignoreDuplicates = false } = {}) {
     const list = Array.isArray(rows) ? rows : [rows];
     const inserted = [];
+    const merged = [];
     for (const raw of list) {
       const row = { ...raw };
       if (!row.id && table !== "shooting_session_players") row.id = crypto.randomUUID();
@@ -31,6 +32,13 @@ export function createFakeDb(seed = {}) {
         const dup = tables[table].find((e) => cols.every((c) => e[c] === row[c]));
         if (dup) {
           if (upsert && ignoreDuplicates) continue;
+          if (upsert) {
+            // Upsert real: actualiza la fila existente.
+            const { id: _id, ...rest } = row;
+            Object.assign(dup, rest);
+            merged.push(dup);
+            continue;
+          }
           return constraintError("duplicate key value violates unique constraint", "23505");
         }
       }
@@ -72,7 +80,7 @@ export function createFakeDb(seed = {}) {
       inserted.push(row);
     }
     tables[table].push(...inserted);
-    return { data: inserted.map((r) => ({ ...r })), error: null };
+    return { data: [...merged, ...inserted].map((r) => ({ ...r })), error: null };
   }
 
   function deleteRows(table, predicate) {
