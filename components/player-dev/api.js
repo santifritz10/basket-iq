@@ -61,6 +61,12 @@ export const devApi = {
   editPlanItem: (id, iid, body) => call(`${P}/players/${id}/plan/${iid}`, { method: "PATCH", body }),
   saveAttendance: (body) => call(`${P}/attendance`, { method: "POST", body }),
   trainingOverview: (ref) => call(`${P}/trainings/${encodeURIComponent(ref)}`),
+  reports: (pid) => call(`${P}/players/${pid}/reports`),
+  addReport: (pid, body) => call(`${P}/players/${pid}/reports`, { method: "POST", body }),
+  report: (id) => call(`${P}/reports/${id}`),
+  editReport: (id, body) => call(`${P}/reports/${id}`, { method: "PATCH", body }),
+  insights: (pid, { days = 90, notes = false } = {}) => call(`${P}/players/${pid}/insights?days=${days}${notes ? "&notes=1" : ""}`),
+  ask: (pid, body) => call(`${P}/players/${pid}/ask`, { method: "POST", body }),
   compare: (ids) => call(`${P}/compare?ids=${ids.map(encodeURIComponent).join(",")}`),
   // Endpoints existentes del dominio de jugadores (se reutilizan, no se duplican).
   createPlayer: (body) => call("/api/players", { method: "POST", body }),

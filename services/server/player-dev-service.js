@@ -5,7 +5,13 @@ import { recordActivityEvent } from "@/services/server/activity-service";
 import * as core from "@/lib/player-dev/core";
 import * as goalsCore from "@/lib/player-dev/goals-core";
 import * as planCore from "@/lib/player-dev/plan-core";
+import * as reportsCore from "@/lib/player-dev/reports-core";
+import { libraryList } from "@/lib/player-dev/plan";
 import { ACADEMY_ARTICLES } from "@/lib/server/assistant/academy-registry";
+import { generateAssistantReply } from "@/lib/server/assistant/gemini";
+import { checkRateLimit } from "@/lib/server/assistant/rate-limit";
+import { buildSystemInstruction } from "@/lib/server/assistant/prompts";
+import { createConversation, insertMessage, touchConversation } from "@/lib/server/assistant/conversations";
 
 /** Perfil y seguimiento escribe solo en el modelo relacional. */
 function requireRelationalMode() {
@@ -182,4 +188,55 @@ export async function addAttendance(userId, body) {
 export async function getTrainingOverview(userId, ref) {
   requireRelationalMode();
   return planCore.loadTrainingOverview(db(), userId, ref);
+}
+
+
+// ---------------------------------------------------------------------------
+// Etapa 5: informes y Asistente IA
+// ---------------------------------------------------------------------------
+
+export async function getReports(userId, playerId) {
+  requireRelationalMode();
+  return reportsCore.listReports(db(), userId, playerId);
+}
+
+export async function getReport(userId, reportId) {
+  requireRelationalMode();
+  return reportsCore.getReport(db(), userId, reportId);
+}
+
+export async function addReport(userId, playerId, body) {
+  requireRelationalMode();
+  return reportsCore.createReport(db(), userId, playerId, body);
+}
+
+export async function editReport(userId, reportId, body) {
+  requireRelationalMode();
+  return reportsCore.updateReport(db(), userId, reportId, body, deps(userId));
+}
+
+export async function getInsights(userId, playerId, query) {
+  requireRelationalMode();
+  return reportsCore.loadInsights(db(), userId, playerId, query, { library: libraryList(ACADEMY_ARTICLES) });
+}
+
+/** Usa el Asistente IA existente: mismo modelo de Gemini, mismas instrucciones base y mismos límites. */
+export async function askAssistant(userId, playerId, body) {
+  requireRelationalMode();
+  return reportsCore.askAboutPlayer(db(), userId, playerId, body, {
+    library: libraryList(ACADEMY_ARTICLES),
+    generate: generateAssistantReply,
+    rateLimit: checkRateLimit,
+    buildInstruction: (sections) => buildSystemInstruction("tecnico", sections),
+    // La consulta queda en el historial del Asistente (sin el resumen del jugador, que no se guarda).
+    saveHistory: body?.save_history === false
+      ? null
+      : async ({ question, answer, model, truncated }) => {
+          const conv = await createConversation(userId, { firstMessage: `Análisis de jugador: ${question}`, mode: "tecnico" });
+          await insertMessage(userId, conv.id, { role: "user", text: `[Análisis de jugador con datos de Jugadores Lab] ${question}`, mode: "tecnico" });
+          await insertMessage(userId, conv.id, { role: "model", text: answer, mode: "tecnico", model, truncated });
+          await touchConversation(userId, conv.id, { mode: "tecnico" });
+          return conv.id;
+        }
+  });
 }

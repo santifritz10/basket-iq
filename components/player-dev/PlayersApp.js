@@ -10,6 +10,7 @@ import Profile from "./Profile";
 import Roster from "./Roster";
 import Compare from "./Compare";
 import Attendance from "./Attendance";
+import ReportPrint from "./ReportPrint";
 
 function viewFromUrl() {
   if (typeof window === "undefined") return { name: "roster" };
@@ -17,6 +18,7 @@ function viewFromUrl() {
   if (q.get("player")) return { name: "profile", id: q.get("player"), tab: q.get("tab") || "summary" };
   if (q.get("view") === "new") return { name: "new" };
   if (q.get("view") === "attendance") return { name: "attendance" };
+  if (q.get("view") === "report" && q.get("id")) return { name: "report", id: q.get("id") };
   if (q.get("view") === "compare") return { name: "compare", ids: (q.get("ids") || "").split(",").filter(Boolean) };
   return { name: "roster" };
 }
@@ -155,6 +157,7 @@ export default function PlayersApp() {
                 onOpen={(id) => go({ name: "profile", id, tab: "summary" })}
               />
             ) : null}
+            {view.name === "report" ? <ReportPrint id={view.id} /> : null}
             {view.name === "attendance" ? <Attendance roster={roster} onOpen={(id) => go({ name: "profile", id, tab: "training" })} /> : null}
             {view.name === "profile" ? (
               <Profile
