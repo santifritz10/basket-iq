@@ -18,6 +18,7 @@ import StatsTab from "./StatsTab";
 import GoalsTab from "./GoalsTab";
 import NotesTab from "./NotesTab";
 import EvolutionTab from "./EvolutionTab";
+import TrainingTab from "./TrainingTab";
 import s from "./dev.module.css";
 
 const MIN_SAMPLE = 20;
@@ -160,7 +161,7 @@ export default function Profile({ playerId, tab = "summary", roster, onTab, onBa
       {current === "fundamentals" ? <Fundamentals profile={profile} canEdit={canEdit} onChanged={reload} /> : null}
       {current === "shooting" ? <ShootingTab profile={profile} canEdit={canEdit} /> : null}
       {current === "stats" ? <StatsTab profile={profile} canEdit={canEdit} onChanged={reload} /> : null}
-      {current === "training" ? <TrainingTab profile={profile} /> : null}
+      {current === "training" ? <TrainingTab profile={profile} canEdit={canEdit} onChanged={reload} /> : null}
       {current === "goals" ? <GoalsTab profile={profile} canEdit={canEdit} onChanged={reload} /> : null}
       {current === "evolution" ? <EvolutionTab profile={profile} canEdit={canEdit} onChanged={reload} /> : null}
       {current === "notes" ? <NotesTab profile={profile} canEdit={canEdit} onChanged={reload} /> : null}
@@ -438,32 +439,6 @@ function SessionsList({ profile }) {
         <p className={lab.subtle}>Todavía no participó de sesiones de tiro.</p>
       )}
     </section>
-  );
-}
-
-function TrainingTab({ profile }) {
-  const done = profile.sessions.filter((x) => x.status !== "draft");
-  return (
-    <div className={lab.stack}>
-      <Notice kind="info">
-        Acá se va a ver lo planificado (planificador) separado de lo realizado. La conexión con el planificador y la biblioteca de ejercicios llega en la etapa de integración deportiva. Por ahora se listan las sesiones de tiro realizadas.
-      </Notice>
-      <section className={lab.card}>
-        <div className={lab.cardHead}><h2 className={lab.cardTitle}>Realizado: sesiones de tiro ({done.length})</h2></div>
-        {done.length ? (
-          <ul className={s.timeline}>
-            {done.map((x) => (
-              <li key={x.id} className={s.timelineItem}>
-                <span className={s.timelineDate}>{formatDate(x.fecha)}</span>
-                <a href={`/shooting?session=${x.id}`} style={{ color: "inherit" }}>{x.nombre}</a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className={lab.subtle}>Sin sesiones registradas.</p>
-        )}
-      </section>
-    </div>
   );
 }
 

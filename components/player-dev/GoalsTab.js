@@ -17,6 +17,7 @@ import {
 import { formatDate, todayISO } from "@/components/shooting-lab/api";
 import { Notice, cx } from "@/components/shooting-lab/parts";
 import lab from "@/components/shooting-lab/lab.module.css";
+import { planByGoal } from "@/lib/player-dev/plan";
 import { devApi } from "./api";
 import { Dialog } from "./Fundamentals";
 import { LineWithTarget } from "./MiniCharts";
@@ -58,6 +59,7 @@ export default function GoalsTab({ profile, canEdit, onChanged }) {
     [profile, today, criteria, days]
   );
   const installed = profile.schema?.goals !== false;
+  const linked = useMemo(() => planByGoal(profile.planItems || []), [profile.planItems]);
 
   const groups = ["active", "completed", "archived"].map((st) => ({
     st,
@@ -87,6 +89,7 @@ export default function GoalsTab({ profile, canEdit, onChanged }) {
                   key={g.id}
                   goal={g}
                   m={measured[g.id]}
+                  plan={linked[g.id]}
                   open={open === g.id}
                   onToggle={() => setOpen(open === g.id ? null : g.id)}
                   canEdit={canEdit}
@@ -143,7 +146,7 @@ function QuickTextGoal({ pid, run, busy }) {
   );
 }
 
-function GoalItem({ goal, m, open, onToggle, canEdit, installed, busy, onStatus, onEdit, pid, run }) {
+function GoalItem({ goal, m, plan, open, onToggle, canEdit, installed, busy, onStatus, onEdit, pid, run }) {
   const structured = isStructured(goal);
   const unit = goal.unit || m?.metric?.unit || "";
   const pct = m?.progress != null ? Math.round(m.progress * 100) : null;
@@ -195,12 +198,12 @@ function GoalItem({ goal, m, open, onToggle, canEdit, installed, busy, onStatus,
           </>
         ) : null}
       </div>
-      {open && structured ? <GoalDetail goal={goal} m={m} unit={unit} canEdit={canEdit} pid={pid} run={run} busy={busy} /> : null}
+      {open && structured ? <GoalDetail goal={goal} m={m} plan={plan} unit={unit} canEdit={canEdit} pid={pid} run={run} busy={busy} /> : null}
     </li>
   );
 }
 
-function GoalDetail({ goal, m, unit, canEdit, pid, run, busy }) {
+function GoalDetail({ goal, m, plan, unit, canEdit, pid, run, busy }) {
   const [form, setForm] = useState({ value: "", note: "", measured_on: todayISO() });
   const manual = !m?.metric || m.metric.kind === "manual";
   return (
@@ -217,6 +220,14 @@ function GoalDetail({ goal, m, unit, canEdit, pid, run, busy }) {
           <p className={lab.stepLabel}>Evidencias</p>
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5 }}>{m.evidence.map((e) => <li key={e}>{e}</li>)}</ul>
           {m.metric && !manual ? <p className={lab.subtle}>Se calcula solo con lo realizado (sesiones y partidos registrados), nunca con lo planificado.</p> : null}
+        </div>
+      ) : null}
+      {plan ? (
+        <div>
+          <p className={lab.stepLabel}>Trabajo vinculado</p>
+          <p className={lab.subtle} style={{ margin: 0 }}>
+            Planificado: <strong>{plan.planned}</strong> · Realizado: <strong>{plan.done}</strong>{plan.skipped ? <> · No se hizo: <strong>{plan.skipped}</strong></> : null}. Es contexto: no cambia el progreso del objetivo.
+          </p>
         </div>
       ) : null}
       {goal.observations ? <p className={lab.subtle} style={{ whiteSpace: "pre-wrap", margin: 0 }}>Observaciones: {goal.observations}</p> : null}

@@ -309,3 +309,31 @@
   align-items: center;
   gap: 12px;
 }
+
+/* Ítem apilado (trabajo planificado, rutinas, asistencia) */
+.stackItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--l-border);
+  border-radius: 12px;
+  background: var(--l-surface-2);
+}
+
+.pickItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--l-border);
+  border-radius: 12px;
+  background: var(--l-surface-2);
+  cursor: pointer;
+}
+
+.pickItem input {
+  flex: none;
+  width: auto;
+  margin-top: 4px;
+}
