@@ -28,11 +28,13 @@ export default function PlayerForm({ player = null, onCancel, onSaved }) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [changed, setChanged] = useState({}); // imágenes elegidas o quitadas en este formulario
 
   async function pick(field, file, size) {
     try {
       const url = await resizeImage(file, size);
       setForm((f) => ({ ...f, [field]: url }));
+      setChanged((c) => ({ ...c, [field]: true }));
     } catch (e) {
       setError(e.message);
     }
@@ -51,9 +53,24 @@ export default function PlayerForm({ player = null, onCancel, onSaved }) {
     }
     setBusy(true);
     setError(null);
+    // Las imágenes no viajan con los datos: se guardan aparte en Storage (privado).
     const body = { ...form, age };
+    delete body.photo_url;
+    delete body.club_shield_url;
     try {
       const res = player ? await devApi.updatePlayer(player.id, body) : await devApi.createPlayer({ ...body, relationship_type: "coach", access_level: "admin" });
+      const id = res.player?.id || player?.id;
+      for (const [field, kind] of [["photo_url", "photo"], ["club_shield_url", "shield"]]) {
+        if (!changed[field] || !id) continue;
+        const value = form[field] || null;
+        try {
+          await devApi.uploadMedia(id, value ? { kind, data_url: value } : { kind, remove: true });
+        } catch (err) {
+          // Sin la migración 016 se guarda como antes (dentro del jugador).
+          if (err.code === "media_not_installed") await devApi.updatePlayer(id, { [field]: value });
+          else throw err;
+        }
+      }
       await onSaved(res.player);
     } catch (err) {
       setError(err.message);
@@ -96,7 +113,7 @@ export default function PlayerForm({ player = null, onCancel, onSaved }) {
               <span className={lab.label}>Foto</span>
               <input type="file" accept="image/*" onChange={(e) => pick("photo_url", e.target.files?.[0], 320)} />
               {form.photo_url ? (
-                <button type="button" className={cx(lab.btn, lab.btnGhost, lab.btnSmall)} onClick={() => setForm((f) => ({ ...f, photo_url: "" }))}>Quitar</button>
+                <button type="button" className={cx(lab.btn, lab.btnGhost, lab.btnSmall)} onClick={() => { setForm((f) => ({ ...f, photo_url: "" })); setChanged((c) => ({ ...c, photo_url: true })); }}>Quitar</button>
               ) : null}
             </div>
           </div>
@@ -109,7 +126,7 @@ export default function PlayerForm({ player = null, onCancel, onSaved }) {
             </div>
           </div>
         </div>
-        <p className={lab.subtle}>Las imágenes se achican antes de guardarse. Solo las ven quienes tienen acceso al jugador.</p>
+        <p className={lab.subtle}>Las imágenes se achican antes de guardarse y se guardan en un espacio privado: solo las ven quienes tienen acceso al jugador.</p>
         {error ? <Notice kind="error">{error}</Notice> : null}
         <div className={lab.btnRow} style={{ marginTop: 12 }}>
           <button type="submit" className={cx(lab.btn, lab.btnPrimary)} disabled={busy}>{busy ? "Guardando…" : player ? "Guardar cambios" : "Crear jugador"}</button>

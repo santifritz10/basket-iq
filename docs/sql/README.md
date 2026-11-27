@@ -83,6 +83,17 @@ Ejecutar en **Supabase SQL Editor** en este orden:
   Verificación: `015-player-reports-verificacion.sql` (5 columnas, rls true, 3 políticas).
   Reversión: `015-player-reports-rollback.sql` (se niega si ya hay informes nuevos).
 
+## Fotos y escudos en Storage (Jugadores Lab, etapa 6)
+
+- `016-player-media-storage.sql` — agrega `photo_path` y `shield_path` a `players` y crea el bucket
+  PRIVADO `player-media` (1 MB por archivo, webp/jpeg/png). No toca `photo_url` ni `club_shield_url`:
+  las imágenes viejas se copian y verifican desde la app, y se liberan solo si el entrenador lo pide.
+  Sin políticas para usuarios: solo el servidor usa el bucket y entrega enlaces firmados (1 hora).
+  Verificación: `016-player-media-storage-verificacion.sql` (columnas = 2, bucket_privado = true).
+  Reversión: `016-player-media-storage-rollback.sql` (se niega si ya hay archivos).
+
+Documentación general del sistema de jugadores: `docs/jugadores-lab.md`.
+
 ## Staging primero
 
 Probar en proyecto de staging antes de producción.

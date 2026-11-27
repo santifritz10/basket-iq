@@ -6,6 +6,7 @@ import * as core from "@/lib/player-dev/core";
 import * as goalsCore from "@/lib/player-dev/goals-core";
 import * as planCore from "@/lib/player-dev/plan-core";
 import * as reportsCore from "@/lib/player-dev/reports-core";
+import * as mediaCore from "@/lib/player-dev/media-core";
 import { libraryList } from "@/lib/player-dev/plan";
 import { ACADEMY_ARTICLES } from "@/lib/server/assistant/academy-registry";
 import { generateAssistantReply } from "@/lib/server/assistant/gemini";
@@ -239,4 +240,29 @@ export async function askAssistant(userId, playerId, body) {
           return conv.id;
         }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Etapa 6: imágenes en Storage y datos del sistema anterior
+// ---------------------------------------------------------------------------
+
+export async function uploadMedia(userId, playerId, body) {
+  requireRelationalMode();
+  const client = db();
+  return mediaCore.uploadPlayerImage(client, client.storage, userId, playerId, body);
+}
+
+export async function getDataStatus(userId) {
+  requireRelationalMode();
+  const client = db();
+  const [media, legacy] = await Promise.all([mediaCore.mediaStatus(client, userId), mediaCore.legacyStatus(client, userId)]);
+  return { media, legacy };
+}
+
+export async function runMediaAction(userId, body) {
+  requireRelationalMode();
+  const client = db();
+  if (body?.action === "migrate") return { result: await mediaCore.migrateLegacyImages(client, client.storage, userId) };
+  if (body?.action === "release") return { result: await mediaCore.releaseLegacyImages(client, client.storage, userId) };
+  throw new core.DevError("Acción inválida.", 400, "invalid_action");
 }
