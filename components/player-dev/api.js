@@ -53,6 +53,14 @@ export const devApi = {
   createNote: (id, body) => call(`${P}/players/${id}/notes`, { method: "POST", body }),
   editNote: (id, nid, body) => call(`${P}/players/${id}/notes/${nid}`, { method: "PATCH", body }),
   deleteNote: (id, nid) => call(`${P}/players/${id}/notes/${nid}`, { method: "DELETE" }),
+  // Etapa 4: integración deportiva.
+  planning: () => call(`${P}/planning`),
+  addRoutine: (body) => call(`${P}/routines`, { method: "POST", body }),
+  editRoutine: (rid, body) => call(`${P}/routines/${rid}`, { method: "PATCH", body }),
+  addPlanItem: (id, body) => call(`${P}/players/${id}/plan`, { method: "POST", body }),
+  editPlanItem: (id, iid, body) => call(`${P}/players/${id}/plan/${iid}`, { method: "PATCH", body }),
+  saveAttendance: (body) => call(`${P}/attendance`, { method: "POST", body }),
+  trainingOverview: (ref) => call(`${P}/trainings/${encodeURIComponent(ref)}`),
   compare: (ids) => call(`${P}/compare?ids=${ids.map(encodeURIComponent).join(",")}`),
   // Endpoints existentes del dominio de jugadores (se reutilizan, no se duplican).
   createPlayer: (body) => call("/api/players", { method: "POST", body }),

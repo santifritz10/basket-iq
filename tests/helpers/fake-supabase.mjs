@@ -131,6 +131,10 @@ export function createFakeDb(seed = {}) {
         filters.push((r) => r[col] === val);
         return api;
       },
+      neq(col, val) {
+        filters.push((r) => r[col] !== val);
+        return api;
+      },
       in(col, vals) {
         const set = new Set(vals);
         filters.push((r) => set.has(r[col]));

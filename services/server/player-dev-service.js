@@ -4,6 +4,8 @@ import { playerDomainFlags } from "@/lib/server/player-domain-flags";
 import { recordActivityEvent } from "@/services/server/activity-service";
 import * as core from "@/lib/player-dev/core";
 import * as goalsCore from "@/lib/player-dev/goals-core";
+import * as planCore from "@/lib/player-dev/plan-core";
+import { ACADEMY_ARTICLES } from "@/lib/server/assistant/academy-registry";
 
 /** Perfil y seguimiento escribe solo en el modelo relacional. */
 function requireRelationalMode() {
@@ -138,4 +140,46 @@ export async function removeNote(userId, playerId, noteId) {
 export async function getCompare(userId, ids) {
   requireRelationalMode();
   return goalsCore.loadCompare(db(), userId, ids);
+}
+
+// --- Etapa 4: rutinas, trabajo planificado y asistencia ---
+// La biblioteca de ejercicios son los mismos contenidos de Basket Lab Academy (solo lectura).
+
+function planDeps(userId) {
+  return { ...deps(userId), articles: ACADEMY_ARTICLES };
+}
+
+export async function getPlanning(userId) {
+  requireRelationalMode();
+  return planCore.loadPlanning(db(), userId, { articles: ACADEMY_ARTICLES });
+}
+
+export async function addRoutine(userId, body) {
+  requireRelationalMode();
+  return planCore.createRoutine(db(), userId, body, planDeps(userId));
+}
+
+export async function editRoutine(userId, routineId, body) {
+  requireRelationalMode();
+  return planCore.updateRoutine(db(), userId, routineId, body, planDeps(userId));
+}
+
+export async function addPlanItem(userId, playerId, body) {
+  requireRelationalMode();
+  return planCore.createPlanItem(db(), userId, playerId, body, planDeps(userId));
+}
+
+export async function editPlanItem(userId, playerId, itemId, body) {
+  requireRelationalMode();
+  return planCore.updatePlanItem(db(), userId, playerId, itemId, body, deps(userId));
+}
+
+export async function addAttendance(userId, body) {
+  requireRelationalMode();
+  return planCore.saveAttendance(db(), userId, body);
+}
+
+export async function getTrainingOverview(userId, ref) {
+  requireRelationalMode();
+  return planCore.loadTrainingOverview(db(), userId, ref);
 }

@@ -63,6 +63,17 @@ Ejecutar en **Supabase SQL Editor** en este orden:
   existentes (foto de control en `goals_notes_migration_snapshot`). Se puede correr dos veces.
   Verificación: `013-goals-notes-verificacion.sql`. Reversión: `013-goals-notes-rollback.sql`.
 
+## Integración deportiva (Jugadores Lab, etapa 4)
+
+- `014-player-plan.sql` — crea `training_routines` (rutinas de cada entrenador; se archivan, no
+  se borran), `player_plan_items` (trabajo PLANIFICADO por jugador: ejercicio de la biblioteca,
+  rutina, plan de tiro sugerido o tarea propia, con vínculo opcional a objetivo y a entrenamiento
+  del planificador; se marca realizado/no se hizo/cancelado) y `player_attendance` (asistencia a
+  entrenamientos del planificador). RLS activo en las tres. No modifica el planificador ni ninguna
+  tabla existente. Lo planificado nunca cambia objetivos. Se puede correr dos veces.
+  Verificación: `014-player-plan-verificacion.sql`. Reversión: `014-player-plan-rollback.sql`
+  (se niega si ya hay datos).
+
 ## Staging primero
 
 Probar en proyecto de staging antes de producción.
