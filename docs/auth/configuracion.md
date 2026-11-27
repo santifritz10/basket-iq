@@ -77,7 +77,31 @@ por año, **es un gasto que tenés que decidir vos**). En el panel del dominio v
 registros DNS que te indique el proveedor (SPF, DKIM y, recomendado, DMARC). Sirven para que
 Gmail/Outlook confíen en que el correo es legítimo y no lo manden a spam.
 
-Pasos (ejemplo con Resend):
+#### Opción elegida por ahora: Brevo sin dominio (prueba)
+
+1. Crear cuenta gratis en https://www.brevo.com (no pide tarjeta).
+2. **Senders, Domains & Dedicated IPs → Senders → Add a sender**: nombre `Basket Lab` y tu correo
+   (por ejemplo, tu Gmail). Brevo te manda un código o enlace para verificarlo.
+3. **Settings → SMTP & API → pestaña SMTP**: anotá el **Login** que aparece ahí y tocá
+   **Generate a new SMTP key** (es distinta de la API key). No la compartas.
+4. En Supabase: **Authentication → Emails → SMTP Settings** → *Enable custom SMTP*:
+   - Sender email: el correo que verificaste en el paso 2 (tiene que ser exactamente el mismo).
+   - Sender name: `Basket Lab`
+   - Host: `smtp-relay.brevo.com` · Port: `587`
+   - Username: el Login del paso 3 · Password: la SMTP key.
+   - Minimum interval: dejar 60 segundos. → **Save changes**.
+5. **Authentication → Rate Limits**: subir el límite de correos por hora (por ejemplo, a 50).
+6. Probar con un registro real. Si no llega: Brevo → **Transactional → Logs**, y Supabase →
+   **Authentication → Logs**.
+
+Limitación: como el remitente es una dirección gratuita (Gmail, Hotmail…) enviada por otro
+servidor, Gmail y Outlook pueden marcarlo como spam o rechazarlo. Para usuarios reales a largo
+plazo conviene pasar a un dominio propio (en Brevo: **Domains → Add a domain** y cargar los
+registros SPF/DKIM; o la opción con Resend de abajo).
+
+#### Opción recomendada a futuro: dominio propio + Resend
+
+Pasos:
 
 1. Crear cuenta en Resend → **Domains → Add domain** → cargar los registros DNS que muestra →
    esperar a que diga *Verified*.
