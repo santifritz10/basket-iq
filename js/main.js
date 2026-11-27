@@ -4243,6 +4243,11 @@ function loadContent(sectionId) {
             break;
 
         case "player_tracking":
+            // Con el modo relacional activo, el seguimiento vive en la pantalla nueva de jugadores.
+            if (playerDomainWriteEnabled()) {
+                window.location.href = "/players";
+                break;
+            }
             pullRemoteDataType(APP_DATA_TYPES.playersTracking).finally(function () {
                 renderPlayerList();
             });

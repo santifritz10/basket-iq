@@ -9,11 +9,11 @@ export async function withLabUser(handler) {
     return NextResponse.json({ ok: true, ...data }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     const status = Number(error?.status) || 500;
-    if (status >= 500 && error?.code !== "shooting_lab_not_installed") console.error("[ShootingLab]", error);
+    if (status >= 500 && !/_not_installed$/.test(String(error?.code || ""))) console.error("[ShootingLab]", error);
     return NextResponse.json(
       {
         ok: false,
-        error: status >= 500 && error?.code !== "shooting_lab_not_installed" ? "Error del servidor. Probá de nuevo." : error.message,
+        error: status >= 500 && !/_not_installed$/.test(String(error?.code || "")) ? "Error del servidor. Probá de nuevo." : error.message,
         code: error?.code || "server_error",
         details: error?.details
       },

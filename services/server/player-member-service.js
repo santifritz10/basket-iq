@@ -149,6 +149,21 @@ export async function acceptInvitation(userId, userEmail, token) {
 export async function revokeMember(userId, playerId, memberId) {
   await requirePlayerAccess(userId, playerId, "admin");
   const service = createSupabaseServiceServerClient();
+
+  // Nunca dejar a un jugador sin administrador: nadie podría gestionarlo.
+  const members = await service
+    .from("player_members")
+    .select("id, access_level, status")
+    .eq("player_id", playerId)
+    .eq("status", "active");
+  if (members.error) throw members.error;
+  const target = (members.data || []).find((m) => m.id === memberId);
+  const admins = (members.data || []).filter((m) => m.access_level === "admin");
+  if (target?.access_level === "admin" && admins.length <= 1) {
+    const err = new Error("No se puede quitar al único administrador del jugador.");
+    err.status = 409;
+    throw err;
+  }
   const result = await service
     .from("player_members")
     .update({ status: "revoked", updated_by_user_id: userId })

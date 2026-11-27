@@ -40,6 +40,18 @@ Ejecutar en **Supabase SQL Editor** en este orden:
   3) correr las consultas de verificación comentadas al final. Se puede correr dos veces.
   Reversión: `011-shooting-lab-rollback.sql` (se niega si ya hay registros nuevos).
 
+## Jugadores Lab (desarrollo del jugador)
+
+- `012-player-development.sql` — crea `assessment_criteria`, `player_assessments` (evaluaciones con
+  fecha, contexto y evaluador), `player_stat_records` (partidos y entrenamientos por separado, con
+  intentos y convertidos), `teams` y `team_players` (equipos por usuario con historial), todas con
+  RLS. No modifica `players`: copia los porcentajes cargados en `game_stats` a un registro
+  «histórico manual» de solo lectura (sin inventar intentos) y deja las estrellas antiguas como
+  están (se confirman a mano desde la app). Guarda una foto de control en
+  `player_dev_migration_snapshot`. Se puede correr dos veces.
+  Verificación: `012-player-development-verificacion.sql`.
+  Reversión: `012-player-development-rollback.sql` (se niega si ya hay datos nuevos).
+
 ## Staging primero
 
 Probar en proyecto de staging antes de producción.

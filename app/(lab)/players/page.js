@@ -8,7 +8,27 @@ import {
 import { playerToLegacyShape } from "@/services/server/player-legacy-adapter";
 import { buildShootingHeatmapPayload } from "@/services/server/shooting-session-service";
 import { listPlayerIdsForUser } from "@/services/server/player-permissions";
+import Link from "next/link";
 import PlayersModule from "@/components/players/PlayersModule";
+import PlayersApp from "@/components/player-dev/PlayersApp";
+
+export const metadata = {
+  title: "Jugadores · Basket Lab"
+};
+
+/** Mismo marco que tenía la pantalla antigua (layout seguro), para el modo sin escritura relacional. */
+function LegacyShell({ children }) {
+  return (
+    <div className="app-container" style={{ display: "block", minHeight: "100dvh" }}>
+      <header style={{ padding: "12px 20px", borderBottom: "1px solid rgba(255,255,255,.08)", display: "flex", alignItems: "center", gap: 12 }}>
+        <Link href="/" className="btn-back">
+          ← Volver a Basket Lab
+        </Link>
+      </header>
+      <main style={{ padding: "16px 20px 32px" }}>{children}</main>
+    </div>
+  );
+}
 
 async function loadLegacyPlayers(userId) {
   const items = (await getUserDataByType(userId, "players_tracking")) || [];
@@ -31,6 +51,9 @@ async function loadRelationalPlayers(userId) {
 }
 
 export default async function PlayersPage() {
+  // Jugadores Lab necesita el modelo relacional con escritura habilitada.
+  if (playerDomainFlags.write) return <PlayersApp />;
+
   const user = await getAuthenticatedUserFromCookies();
   const useRelational = playerDomainFlags.active;
 
@@ -52,6 +75,7 @@ export default async function PlayersPage() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
 
   return (
+    <LegacyShell>
     <PlayersModule
       initialItems={initialItems}
       initialShootingPayload={initialShootingPayload}
@@ -62,5 +86,6 @@ export default async function PlayersPage() {
       supabaseUrl={supabaseUrl}
       supabaseAnonKey={supabaseAnonKey}
     />
+    </LegacyShell>
   );
 }

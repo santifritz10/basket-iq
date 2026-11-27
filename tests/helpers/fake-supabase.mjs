@@ -26,6 +26,21 @@ export function createFakeDb(seed = {}) {
       const row = { ...raw };
       if (!row.id && table !== "shooting_session_players") row.id = crypto.randomUUID();
       const now = new Date().toISOString();
+      if (onConflict && table !== "shooting_entries") {
+        const cols = onConflict.split(",");
+        const dup = tables[table].find((e) => cols.every((c) => e[c] === row[c]));
+        if (dup) {
+          if (upsert && ignoreDuplicates) continue;
+          return constraintError("duplicate key value violates unique constraint", "23505");
+        }
+      }
+      if (!["shooting_sessions", "shooting_entries", "shooting_session_players"].includes(table)) {
+        row.created_at = row.created_at || now;
+        if ("voided_at" in row === false && ["player_assessments", "player_stat_records"].includes(table)) row.voided_at = null;
+        if (table === "team_players" && row.left_on === undefined) row.left_on = null;
+        if (table === "teams" && row.archived_at === undefined) row.archived_at = null;
+        if (table === "assessment_criteria" && row.active === undefined) row.active = true;
+      }
       if (table === "shooting_sessions" || table === "shooting_entries") {
         row.created_at = row.created_at || now;
         if (table === "shooting_sessions") row.updated_at = now;

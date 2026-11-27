@@ -121,6 +121,7 @@
   border-radius: 10px;
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .navBtn:hover {
@@ -163,6 +164,12 @@
   .navBtn {
     padding: 8px 9px;
     font-size: 13.5px;
+  }
+}
+
+@media (max-width: 420px) {
+  .brandText {
+    display: none;
   }
 }
 
