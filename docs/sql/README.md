@@ -74,6 +74,15 @@ Ejecutar en **Supabase SQL Editor** en este orden:
   Verificación: `014-player-plan-verificacion.sql`. Reversión: `014-player-plan-rollback.sql`
   (se niega si ya hay datos).
 
+## Informes de desarrollo (Jugadores Lab, etapa 5)
+
+- `015-player-reports.sql` — reutiliza `player_reports`: agrega `status` (borrador / compartido /
+  archivado), `period_from`, `period_to`, `shared_at`, `archived_at`. Las filas existentes quedan
+  con `status` NULL y se tratan como compartidas (nadie pierde acceso). Un borrador solo lo ve y
+  edita su autor; agrega la política de edición (antes no había). Sin delete. No modifica filas.
+  Verificación: `015-player-reports-verificacion.sql` (5 columnas, rls true, 3 políticas).
+  Reversión: `015-player-reports-rollback.sql` (se niega si ya hay informes nuevos).
+
 ## Staging primero
 
 Probar en proyecto de staging antes de producción.

@@ -19,6 +19,7 @@ import GoalsTab from "./GoalsTab";
 import NotesTab from "./NotesTab";
 import EvolutionTab from "./EvolutionTab";
 import TrainingTab from "./TrainingTab";
+import ReportsTab from "./ReportsTab";
 import s from "./dev.module.css";
 
 const MIN_SAMPLE = 20;
@@ -165,18 +166,9 @@ export default function Profile({ playerId, tab = "summary", roster, onTab, onBa
       {current === "goals" ? <GoalsTab profile={profile} canEdit={canEdit} onChanged={reload} /> : null}
       {current === "evolution" ? <EvolutionTab profile={profile} canEdit={canEdit} onChanged={reload} /> : null}
       {current === "notes" ? <NotesTab profile={profile} canEdit={canEdit} onChanged={reload} /> : null}
-      {current === "reports" ? <ComingNext title="Informes" text="Los informes de desarrollo (semanales, mensuales, de temporada) se arman en la etapa de inteligencia e informes, con revisión del entrenador antes de compartir." /> : null}
+      {current === "reports" ? <ReportsTab profile={profile} canEdit={canEdit} /> : null}
       {current === "people" ? <PeopleTab profile={profile} onChanged={reload} onArchived={async () => { await onChanged?.(); onBack(); }} /> : null}
     </>
-  );
-}
-
-function ComingNext({ title, text }) {
-  return (
-    <div className={lab.empty}>
-      <p className={lab.emptyTitle}>{title}</p>
-      <p className={lab.emptyText}>{text}</p>
-    </div>
   );
 }
 
