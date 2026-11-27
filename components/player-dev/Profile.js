@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DIMENSIONS } from "@/lib/player-dev/catalog";
 import { criteriaCatalog, dimensionSummary, latestByCriterion, pctText } from "@/lib/player-dev/model";
 import { ACCESS_LEVELS, RELATIONSHIP_TYPES } from "@/lib/player-domain/membership-rules";
+import { PendingInvitations } from "./Invitations";
 import { PROVENANCE, emptyZoneMap, legacyZonesToMap, summarizeEntries, summarizeZoneMap, timelineByDate } from "@/lib/shooting/model";
 import { formatDate, todayISO } from "@/components/shooting-lab/api";
 import { Kpi, Notice, ProvenanceBadge, StatusBadge, cx } from "@/components/shooting-lab/parts";
@@ -456,6 +457,35 @@ function useAction(onChanged) {
   return { busy, error, run };
 }
 
+/** Después de invitar: cómo le llega a la persona (no se manda ningún correo automático). */
+function InviteLink({ token, email }) {
+  const [copied, setCopied] = useState(false);
+  const link = typeof window === "undefined" ? `/invitations/accept?token=${token}` : `${window.location.origin}/invitations/accept?token=${token}`;
+  return (
+    <div className={lab.stack} style={{ marginTop: 12 }}>
+      <Notice kind="info">
+        <strong>Invitación creada{email ? ` para ${email}` : ""}.</strong> La app no manda correos: avisale vos. Cuando esa persona entre a Basket Lab con ese email, la ve arriba de todo en <strong>Jugadores</strong> y la acepta con un toque. También podés mandarle este enlace (vence en 7 días):
+      </Notice>
+      <div className={lab.btnRow} style={{ alignItems: "center" }}>
+        <code style={{ wordBreak: "break-all", fontSize: 12, flex: "1 1 220px" }}>{link}</code>
+        <button
+          type="button"
+          className={cx(lab.btn, lab.btnSmall)}
+          onClick={() => {
+            try {
+              navigator.clipboard.writeText(link).then(() => setCopied(true), () => setCopied(false));
+            } catch {
+              setCopied(false);
+            }
+          }}
+        >
+          {copied ? "Copiado" : "Copiar enlace"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PeopleTab({ profile, onChanged, onArchived }) {
   const { busy, error, run } = useAction(onChanged);
   const [form, setForm] = useState({ email: "", relationship_type: "coach", access_level: "viewer" });
@@ -475,8 +505,9 @@ function PeopleTab({ profile, onChanged, onArchived }) {
             {profile.members.map((m) => (
               <li key={m.id} className={lab.sessionItem}>
                 <div>
-                  <div className={lab.sessionName}>{relLabel(m.relationship_type)}</div>
+                  <div className={lab.sessionName} style={{ wordBreak: "break-all" }}>{m.email || relLabel(m.relationship_type)}</div>
                   <div className={lab.sessionMeta}>
+                    {m.email ? <span>{relLabel(m.relationship_type)}</span> : null}
                     <span>{ACCESS_LABEL[m.access_level]}</span>
                     <span>{m.status === "active" ? "Activo" : m.status === "revoked" ? "Revocado" : "Pendiente"}</span>
                     <span>desde {formatDate(String(m.created_at).slice(0, 10))}</span>
@@ -527,11 +558,8 @@ function PeopleTab({ profile, onChanged, onArchived }) {
             </div>
             <button type="submit" className={cx(lab.btn, lab.btnPrimary, lab.btnSmall)} style={{ marginTop: 10 }} disabled={busy}>Crear invitación</button>
           </form>
-          {result?.token ? (
-            <p className={lab.subtle} style={{ wordBreak: "break-all" }}>Invitación creada. Compartí este código con la persona invitada; lo carga en <strong>/invitations/accept</strong> con su cuenta: <code>{result.token}</code></p>
-          ) : result ? (
-            <p className={lab.subtle}>Invitación creada.</p>
-          ) : null}
+          {result?.token ? <InviteLink token={result.token} email={result.invitation?.email} /> : null}
+          <PendingInvitations playerId={pid} refreshKey={result?.invitation?.id || ""} />
         </section>
       ) : null}
       {isAdmin ? (

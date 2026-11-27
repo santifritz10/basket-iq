@@ -7,6 +7,7 @@ import * as goalsCore from "@/lib/player-dev/goals-core";
 import * as planCore from "@/lib/player-dev/plan-core";
 import * as reportsCore from "@/lib/player-dev/reports-core";
 import * as mediaCore from "@/lib/player-dev/media-core";
+import * as inviteCore from "@/lib/player-dev/invitations-core";
 import { libraryList } from "@/lib/player-dev/plan";
 import { ACADEMY_ARTICLES } from "@/lib/server/assistant/academy-registry";
 import { generateAssistantReply } from "@/lib/server/assistant/gemini";
@@ -44,7 +45,24 @@ export async function getRoster(userId) {
 
 export async function getProfile(userId, playerId) {
   requireRelationalMode();
-  return core.loadProfile(db(), userId, playerId);
+  const client = db();
+  const profile = await core.loadProfile(client, userId, playerId);
+  if (Array.isArray(profile.members)) profile.members = await withMemberEmails(client, profile.members);
+  return profile;
+}
+
+/** Solo para administradores del jugador: muestra el email de cada colaborador (si no, no se sabe quién es). */
+async function withMemberEmails(client, members) {
+  return Promise.all(
+    members.map(async (m) => {
+      try {
+        const { data } = await client.auth.admin.getUserById(m.user_id);
+        return { ...m, email: data?.user?.email || null };
+      } catch {
+        return { ...m, email: null };
+      }
+    })
+  );
 }
 
 export async function addAssessment(userId, playerId, body) {
@@ -265,4 +283,28 @@ export async function runMediaAction(userId, body) {
   if (body?.action === "migrate") return { result: await mediaCore.migrateLegacyImages(client, client.storage, userId) };
   if (body?.action === "release") return { result: await mediaCore.releaseLegacyImages(client, client.storage, userId) };
   throw new core.DevError("Acción inválida.", 400, "invalid_action");
+}
+
+// ---------------------------------------------------------------------------
+// Invitaciones a colaborar
+// ---------------------------------------------------------------------------
+
+export async function getMyInvitations(user) {
+  return inviteCore.listMyInvitations(db(), user.email);
+}
+
+export async function acceptMyInvitation(user, body) {
+  return inviteCore.acceptInvitation(db(), user.id, user.email, { token: body?.token, invitationId: body?.invitation_id }, deps(user.id));
+}
+
+export async function declineMyInvitation(user, invitationId) {
+  return inviteCore.declineInvitation(db(), user.email, invitationId);
+}
+
+export async function getPlayerInvitations(userId, playerId) {
+  return inviteCore.listPlayerInvitations(db(), userId, playerId);
+}
+
+export async function cancelInvitation(userId, playerId, invitationId) {
+  return inviteCore.revokeInvitation(db(), userId, playerId, invitationId);
 }

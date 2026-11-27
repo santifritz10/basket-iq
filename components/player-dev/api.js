@@ -70,6 +70,12 @@ export const devApi = {
   uploadMedia: (pid, body) => call(`${P}/players/${pid}/media`, { method: "POST", body }),
   dataStatus: () => call(`${P}/data-status`),
   dataAction: (action) => call(`${P}/data-status`, { method: "POST", body: { action } }),
+  // Invitaciones: las que me mandaron (por mi email) y las de un jugador.
+  myInvitations: () => call(`${P}/invitations`),
+  acceptInvitation: (body) => call(`${P}/invitations`, { method: "POST", body }),
+  declineInvitation: (iid) => call(`${P}/invitations/${iid}`, { method: "DELETE" }),
+  playerInvitations: (pid) => call(`${P}/players/${pid}/invitations`),
+  cancelInvitation: (pid, iid) => call(`${P}/players/${pid}/invitations/${iid}`, { method: "DELETE" }),
   compare: (ids) => call(`${P}/compare?ids=${ids.map(encodeURIComponent).join(",")}`),
   // Endpoints existentes del dominio de jugadores (se reutilizan, no se duplican).
   createPlayer: (body) => call("/api/players", { method: "POST", body }),
