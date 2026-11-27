@@ -36,7 +36,7 @@ export function createFakeDb(seed = {}) {
       }
       if (!["shooting_sessions", "shooting_entries", "shooting_session_players"].includes(table)) {
         row.created_at = row.created_at || now;
-        if ("voided_at" in row === false && ["player_assessments", "player_stat_records"].includes(table)) row.voided_at = null;
+        if ("voided_at" in row === false && ["player_assessments", "player_stat_records", "player_goal_checkins"].includes(table)) row.voided_at = null;
         if (table === "team_players" && row.left_on === undefined) row.left_on = null;
         if (table === "teams" && row.archived_at === undefined) row.archived_at = null;
         if (table === "assessment_criteria" && row.active === undefined) row.active = true;

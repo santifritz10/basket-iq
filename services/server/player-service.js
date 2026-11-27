@@ -3,6 +3,7 @@ import { createSupabaseServiceServerClient } from "@/lib/server/supabase";
 import { isUuid } from "@/lib/player-domain/is-uuid.js";
 import { listPlayerIdsForUser, requirePlayerAccess, getPlayerMembership, accessLevelSatisfies } from "@/services/server/player-permissions";
 import { recordActivityEvent } from "@/services/server/activity-service";
+import { visibleNotes } from "@/lib/player-dev/goals.js";
 
 function pickPlayerFields(row) {
   if (!row) return null;
@@ -264,7 +265,19 @@ export async function listPlayerNotes(userId, playerId) {
     .eq("player_id", playerId)
     .order("created_at", { ascending: false });
   if (result.error) throw result.error;
-  return result.data || [];
+  // Notas privadas (migración 013): solo las ve quien las escribió.
+  return visibleNotes(result.data || [], userId);
+}
+
+/** Una nota privada ajena se trata como inexistente. */
+async function assertNoteVisible(service, userId, playerId, noteId) {
+  const found = await service.from("player_notes").select("*").eq("id", noteId).eq("player_id", playerId).maybeSingle();
+  if (found.error) throw found.error;
+  if (!found.data || (found.data.visibility === "private" && found.data.created_by_user_id !== userId)) {
+    const err = new Error("Not found");
+    err.status = 404;
+    throw err;
+  }
 }
 
 export async function createPlayerNote(userId, playerId, body) {
@@ -303,6 +316,7 @@ export async function createPlayerNote(userId, playerId, body) {
 export async function updatePlayerNote(userId, playerId, noteId, body) {
   await requirePlayerAccess(userId, playerId, "editor");
   const service = createSupabaseServiceServerClient();
+  await assertNoteVisible(service, userId, playerId, noteId);
   const result = await service
     .from("player_notes")
     .update({ body: body.body, updated_by_user_id: userId })
@@ -317,6 +331,7 @@ export async function updatePlayerNote(userId, playerId, noteId, body) {
 export async function deletePlayerNote(userId, playerId, noteId) {
   await requirePlayerAccess(userId, playerId, "editor");
   const service = createSupabaseServiceServerClient();
+  await assertNoteVisible(service, userId, playerId, noteId);
   const result = await service.from("player_notes").delete().eq("id", noteId).eq("player_id", playerId);
   if (result.error) throw result.error;
 }

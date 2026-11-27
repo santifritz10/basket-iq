@@ -52,6 +52,17 @@ Ejecutar en **Supabase SQL Editor** en este orden:
   Verificación: `012-player-development-verificacion.sql`.
   Reversión: `012-player-development-rollback.sql` (se niega si ya hay datos nuevos).
 
+## Objetivos medibles y notas (Jugadores Lab, etapa 3)
+
+- `013-goals-notes.sql` — agrega a `player_goals` columnas opcionales para objetivos medibles
+  (título, tipo, métrica, valor inicial, meta, unidad, fechas, prioridad, muestra mínima,
+  observaciones, fecha y valor de cumplimiento) y crea `player_goal_checkins` (mediciones y
+  evidencias manuales; se anulan, no se borran). Agrega a `player_notes` tipo, visibilidad
+  (colaboradores / privada) y vínculo opcional con evaluación, sesión, objetivo o partido, y ajusta
+  sus políticas: una nota privada solo la ve y modifica su autor. No cambia textos ni estados
+  existentes (foto de control en `goals_notes_migration_snapshot`). Se puede correr dos veces.
+  Verificación: `013-goals-notes-verificacion.sql`. Reversión: `013-goals-notes-rollback.sql`.
+
 ## Staging primero
 
 Probar en proyecto de staging antes de producción.

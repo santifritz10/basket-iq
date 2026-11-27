@@ -3,6 +3,7 @@ import { createSupabaseServiceServerClient } from "@/lib/server/supabase";
 import { playerDomainFlags } from "@/lib/server/player-domain-flags";
 import { recordActivityEvent } from "@/services/server/activity-service";
 import * as core from "@/lib/player-dev/core";
+import * as goalsCore from "@/lib/player-dev/goals-core";
 
 /** Perfil y seguimiento escribe solo en el modelo relacional. */
 function requireRelationalMode() {
@@ -95,4 +96,46 @@ export async function addTeamMember(userId, teamId, body) {
 export async function endTeamMember(userId, membershipId, body) {
   requireRelationalMode();
   return core.endTeamMember(db(), userId, membershipId, body);
+}
+
+// --- Etapa 3: objetivos medibles, notas clasificadas y comparación ---
+
+export async function addGoal(userId, playerId, body) {
+  requireRelationalMode();
+  return goalsCore.createGoal(db(), userId, playerId, body, deps(userId));
+}
+
+export async function editGoal(userId, playerId, goalId, body) {
+  requireRelationalMode();
+  return goalsCore.updateGoal(db(), userId, playerId, goalId, body, deps(userId));
+}
+
+export async function addGoalCheckin(userId, playerId, goalId, body) {
+  requireRelationalMode();
+  return goalsCore.addCheckin(db(), userId, playerId, goalId, body, deps(userId));
+}
+
+export async function removeGoalCheckin(userId, playerId, checkinId) {
+  requireRelationalMode();
+  return goalsCore.voidCheckin(db(), userId, playerId, checkinId);
+}
+
+export async function addNote(userId, playerId, body) {
+  requireRelationalMode();
+  return goalsCore.createNote(db(), userId, playerId, body, deps(userId));
+}
+
+export async function editNote(userId, playerId, noteId, body) {
+  requireRelationalMode();
+  return goalsCore.updateNote(db(), userId, playerId, noteId, body);
+}
+
+export async function removeNote(userId, playerId, noteId) {
+  requireRelationalMode();
+  return goalsCore.deleteNote(db(), userId, playerId, noteId);
+}
+
+export async function getCompare(userId, ids) {
+  requireRelationalMode();
+  return goalsCore.loadCompare(db(), userId, ids);
 }
