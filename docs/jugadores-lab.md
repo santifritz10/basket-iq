@@ -1,6 +1,6 @@
 # Jugadores Lab y Shooting Lab: desarrollo y seguimiento de jugadores
 
-Documentación técnica del sistema de desarrollo de jugadores, construido en seis etapas (PR #13 a #17).
+Documentación técnica del sistema de desarrollo de jugadores, construido en seis etapas (PR #13 a #18).
 Para cada etapa: qué tablas usa, dónde está el código, qué reglas cumple y cómo se verifica.
 
 ## Mapa rápido
