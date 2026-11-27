@@ -1,5 +1,10 @@
 # Basket Lab + Supabase (Fase 1 Usuarios)
 
+> **Importante (2026-11-27):** esta guía es histórica. La configuración vigente de
+> autenticación (Site URL, Redirect URLs, SMTP, plantillas, Google) está en
+> [`docs/auth/configuracion.md`](auth/configuracion.md). En particular, **nunca** pongas
+> `localhost` como Site URL del proyecto de producción: los correos usan ese valor.
+
 Esta guia explica, paso a paso y sin suponer conocimiento previo, como dejar Supabase listo para registro/inicio de sesion de usuarios en Basket Lab.
 
 ## 1) Prerrequisitos
@@ -25,8 +30,7 @@ Esta guia explica, paso a paso y sin suponer conocimiento previo, como dejar Sup
 1. En el menu izquierdo, abrir **Authentication**.
 2. Ir a **Providers**.
 3. Verificar que **Email** este habilitado.
-4. En esta fase local, recomiendo:
-   - **Confirm email**: desactivado para pruebas rapidas.
+4. Dejar **Confirm email** activado (ver `docs/auth/configuracion.md`).
 5. Guardar cambios.
 
 > Si dejas Confirm email activado, el registro funciona pero el usuario debe confirmar su correo antes de iniciar sesion.
@@ -34,12 +38,9 @@ Esta guia explica, paso a paso y sin suponer conocimiento previo, como dejar Sup
 ## 4) Configurar URL para uso local
 
 1. Ir a **Authentication** -> **URL Configuration**.
-2. En **Site URL** poner:
-   - `http://localhost:5500` (si usas Live Server)
-   - o el puerto local que uses.
-3. En **Redirect URLs** agregar:
-   - `http://localhost:5500`
-   - `http://127.0.0.1:5500`
+2. En un proyecto de **pruebas locales** (no el de producción) podés usar como Site URL
+   `http://localhost:3000`. En producción, seguí `docs/auth/configuracion.md`.
+3. En **Redirect URLs** agregar `http://localhost:3000/auth/confirm**`.
 4. Guardar.
 
 ## 5) Crear tabla `profiles` + RLS

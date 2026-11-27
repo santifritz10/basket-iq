@@ -14,47 +14,10 @@
 </head>
 <body class="app-body">
 
-<!-- Pantalla de registro / inicio de sesión -->
-<div id="auth-screen" class="auth-screen">
-    <div class="auth-card">
-        <div class="auth-brand">
-            <img src="images/logo-basketlab.svg" alt="Basket Lab" class="auth-logo">
-            <h1>Basket Lab</h1>
-            <p class="auth-credit">By Coach Fritz</p>
-            <p class="auth-subtitle">Registrate o iniciá sesión para continuar</p>
-            <p class="auth-local-notice" role="note">
-                <strong>Cuenta en la nube (Supabase):</strong> tu usuario se guarda en la base de datos del proyecto. Para que funcione en local, verificá que configuraste correctamente `js/supabase-config.js` y que abrís la app desde `http://localhost`.
-            </p>
-        </div>
-        <div class="auth-tabs">
-            <button type="button" class="auth-tab active" data-tab="login">Iniciar sesión</button>
-            <button type="button" class="auth-tab" data-tab="register">Registrarse</button>
-        </div>
-
-        <form id="auth-form-login" class="auth-form active">
-            <label>Correo electrónico</label>
-            <input type="email" id="login-identificador" placeholder="tu@email.com" required autocomplete="email">
-            <label>Contraseña</label>
-            <input type="password" id="login-password" placeholder="Contraseña" required autocomplete="current-password">
-            <p id="auth-login-error" class="auth-error" aria-live="polite"></p>
-            <button type="submit" class="auth-btn">Entrar</button>
-        </form>
-
-        <form id="auth-form-register" class="auth-form">
-            <label>Nombre de usuario</label>
-            <input type="text" id="register-username" placeholder="Usuario" required autocomplete="username" minlength="2">
-            <label>Correo electrónico</label>
-            <input type="email" id="register-email" placeholder="tu@email.com" required autocomplete="email">
-            <label>Nombre</label>
-            <input type="text" id="register-name" placeholder="Tu nombre" required autocomplete="name">
-            <label>Contraseña</label>
-            <input type="password" id="register-password" placeholder="Mínimo 6 caracteres" required autocomplete="new-password" minlength="6">
-            <label>Confirmar contraseña</label>
-            <input type="password" id="register-password2" placeholder="Repetir contraseña" required autocomplete="new-password">
-            <p id="auth-register-error" class="auth-error" aria-live="polite"></p>
-            <button type="submit" class="auth-btn">Crear cuenta</button>
-        </form>
-    </div>
+<!-- Pantalla de carga: mientras se valida la sesión. El login vive en /login. -->
+<div id="auth-screen" class="auth-screen auth-splash" role="status" aria-live="polite">
+    <img src="images/logo-basketlab.svg" alt="Basket Lab · By Coach Fritz" class="auth-splash-logo" width="104" height="104">
+    <p class="auth-splash-text">Cargando Basket Lab…</p>
 </div>
 
 <div id="app-container" class="container" hidden>

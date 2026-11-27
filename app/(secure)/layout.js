@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { requireUserOrRedirect } from "@/lib/server/auth";
 
-export default function SecureLayout({ children }) {
+export const dynamic = "force-dynamic";
+
+export default async function SecureLayout({ children }) {
+  await requireUserOrRedirect();
   return (
     <div className="app-container" style={{ display: "block", height: "100dvh", overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}>
       <header

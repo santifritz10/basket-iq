@@ -6249,3 +6249,47 @@ textarea {
 .entrenamientos-folder-body {
     padding: 1.5rem !important; /* p-6 */
 }
+
+
+/* ===== Pantalla de carga mientras se valida la sesión ===== */
+.auth-screen.auth-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: #0a0b10;
+}
+
+.auth-screen.auth-splash.hidden {
+    display: none;
+}
+
+.auth-splash-logo {
+    width: 104px;
+    height: 104px;
+    animation: authSplashPulse 1.6s ease-in-out infinite;
+}
+
+.auth-splash-text {
+    margin: 0;
+    color: #a5aaba;
+    font-size: 0.95rem;
+}
+
+@keyframes authSplashPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(0.95); opacity: 0.75; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-splash-logo { animation: none; }
+}
+
+a.dashboard-user-menu-item {
+    text-decoration: none;
+    box-sizing: border-box;
+}
