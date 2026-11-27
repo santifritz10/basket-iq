@@ -11,6 +11,7 @@ import Roster from "./Roster";
 import Compare from "./Compare";
 import Attendance from "./Attendance";
 import ReportPrint from "./ReportPrint";
+import DataHealth from "./DataHealth";
 
 function viewFromUrl() {
   if (typeof window === "undefined") return { name: "roster" };
@@ -132,7 +133,10 @@ export default function PlayersApp() {
         {roster && relational ? (
           <>
             {view.name === "roster" ? (
-              <Roster roster={roster} onOpen={(id) => go({ name: "profile", id, tab: "summary" })} onNew={() => go({ name: "new" })} onReload={load} />
+              <>
+                <Roster roster={roster} onOpen={(id) => go({ name: "profile", id, tab: "summary" })} onNew={() => go({ name: "new" })} onReload={load} />
+                {roster.schema?.installed ? <DataHealth onChanged={load} /> : null}
+              </>
             ) : null}
             {view.name === "new" ? (
               <PlayerForm

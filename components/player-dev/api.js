@@ -67,6 +67,9 @@ export const devApi = {
   editReport: (id, body) => call(`${P}/reports/${id}`, { method: "PATCH", body }),
   insights: (pid, { days = 90, notes = false } = {}) => call(`${P}/players/${pid}/insights?days=${days}${notes ? "&notes=1" : ""}`),
   ask: (pid, body) => call(`${P}/players/${pid}/ask`, { method: "POST", body }),
+  uploadMedia: (pid, body) => call(`${P}/players/${pid}/media`, { method: "POST", body }),
+  dataStatus: () => call(`${P}/data-status`),
+  dataAction: (action) => call(`${P}/data-status`, { method: "POST", body: { action } }),
   compare: (ids) => call(`${P}/compare?ids=${ids.map(encodeURIComponent).join(",")}`),
   // Endpoints existentes del dominio de jugadores (se reutilizan, no se duplican).
   createPlayer: (body) => call("/api/players", { method: "POST", body }),
@@ -99,7 +102,9 @@ export function resizeImage(file, size = 320) {
         canvas.height = size;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
+        // webp pesa bastante menos; si el navegador no lo genera, jpeg.
+        const webp = canvas.toDataURL("image/webp", 0.8);
+        resolve(webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/jpeg", 0.82));
       };
       img.src = reader.result;
     };
