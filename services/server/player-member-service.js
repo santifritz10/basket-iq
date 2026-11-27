@@ -1,4 +1,5 @@
 import "server-only";
+import { validateInvitation } from "@/lib/player-domain/membership-rules";
 import { createHash, randomBytes } from "crypto";
 import { createSupabaseServiceServerClient } from "@/lib/server/supabase";
 import { requirePlayerAccess } from "@/services/server/player-permissions";
@@ -21,7 +22,7 @@ export async function listPlayerMembers(userId, playerId) {
 }
 
 export async function createInvitation(userId, playerId, body) {
-  await requirePlayerAccess(userId, playerId, "editor");
+  const membership = await requirePlayerAccess(userId, playerId, "editor");
 
   const email = String(body?.email || "").trim().toLowerCase();
   if (!email) {
@@ -30,8 +31,20 @@ export async function createInvitation(userId, playerId, body) {
     throw err;
   }
 
-  const relationshipType = body?.relationship_type || "coach";
-  const accessLevel = body?.access_level || "editor";
+  // El rol deportivo no otorga permisos: el permiso se valida aparte y nunca
+  // puede superar el de quien invita (antes un editor podía invitar admins).
+  const rules = validateInvitation({
+    inviterLevel: membership.access_level,
+    relationshipType: body?.relationship_type,
+    accessLevel: body?.access_level
+  });
+  if (!rules.ok) {
+    const err = new Error(rules.error);
+    err.status = 403;
+    throw err;
+  }
+  const relationshipType = rules.value.relationship_type;
+  const accessLevel = rules.value.access_level;
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 

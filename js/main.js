@@ -2559,10 +2559,32 @@ function renderPlayerShootingTab(player) {
             "</div>"
         );
     }
+    // Procedencia: en sesiones de Shooting Lab se muestran solo los registros del jugador;
+    // en sesiones grupales antiguas, el total es del grupo y no se atribuye al jugador.
+    function sessionView(session) {
+        var participants = Number(session.participants_total || (session.player_ids || []).length || 0);
+        if (session.recording_mode === "entries") {
+            var own = session.player_zones && session.player_zones[player.id];
+            return { zones: own || {}, label: "Registros individuales", note: "" };
+        }
+        if (participants > 1) {
+            return {
+                zones: session.zones || {},
+                label: "Grupal sin atribución individual",
+                note: "Totales de todo el grupo (" + participants + " jugadores). No indican los tiros de este jugador."
+            };
+        }
+        return { zones: session.zones || {}, label: "Histórico (sesión de un solo jugador)", note: "" };
+    }
+    var labLink = playerDomainWriteEnabled()
+        ? '<p class="text-muted"><a href="/shooting?player=' + encodeURIComponent(player.id) + '">Ver el lanzamiento de este jugador en Shooting Lab →</a></p>'
+        : "";
     return (
+        labLink +
         '<div class="player-shooting-accordion">' +
         sessions.map(function (session, index) {
-            var totals = shooting.sessionTotalShots(session.zones || {});
+            var view = sessionView(session);
+            var totals = shooting.sessionTotalShots(view.zones);
             var customName = String(session.nombre || "").trim();
             var showName = customName && customName !== "Sesión de tiro";
             return (
@@ -2572,13 +2594,15 @@ function renderPlayerShootingTab(player) {
                 (showName ? '<span class="player-shooting-session-name">' + escapeHtml(customName) + "</span>" : "") +
                 '<span class="player-shooting-session-date">' + escapeHtml(shooting.formatSessionFecha(session.fecha)) + "</span>" +
                 '<span class="player-shooting-session-meta">' +
+                escapeHtml(view.label) + " · " +
                 totals.attempts + " intentos · " + totals.made + " encestados · " +
-                shooting.pctLabel(totals.attempts, totals.made) + " global</span>" +
+                shooting.pctLabel(totals.attempts, totals.made) + "</span>" +
                 '<span class="player-shooting-session-chevron" aria-hidden="true">▶</span>' +
                 "</summary>" +
                 '<div class="player-shooting-session-body">' +
+                (view.note ? '<p class="text-muted">' + escapeHtml(view.note) + "</p>" : "") +
                 '<table class="shx-table"><thead><tr><th>Zona</th><th>Int.</th><th>Enc.</th><th>%</th><th>Volumen</th></tr></thead>' +
-                "<tbody>" + renderPlayerShootingTableRows(shooting, session.zones) + "</tbody></table>" +
+                "<tbody>" + renderPlayerShootingTableRows(shooting, view.zones) + "</tbody></table>" +
                 "</div>" +
                 "</details>"
             );
@@ -2677,11 +2701,22 @@ function renderPlayerTeamTab(player) {
     return (
         '<form id="player-invite-form" class="player-tab-card">' +
         '  <h4>Invitar colaborador</h4>' +
-        '  <p class="text-muted">Invitá al jugador (admin del perfil) o a otro entrenador.</p>' +
-        '  <div class="form-row"><label>Tipo</label>' +
-        '    <select name="invite_as">' +
-        '      <option value="player">Jugador (admin del perfil)</option>' +
-        '      <option value="coach">Entrenador (editor)</option>' +
+        '  <p class="text-muted">El rol describe el vínculo con el jugador; el permiso define qué puede hacer. Elegir un rol no da permisos.</p>' +
+        '  <div class="form-row"><label>Rol</label>' +
+        '    <select name="relationship_type">' +
+        '      <option value="coach">Entrenador/a</option>' +
+        '      <option value="assistant">Ayudante</option>' +
+        '      <option value="player">Jugador/a</option>' +
+        '      <option value="parent">Madre, padre o tutor/a</option>' +
+        '      <option value="physio">Preparación física / salud</option>' +
+        '      <option value="scout">Scouting</option>' +
+        "    </select>" +
+        "  </div>" +
+        '  <div class="form-row"><label>Permiso</label>' +
+        '    <select name="access_level">' +
+        '      <option value="viewer">Lector: ve el perfil</option>' +
+        '      <option value="editor">Editor: carga datos</option>' +
+        '      <option value="admin">Administrador: además gestiona colaboradores</option>' +
         "    </select>" +
         "  </div>" +
         '  <div class="form-row"><label>Email</label>' +
@@ -2837,18 +2872,18 @@ function renderPlayerProfile(playerId, activeTab) {
             ev.preventDefault();
             var fd = new FormData(inviteForm);
             var email = String(fd.get("email") || "").trim().toLowerCase();
-            var inviteAs = String(fd.get("invite_as") || "player");
+            var relationshipType = String(fd.get("relationship_type") || "coach");
+            var accessLevel = String(fd.get("access_level") || "viewer");
             var statusEl = document.getElementById("player-invite-status");
             var tokenEl = document.getElementById("player-invite-token");
             if (!email || !window.BasketLabPlayerDomainApi) return;
             if (statusEl) statusEl.textContent = "Enviando…";
             if (tokenEl) tokenEl.style.display = "none";
             try {
-                var isPlayer = inviteAs === "player";
                 var result = await window.BasketLabPlayerDomainApi.inviteMember(player.id, {
                     email: email,
-                    relationship_type: isPlayer ? "player" : "coach",
-                    access_level: isPlayer ? "admin" : "editor"
+                    relationship_type: relationshipType,
+                    access_level: accessLevel
                 });
                 if (statusEl) statusEl.textContent = "Invitación creada.";
                 if (tokenEl && result.token) {
@@ -4219,6 +4254,11 @@ function loadContent(sectionId) {
 
         case "shooting_training":
         case "shooting_heatmap":
+            // Con el modo relacional activo, el entrenamiento de tiro vive en Shooting Lab.
+            if (playerDomainWriteEnabled()) {
+                window.location.href = "/shooting";
+                break;
+            }
             contentDiv.innerHTML = '<div id="shooting-heatmap-root"></div>';
             if (typeof ShootingHeatmap !== "undefined") {
                 ShootingHeatmap.init(document.getElementById("shooting-heatmap-root"));

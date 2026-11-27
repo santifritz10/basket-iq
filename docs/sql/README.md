@@ -30,6 +30,16 @@ Ejecutar en **Supabase SQL Editor** en este orden:
   Sin esta migración la app funciona igual: guarda esos datos en la cuenta del usuario.
   Reversión: `010-auth-profiles-rollback.sql`.
 
+## Shooting Lab
+
+- `011-shooting-lab.sql` — agrega a `shooting_sessions` estado, modo de registro, notas y fechas
+  de cierre/archivo (las sesiones existentes quedan como «finalizadas» e «históricas») y crea
+  `shooting_entries` (cada tiro o serie a nombre de un jugador, con RLS). No copia, reparte ni
+  borra datos existentes; guarda antes una foto de control en `shooting_lab_migration_snapshot`.
+  Pasos: 1) correr la consulta de prevalidación del principio, 2) correr el archivo completo,
+  3) correr las consultas de verificación comentadas al final. Se puede correr dos veces.
+  Reversión: `011-shooting-lab-rollback.sql` (se niega si ya hay registros nuevos).
+
 ## Staging primero
 
 Probar en proyecto de staging antes de producción.

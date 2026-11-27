@@ -72,18 +72,8 @@
             migrated[z.id] = zoneStats(safe, z.id);
         });
 
-        // Migración legacy: si existía solo t3_front vieja y no 45°, redistribuye una parte.
-        if (safe.t3_front && !safe.t3_left45 && !safe.t3_right45) {
-            var legacy = zoneStats(safe, "t3_front");
-            var splitAttempts = Math.floor(legacy.attempts * 0.2);
-            var splitMade = Math.floor(legacy.made * 0.2);
-            migrated.t3_left45 = { attempts: splitAttempts, made: splitMade };
-            migrated.t3_right45 = { attempts: splitAttempts, made: splitMade };
-            migrated.t3_front = {
-                attempts: Math.max(0, legacy.attempts - splitAttempts * 2),
-                made: Math.max(0, legacy.made - splitMade * 2)
-            };
-        }
+        // Los datos muy antiguos que solo tenían triple frontal se conservan tal cual:
+        // no se reparten tiros hacia los 45° (sería inventar datos).
         return migrated;
     }
 
@@ -103,6 +93,10 @@
             nombre: String(s.nombre || "Sesión de tiro").trim() || "Sesión de tiro",
             player_ids: Array.isArray(s.player_ids) ? s.player_ids.map(String) : [],
             zones: sanitizeState(s.zones || {}),
+            recording_mode: s.recording_mode === "entries" ? "entries" : "legacy_zones",
+            status: s.status || "completed",
+            participants_total: Number.isFinite(Number(s.participants_total)) ? Number(s.participants_total) : (Array.isArray(s.player_ids) ? s.player_ids.length : 0),
+            player_zones: s.player_zones && typeof s.player_zones === "object" ? s.player_zones : null,
             created_at: s.created_at || new Date().toISOString(),
             updated_at: s.updated_at || new Date().toISOString()
         };
@@ -636,6 +630,11 @@
         resetActiveSessionStats: function () {
             var active = this.getActiveSession();
             if (!active) return;
+            if (isRelationalWrite()) {
+                // En modo relacional el reinicio no se sincronizaba y podía borrar el histórico.
+                alert("Para corregir registros usá Shooting Lab: el reinicio de sesiones ya no está disponible.");
+                return;
+            }
             if (!confirm("¿Reiniciar las estadísticas de esta sesión?")) return;
             this.state = emptyZonesState();
             active.zones = this.state;

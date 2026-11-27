@@ -2,6 +2,7 @@ import "server-only";
 import { createSupabaseServiceServerClient } from "@/lib/server/supabase";
 import { requirePlayerAccess } from "@/services/server/player-permissions";
 import { recordActivityEvent } from "@/services/server/activity-service";
+import { zonesCacheFromEntries } from "@/lib/shooting/model";
 
 async function attachPlayerIds(session) {
   const service = createSupabaseServiceServerClient();
@@ -51,10 +52,24 @@ export async function getShootingSession(userId, sessionId) {
   }
 
   const session = await attachPlayerIds(result.data);
+  if (!session.player_ids.length) {
+    const err = new Error("Session not found");
+    err.status = 404;
+    throw err;
+  }
   for (const pid of session.player_ids) {
     await requirePlayerAccess(userId, pid, "viewer");
   }
   return session;
+}
+
+/** Las sesiones de Shooting Lab se editan solo desde Shooting Lab (sus zonas son un resumen calculado). */
+function assertLegacySession(session) {
+  if (session.recording_mode === "entries") {
+    const err = new Error("Esta sesión se registró en Shooting Lab. Editala desde Shooting Lab.");
+    err.status = 409;
+    throw err;
+  }
 }
 
 export async function createShootingSession(userId, playerId, body) {
@@ -105,8 +120,23 @@ export async function createShootingSession(userId, playerId, body) {
 
 export async function updateShootingSession(userId, sessionId, body) {
   const existing = await getShootingSession(userId, sessionId);
+  assertLegacySession(existing);
   for (const pid of existing.player_ids) {
     await requirePlayerAccess(userId, pid, "editor");
+  }
+
+  // Participantes nuevos: el usuario tiene que poder editar a cada uno.
+  let nextPlayerIds = null;
+  if (Array.isArray(body?.player_ids)) {
+    nextPlayerIds = [...new Set(body.player_ids.map(String))];
+    if (!nextPlayerIds.length) {
+      const err = new Error("La sesión necesita al menos un jugador.");
+      err.status = 400;
+      throw err;
+    }
+    for (const pid of nextPlayerIds) {
+      if (!existing.player_ids.includes(pid)) await requirePlayerAccess(userId, pid, "editor");
+    }
   }
 
   const service = createSupabaseServiceServerClient();
@@ -123,14 +153,25 @@ export async function updateShootingSession(userId, sessionId, body) {
     .single();
   if (result.error) throw result.error;
 
-  if (Array.isArray(body?.player_ids)) {
-    await service.from("shooting_session_players").delete().eq("session_id", sessionId);
-    const junctionRows = body.player_ids.map((pid) => ({
-      session_id: sessionId,
-      player_id: pid
-    }));
-    const junctionResult = await service.from("shooting_session_players").insert(junctionRows);
-    if (junctionResult.error) throw junctionResult.error;
+  if (nextPlayerIds) {
+    // Primero se agregan los nuevos y después se quitan los que salieron,
+    // para que la sesión nunca quede sin participantes si algo falla.
+    const toAdd = nextPlayerIds.filter((pid) => !existing.player_ids.includes(pid));
+    const toRemove = existing.player_ids.filter((pid) => !nextPlayerIds.includes(pid));
+    if (toAdd.length) {
+      const ins = await service
+        .from("shooting_session_players")
+        .insert(toAdd.map((pid) => ({ session_id: sessionId, player_id: pid })));
+      if (ins.error) throw ins.error;
+    }
+    if (toRemove.length) {
+      const del = await service
+        .from("shooting_session_players")
+        .delete()
+        .eq("session_id", sessionId)
+        .in("player_id", toRemove);
+      if (del.error) throw del.error;
+    }
   }
 
   const session = await attachPlayerIds(result.data);
@@ -150,6 +191,7 @@ export async function updateShootingSession(userId, sessionId, body) {
 
 export async function deleteShootingSession(userId, sessionId) {
   const existing = await getShootingSession(userId, sessionId);
+  assertLegacySession(existing);
   for (const pid of existing.player_ids) {
     await requirePlayerAccess(userId, pid, "editor");
   }
@@ -183,17 +225,51 @@ export async function buildShootingHeatmapPayload(userId, playerIds) {
 
   allSessions.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
 
+  // Sesiones de Shooting Lab: números por jugador calculados desde sus registros,
+  // solo para los jugadores que este usuario puede ver.
+  const visible = new Set(playerIds);
+  const labIds = allSessions.filter((s) => s.recording_mode === "entries").map((s) => s.id);
+  const perPlayer = {};
+  if (labIds.length) {
+    const entries = await service
+      .from("shooting_entries")
+      .select("session_id, player_id, zone_id, attempts, made")
+      .in("session_id", labIds)
+      .is("voided_at", null);
+    if (entries.error) throw entries.error;
+    const bySession = {};
+    (entries.data || []).forEach((e) => {
+      if (!e.player_id || !visible.has(e.player_id)) return;
+      (bySession[e.session_id] = bySession[e.session_id] || {})[e.player_id] =
+        (bySession[e.session_id]?.[e.player_id] || []).concat(e);
+    });
+    Object.entries(bySession).forEach(([sid, byPlayer]) => {
+      perPlayer[sid] = Object.fromEntries(
+        Object.entries(byPlayer).map(([pid, list]) => [pid, zonesCacheFromEntries(list)])
+      );
+    });
+  }
+
   return {
     version: 2,
     active_session_id: allSessions[0]?.id || null,
-    sessions: allSessions.map((s) => ({
-      id: s.id,
-      fecha: s.fecha,
-      nombre: s.nombre,
-      player_ids: s.player_ids,
-      zones: s.zones || {},
-      created_at: s.created_at,
-      updated_at: s.updated_at
-    }))
+    sessions: allSessions.map((s) => {
+      const isLab = s.recording_mode === "entries";
+      const fullyVisible = s.player_ids.every((pid) => visible.has(pid));
+      return {
+        id: s.id,
+        fecha: s.fecha,
+        nombre: s.nombre,
+        player_ids: s.player_ids.filter((pid) => visible.has(pid)),
+        // En sesiones de Shooting Lab con jugadores ajenos no se expone el total.
+        zones: isLab && !fullyVisible ? {} : s.zones || {},
+        recording_mode: s.recording_mode || "legacy_zones",
+        status: s.status || "completed",
+        participants_total: s.player_ids.length,
+        player_zones: isLab ? perPlayer[s.id] || {} : null,
+        created_at: s.created_at,
+        updated_at: s.updated_at
+      };
+    })
   };
 }
