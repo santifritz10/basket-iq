@@ -45,6 +45,15 @@ export const devApi = {
   editTeam: (tid, body) => call(`${P}/teams/${tid}`, { method: "PATCH", body }),
   addTeamMember: (tid, body) => call(`${P}/teams/${tid}/members`, { method: "POST", body }),
   endTeamMember: (mid, body = {}) => call(`${P}/team-members/${mid}`, { method: "PATCH", body }),
+  // Etapa 3: objetivos medibles, notas clasificadas y comparación.
+  createGoal: (id, body) => call(`${P}/players/${id}/goals`, { method: "POST", body }),
+  editGoal: (id, gid, body) => call(`${P}/players/${id}/goals/${gid}`, { method: "PATCH", body }),
+  addCheckin: (id, gid, body) => call(`${P}/players/${id}/goals/${gid}/checkins`, { method: "POST", body }),
+  voidCheckin: (id, cid) => call(`${P}/players/${id}/checkins/${cid}`, { method: "DELETE" }),
+  createNote: (id, body) => call(`${P}/players/${id}/notes`, { method: "POST", body }),
+  editNote: (id, nid, body) => call(`${P}/players/${id}/notes/${nid}`, { method: "PATCH", body }),
+  deleteNote: (id, nid) => call(`${P}/players/${id}/notes/${nid}`, { method: "DELETE" }),
+  compare: (ids) => call(`${P}/compare?ids=${ids.map(encodeURIComponent).join(",")}`),
   // Endpoints existentes del dominio de jugadores (se reutilizan, no se duplican).
   createPlayer: (body) => call("/api/players", { method: "POST", body }),
   updatePlayer: (id, body) => call(`/api/players/${id}`, { method: "PATCH", body }),

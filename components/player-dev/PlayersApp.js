@@ -8,12 +8,14 @@ import { devApi } from "./api";
 import PlayerForm from "./PlayerForm";
 import Profile from "./Profile";
 import Roster from "./Roster";
+import Compare from "./Compare";
 
 function viewFromUrl() {
   if (typeof window === "undefined") return { name: "roster" };
   const q = new URLSearchParams(window.location.search);
   if (q.get("player")) return { name: "profile", id: q.get("player"), tab: q.get("tab") || "summary" };
   if (q.get("view") === "new") return { name: "new" };
+  if (q.get("view") === "compare") return { name: "compare", ids: (q.get("ids") || "").split(",").filter(Boolean) };
   return { name: "roster" };
 }
 
@@ -23,6 +25,10 @@ function urlFor(view) {
     q.set("player", view.id);
     if (view.tab && view.tab !== "summary") q.set("tab", view.tab);
   } else if (view.name === "new") q.set("view", "new");
+  else if (view.name === "compare") {
+    q.set("view", "compare");
+    if (view.ids?.length) q.set("ids", view.ids.join(","));
+  }
   const s = q.toString();
   return `/players${s ? `?${s}` : ""}`;
 }
@@ -77,6 +83,11 @@ export default function PlayersApp() {
           <button type="button" className={cx(lab.navBtn, view.name === "roster" && lab.navBtnActive)} onClick={() => go({ name: "roster" })}>
             Plantel
           </button>
+          {relational ? (
+            <button type="button" className={cx(lab.navBtn, view.name === "compare" && lab.navBtnActive)} onClick={() => go({ name: "compare", ids: [] })}>
+              Comparar
+            </button>
+          ) : null}
           <a className={lab.navBtn} href="/shooting">Shooting Lab</a>
           {relational ? (
             <button type="button" className={cx(lab.navBtn, view.name === "new" && lab.navBtnActive)} onClick={() => go({ name: "new" })}>
@@ -120,6 +131,20 @@ export default function PlayersApp() {
                   await load();
                   go({ name: "profile", id: player.id, tab: "summary" }, { replace: true });
                 }}
+              />
+            ) : null}
+            {view.name === "compare" ? (
+              <Compare
+                roster={roster}
+                initialIds={view.ids || []}
+                onIds={(ids) => {
+                  try {
+                    window.history.replaceState(null, "", urlFor({ name: "compare", ids }));
+                  } catch {
+                    /* sin URL igual funciona */
+                  }
+                }}
+                onOpen={(id) => go({ name: "profile", id, tab: "summary" })}
               />
             ) : null}
             {view.name === "profile" ? (

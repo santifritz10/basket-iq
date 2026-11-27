@@ -279,7 +279,7 @@ function VoidButton({ playerId, batchId, onDone }) {
   );
 }
 
-function Dialog({ title, onClose, children, wide }) {
+export function Dialog({ title, onClose, children, wide }) {
   return (
     <div className={lab.dialogBackdrop} onClick={(e) => e.target === e.currentTarget && onClose()} onKeyDown={(e) => e.key === "Escape" && onClose()}>
       <div className={lab.dialog} role="dialog" aria-modal="true" aria-label={title} style={wide ? { width: "min(720px, 100%)" } : undefined}>

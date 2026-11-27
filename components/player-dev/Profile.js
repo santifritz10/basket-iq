@@ -15,6 +15,9 @@ import Fundamentals from "./Fundamentals";
 import PlayerForm from "./PlayerForm";
 import { Avatar } from "./Roster";
 import StatsTab from "./StatsTab";
+import GoalsTab from "./GoalsTab";
+import NotesTab from "./NotesTab";
+import EvolutionTab from "./EvolutionTab";
 import s from "./dev.module.css";
 
 const MIN_SAMPLE = 20;
@@ -276,7 +279,7 @@ function Summary({ profile, roster, canEdit, onTab, onChanged }) {
             </div>
             {activeGoals.length ? (
               <ul className={lab.list}>
-                {activeGoals.slice(0, 5).map((g) => <li key={g.id} className={lab.goalItem}>{g.body}</li>)}
+                {activeGoals.slice(0, 5).map((g) => <li key={g.id} className={lab.goalItem}>{g.title || g.body}</li>)}
               </ul>
             ) : (
               <p className={lab.subtle}>Sin objetivos activos.</p>
@@ -484,154 +487,6 @@ function useAction(onChanged) {
     }
   };
   return { busy, error, run };
-}
-
-function TextAdder({ placeholder, button, onAdd, busy }) {
-  const [text, setText] = useState("");
-  return (
-    <form
-      onSubmit={async (e) => {
-        e.preventDefault();
-        if (!text.trim()) return;
-        if (await onAdd(text.trim())) setText("");
-      }}
-      style={{ display: "grid", gap: 8 }}
-    >
-      <textarea className={lab.textarea} rows={3} maxLength={4000} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} />
-      <div><button type="submit" className={cx(lab.btn, lab.btnPrimary, lab.btnSmall)} disabled={busy || !text.trim()}>{button}</button></div>
-    </form>
-  );
-}
-
-const GOAL_STATUS = { active: "Activo", completed: "Cumplido", archived: "Archivado" };
-
-function GoalsTab({ profile, canEdit, onChanged }) {
-  const { busy, error, run } = useAction(onChanged);
-  const pid = profile.player.id;
-  const groups = ["active", "completed", "archived"].map((st) => ({ st, items: profile.goals.filter((g) => (g.status || "active") === st) }));
-  return (
-    <div className={lab.stack}>
-      <Notice kind="info">Los objetivos medibles (métrica, valor inicial, meta, fecha límite y vínculo con datos reales) llegan en la próxima etapa. Los objetivos de texto se conservan.</Notice>
-      {canEdit ? (
-        <section className={lab.card}>
-          <div className={lab.cardHead}><h2 className={lab.cardTitle}>Nuevo objetivo</h2></div>
-          <TextAdder placeholder="Ej.: Mejorar el control con mano débil" button="Agregar objetivo" busy={busy} onAdd={(t) => run(() => devApi.addGoal(pid, t))} />
-        </section>
-      ) : null}
-      {error ? <Notice kind="error">{error}</Notice> : null}
-      {groups.map(({ st, items }) =>
-        items.length ? (
-          <section key={st} className={lab.card}>
-            <div className={lab.cardHead}><h2 className={lab.cardTitle}>{GOAL_STATUS[st]} ({items.length})</h2></div>
-            <ul className={lab.list}>
-              {items.map((g) => (
-                <li key={g.id} className={lab.sessionItem}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ whiteSpace: "pre-wrap" }}>{g.body}</div>
-                    <div className={lab.subtle}>Creado el {formatDate(String(g.created_at).slice(0, 10))}</div>
-                  </div>
-                  {canEdit ? (
-                    <div className={lab.btnRow}>
-                      {st !== "completed" ? <button type="button" className={cx(lab.btn, lab.btnSmall)} disabled={busy} onClick={() => run(() => devApi.updateGoal(pid, g.id, { status: "completed" }))}>Cumplido</button> : null}
-                      {st !== "active" ? <button type="button" className={cx(lab.btn, lab.btnGhost, lab.btnSmall)} disabled={busy} onClick={() => run(() => devApi.updateGoal(pid, g.id, { status: "active" }))}>Reactivar</button> : null}
-                      {st !== "archived" ? <button type="button" className={cx(lab.btn, lab.btnGhost, lab.btnSmall)} disabled={busy} onClick={() => run(() => devApi.updateGoal(pid, g.id, { status: "archived" }))}>Archivar</button> : null}
-                    </div>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null
-      )}
-      {!profile.goals.length ? <p className={lab.subtle}>Sin objetivos.</p> : null}
-    </div>
-  );
-}
-
-function NotesTab({ profile, canEdit, onChanged }) {
-  const { busy, error, run } = useAction(onChanged);
-  const [q, setQ] = useState("");
-  const list = profile.notes.filter((n) => !q || String(n.body).toLowerCase().includes(q.toLowerCase()));
-  return (
-    <div className={lab.stack}>
-      {canEdit ? (
-        <section className={lab.card}>
-          <div className={lab.cardHead}><h2 className={lab.cardTitle}>Nueva nota</h2></div>
-          <TextAdder placeholder="Observación del entrenamiento o del partido…" button="Guardar nota" busy={busy} onAdd={(t) => run(() => devApi.addNote(profile.player.id, t))} />
-          <p className={lab.subtle}>Hoy las notas las ven todos los colaboradores del jugador. La clasificación y la visibilidad privada llegan en la próxima etapa.</p>
-        </section>
-      ) : null}
-      {error ? <Notice kind="error">{error}</Notice> : null}
-      <section className={lab.card}>
-        <div className={lab.cardHead}>
-          <h2 className={lab.cardTitle}>Notas ({profile.notes.length})</h2>
-          {profile.notes.length > 4 ? <input className={lab.input} style={{ maxWidth: 220 }} placeholder="Buscar" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar en notas" /> : null}
-        </div>
-        {list.length ? (
-          <ul className={s.timeline}>
-            {list.map((n) => (
-              <li key={n.id} className={s.timelineItem}>
-                <span className={s.timelineDate}>{formatDate(String(n.created_at).slice(0, 10))}</span>
-                <span style={{ whiteSpace: "pre-wrap" }}>{n.body}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className={lab.subtle}>{profile.notes.length ? "Ninguna nota coincide." : "Sin notas."}</p>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function EvolutionTab({ profile, canEdit, onChanged }) {
-  const { busy, error, run } = useAction(onChanged);
-  const data = useMemo(() => playerShooting(profile), [profile]);
-  return (
-    <div className={lab.stack}>
-      <section className={lab.card}>
-        <div className={lab.cardHead}>
-          <div>
-            <h2 className={lab.cardTitle}>Evolución de lanzamiento</h2>
-            <p className={lab.cardHint}>Calculada desde los registros originales, no desde textos.</p>
-          </div>
-        </div>
-        <TrendCharts points={data.timeline} minSample={MIN_SAMPLE} />
-      </section>
-      <section className={lab.card}>
-        <div className={lab.cardHead}><h2 className={lab.cardTitle}>Hitos registrados por el entrenador</h2></div>
-        {canEdit ? <TextAdder placeholder="Ej.: Empezó a finalizar con mano izquierda en contraataque" button="Agregar hito" busy={busy} onAdd={(t) => run(() => devApi.addEvolution(profile.player.id, t))} /> : null}
-        {error ? <Notice kind="error">{error}</Notice> : null}
-        {profile.evolution.length ? (
-          <ul className={s.timeline} style={{ marginTop: 12 }}>
-            {profile.evolution.map((e) => (
-              <li key={e.id} className={s.timelineItem}>
-                <span className={s.timelineDate}>{formatDate(String(e.created_at).slice(0, 10))}</span>
-                <span style={{ whiteSpace: "pre-wrap" }}>{e.message}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className={lab.subtle}>Sin hitos.</p>
-        )}
-      </section>
-      <section className={lab.card}>
-        <div className={lab.cardHead}><h2 className={lab.cardTitle}>Registro de actividad</h2></div>
-        {profile.activity.length ? (
-          <ul className={s.timeline}>
-            {profile.activity.map((a) => (
-              <li key={a.id} className={s.timelineItem}>
-                <span className={s.timelineDate}>{formatDate(String(a.created_at).slice(0, 10))}</span>
-                <span>{a.summary || a.event_type}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className={lab.subtle}>Sin actividad registrada.</p>
-        )}
-      </section>
-    </div>
-  );
 }
 
 function PeopleTab({ profile, onChanged, onArchived }) {
