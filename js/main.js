@@ -1,8 +1,13 @@
 // ===============================
 // AUTENTICACIÓN (Supabase)
 // ===============================
+// El inicio de sesión, el registro y la recuperación de contraseña viven en
+// las pantallas de Next (/login, /registro, /recuperar-contrasena...). Esta
+// página solo valida la sesión compartida (mismo almacenamiento) y, si no
+// hay, manda al login.
 
 var authCurrentUser = null;
+var authLoggingOut = false;
 
 function isSupabaseReady() {
     return Boolean(window.basketLabSupabase && window.basketLabSupabase.client);
@@ -12,63 +17,12 @@ function getSupabaseClient() {
     return isSupabaseReady() ? window.basketLabSupabase.client : null;
 }
 
-async function forceClientSessionFromAuthResult(client, authResultData) {
-    if (!client || !authResultData || !authResultData.session) return null;
-    var session = authResultData.session;
-    if (!session.access_token || !session.refresh_token) return null;
-    try {
-        var setResult = await client.auth.setSession({
-            access_token: session.access_token,
-            refresh_token: session.refresh_token
-        });
-        if (setResult.error) {
-            console.error("[Auth][setSession] error", setResult.error);
-            return null;
-        }
-        return setResult.data && setResult.data.session && setResult.data.session.user
-            ? setResult.data.session.user
-            : null;
-    } catch (e) {
-        console.error("[Auth][setSession] unexpected error", e);
-        return null;
-    }
-}
-
 function normalizeUsername(value) {
-    return String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
-}
-
-function setAuthUiError(message) {
-    var loginError = document.getElementById("auth-login-error");
-    var registerError = document.getElementById("auth-register-error");
-    if (loginError) loginError.textContent = message || "";
-    if (registerError) registerError.textContent = message || "";
+    return String(value || "").trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24) || "usuario";
 }
 
 function getCurrentUser() {
     return authCurrentUser;
-}
-
-function mapSupabaseAuthError(error) {
-    var message = String((error && error.message) || "").toLowerCase();
-    var name = String((error && error.name) || "").toLowerCase();
-    var statusCode = Number((error && error.status) || 0);
-    if (name.indexOf("authretryablefetcherror") >= 0 || message.indexOf("failed to fetch") >= 0 || statusCode === 503 || statusCode === 504) {
-        return "Supabase no está respondiendo en este momento (503/504). Esperá 1-2 minutos y probá de nuevo.";
-    }
-    if (message.indexOf("already registered") >= 0 || message.indexOf("already been registered") >= 0) {
-        return "Ese correo ya está registrado.";
-    }
-    if (message.indexOf("invalid login credentials") >= 0) {
-        return "Correo o contraseña incorrectos.";
-    }
-    if (message.indexOf("email not confirmed") >= 0) {
-        return "Tu correo todavía no está confirmado. Revisá tu bandeja y volvé a intentar.";
-    }
-    if (message.indexOf("password should be at least") >= 0) {
-        return "La contraseña debe tener al menos 6 caracteres.";
-    }
-    return (error && error.message) || "No se pudo completar la operación de autenticación.";
 }
 
 function toAppUser(authUser, profile) {
@@ -88,28 +42,16 @@ async function upsertProfile(authUser, profileInput) {
     if (!client || !authUser) return;
     var usernameRaw = (profileInput && profileInput.username) || (authUser.user_metadata && authUser.user_metadata.username) || (authUser.email ? authUser.email.split("@")[0] : "usuario");
     var username = normalizeUsername(usernameRaw);
-    var payload = {
-        id: authUser.id,
-        username: username,
-        full_name: (profileInput && profileInput.full_name) || (authUser.user_metadata && authUser.user_metadata.full_name) || username
-    };
-    var upsertResult = await client.from("profiles").upsert(payload, { onConflict: "id" });
-    if (upsertResult.error) throw upsertResult.error;
-}
-
-async function getAuthenticatedSessionUser() {
-    var client = getSupabaseClient();
-    if (!client) return null;
-    for (var attempt = 0; attempt < 3; attempt++) {
-        var sessionResult = await client.auth.getSession();
-        if (sessionResult.error) throw sessionResult.error;
-        var session = sessionResult.data && sessionResult.data.session;
-        if (session && session.user) return session.user;
-        if (attempt < 2) {
-            await new Promise(function (resolve) { setTimeout(resolve, 180); });
-        }
+    var fullName = (profileInput && profileInput.full_name) || (authUser.user_metadata && authUser.user_metadata.full_name) || username;
+    // Solo crea el perfil si falta: nunca pisa un perfil existente.
+    var candidates = [username, username + "_" + String(authUser.id).slice(0, 6)];
+    for (var i = 0; i < candidates.length; i++) {
+        var insertResult = await client
+            .from("profiles")
+            .upsert({ id: authUser.id, username: candidates[i], full_name: fullName }, { onConflict: "id", ignoreDuplicates: true });
+        if (!insertResult.error) return;
+        if (insertResult.error.code !== "23505") throw insertResult.error;
     }
-    return null;
 }
 
 async function loadCurrentUserFromSession() {
@@ -164,119 +106,13 @@ async function loadCurrentUserFromSession() {
     return authCurrentUser;
 }
 
-async function register(username, email, name, password) {
-    var client = getSupabaseClient();
-    if (!client) {
-        return { ok: false, error: "Supabase no está configurado. Revisá js/supabase-config.js." };
-    }
-
-    var normalizedUsername = normalizeUsername(username);
-    if (!normalizedUsername) return { ok: false, error: "Ingresá un nombre de usuario." };
-
-    try {
-        var signUpResult = await client.auth.signUp({
-            email: String(email || "").trim(),
-            password: password,
-            options: {
-                data: {
-                    username: normalizedUsername,
-                    full_name: String(name || "").trim()
-                }
-            }
-        });
-        console.log("[Auth][signUp] response", {
-            hasUser: Boolean(signUpResult && signUpResult.data && signUpResult.data.user),
-            hasSession: Boolean(signUpResult && signUpResult.data && signUpResult.data.session)
-        });
-
-        if (signUpResult.error) {
-            console.error("[Auth][signUp] error", signUpResult.error);
-            return { ok: false, error: mapSupabaseAuthError(signUpResult.error) };
-        }
-
-        var authUser = signUpResult.data && signUpResult.data.user;
-        if (!authUser) {
-            console.error("[Auth][signUp] Missing data.user in response");
-            return { ok: false, error: "No se pudo crear el usuario en Supabase." };
-        }
-
-        var sessionUser = await getAuthenticatedSessionUser();
-        if (sessionUser && sessionUser.id === authUser.id) {
-            try {
-                await upsertProfile(authUser, { username: normalizedUsername, full_name: String(name || "").trim() });
-                console.log("[Auth][signUp] Profile upserted for authenticated user", authUser.id);
-            } catch (profileError) {
-                console.error("[Auth][signUp] profile upsert error", profileError);
-                return { ok: false, error: "Usuario creado, pero no se pudo guardar el perfil. Revisá la tabla/políticas de profiles." };
-            }
-
-            var current = await loadCurrentUserFromSession();
-            if (!current) {
-                console.error("[Auth][signUp] Session exists but app user could not be loaded");
-                return { ok: false, error: "No se pudo cargar la sesión luego del registro." };
-            }
-            return { ok: true, user: current };
-        }
-
-        authCurrentUser = null;
-        return {
-            ok: true,
-            user: null,
-            pendingEmailConfirmation: true
-        };
-    } catch (error) {
-        console.error("[Auth][signUp] unexpected error", error);
-        return { ok: false, error: mapSupabaseAuthError(error) };
-    }
-}
-
-async function login(email, password) {
-    var client = getSupabaseClient();
-    if (!client) {
-        return { ok: false, error: "Supabase no está configurado. Revisá js/supabase-config.js." };
-    }
-
-    try {
-        var loginResult = await client.auth.signInWithPassword({
-            email: String(email || "").trim(),
-            password: password
-        });
-        console.log("[Auth][signIn] response", {
-            hasUser: Boolean(loginResult && loginResult.data && loginResult.data.user),
-            hasSession: Boolean(loginResult && loginResult.data && loginResult.data.session)
-        });
-
-        if (loginResult.error) {
-            console.error("[Auth][signIn] error", loginResult.error);
-            return { ok: false, error: mapSupabaseAuthError(loginResult.error) };
-        }
-
-        var sessionUser = await getAuthenticatedSessionUser();
-        if (!sessionUser && loginResult.data && loginResult.data.session && loginResult.data.session.user) {
-            sessionUser = loginResult.data.session.user;
-        }
-        if (!sessionUser && loginResult.data && loginResult.data.user) {
-            sessionUser = loginResult.data.user;
-        }
-        if (!sessionUser && loginResult.data && loginResult.data.session) {
-            sessionUser = await forceClientSessionFromAuthResult(client, loginResult.data);
-        }
-        if (!sessionUser) {
-            console.error("[Auth][signIn] No active session after successful signIn");
-            return { ok: false, error: "Inicio de sesión incompleto: no se obtuvo una sesión válida." };
-        }
-
-        var current = await loadCurrentUserFromSession();
-        if (!current) {
-            console.error("[Auth][signIn] session available but app user mapping failed");
-            return { ok: false, error: "No se pudo cargar el perfil del usuario luego del login." };
-        }
-        await syncAuthCookiesFromClient();
-        return { ok: true, user: current };
-    } catch (error) {
-        console.error("[Auth][signIn] unexpected error", error);
-        return { ok: false, error: mapSupabaseAuthError(error) };
-    }
+function redirectToLogin(reason) {
+    var params = new URLSearchParams();
+    var here = window.location.pathname + window.location.search;
+    if (here && here !== "/") params.set("next", here);
+    if (reason) params.set("motivo", reason);
+    var qs = params.toString();
+    window.location.replace("/login" + (qs ? "?" + qs : ""));
 }
 
 function showApp() {
@@ -293,149 +129,80 @@ function showApp() {
         });
 }
 
-function showAuthScreen() {
-    var authScreen = document.getElementById("auth-screen");
-    var appContainer = document.getElementById("app-container");
-    if (authScreen) authScreen.classList.remove("hidden");
-    if (appContainer) appContainer.hidden = true;
-    closeDashboardUserMenu();
-    document.getElementById("auth-login-error").textContent = "";
-    document.getElementById("auth-register-error").textContent = "";
-    attachAuthListeners();
+function showAuthScreen(reason) {
+    authCurrentUser = null;
+    redirectToLogin(reason);
 }
 
-async function syncAuthCookiesFromClient() {
+async function syncAuthCookiesFromClient(sessionOverride) {
     var client = getSupabaseClient();
     if (!client) return;
     try {
-        var sessionResult = await client.auth.getSession();
-        var session = sessionResult.data && sessionResult.data.session;
-        if (!session || !session.access_token || !session.refresh_token) return;
+        var session = sessionOverride;
+        if (!session) {
+            var sessionResult = await client.auth.getSession();
+            session = sessionResult.data && sessionResult.data.session;
+        }
+        if (!session || !session.access_token) return;
         await fetch("/api/auth/sync-session", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
-            body: JSON.stringify({
-                access_token: session.access_token,
-                refresh_token: session.refresh_token
-            })
+            body: JSON.stringify({ access_token: session.access_token })
         });
     } catch (e) {
-        console.warn("[Auth] sync-session cookies failed", e);
+        console.warn("[Auth] No se pudo sincronizar la sesión con el servidor.");
     }
 }
 
 function logout() {
+    authLoggingOut = true;
+    authCurrentUser = null;
+    dataSyncDirtyTypes = {};
+    dataSyncBootstrapPromise = null;
+    window.location.assign("/cerrar-sesion");
+}
+
+function bindAuthLifecycle() {
     var client = getSupabaseClient();
-    if (!client) {
-        authCurrentUser = null;
-        showAuthScreen();
-        return;
-    }
-    client.auth.signOut()
-        .catch(function () {
-            return null;
-        })
-        .finally(function () {
+    if (!client || window.__basketLabAuthBound) return;
+    window.__basketLabAuthBound = true;
+    client.auth.onAuthStateChange(function (event, session) {
+        // La sesión se renueva sola en el navegador: copiamos el token nuevo
+        // a la cookie del servidor para que /assistant, /players, etc. sigan
+        // funcionando sin pedir login otra vez.
+        if (event === "TOKEN_REFRESHED" && session) {
+            syncAuthCookiesFromClient(session);
+        }
+        if (event === "SIGNED_OUT" && !authLoggingOut) {
             fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(function () {});
-            authCurrentUser = null;
-            dataSyncDirtyTypes = {};
-            dataSyncBootstrapPromise = null;
-            showAuthScreen();
-        });
-}
-
-function switchAuthTab(tabName) {
-    var loginForm = document.getElementById("auth-form-login");
-    var registerForm = document.getElementById("auth-form-register");
-    var tabs = document.querySelectorAll(".auth-tab");
-    tabs.forEach(function (t) {
-        t.classList.toggle("active", t.getAttribute("data-tab") === tabName);
+            showAuthScreen("expirada");
+        }
     });
-    if (loginForm) loginForm.classList.toggle("active", tabName === "login");
-    if (registerForm) registerForm.classList.toggle("active", tabName === "register");
-}
-
-function attachAuthListeners() {
-    var tabButtons = document.querySelectorAll(".auth-tab");
-    tabButtons.forEach(function (btn) {
-        btn.onclick = function () {
-            switchAuthTab(btn.getAttribute("data-tab"));
-            document.getElementById("auth-login-error").textContent = "";
-            document.getElementById("auth-register-error").textContent = "";
-        };
-    });
-
-    var loginForm = document.getElementById("auth-form-login");
-    if (loginForm) {
-        loginForm.onsubmit = function (e) {
-            e.preventDefault();
-            var ident = document.getElementById("login-identificador").value;
-            var pwd = document.getElementById("login-password").value;
-            var errEl = document.getElementById("auth-login-error");
-            errEl.textContent = "";
-            login(ident, pwd).then(function (result) {
-                if (result.ok) showApp(); else errEl.textContent = result.error || "Error al iniciar sesión.";
-            }).catch(function (err) {
-                errEl.textContent = mapSupabaseAuthError(err);
-            });
-        };
-    }
-
-    var registerForm = document.getElementById("auth-form-register");
-    if (registerForm) {
-        registerForm.onsubmit = function (e) {
-            e.preventDefault();
-            var username = document.getElementById("register-username").value.trim();
-            var email = document.getElementById("register-email").value.trim();
-            var name = document.getElementById("register-name").value.trim();
-            var pwd = document.getElementById("register-password").value;
-            var pwd2 = document.getElementById("register-password2").value;
-            var errEl = document.getElementById("auth-register-error");
-            errEl.textContent = "";
-            if (pwd !== pwd2) {
-                errEl.textContent = "Las contraseñas no coinciden.";
-                return;
-            }
-            if (pwd.length < 6) {
-                errEl.textContent = "La contraseña debe tener al menos 6 caracteres.";
-                return;
-            }
-            register(username, email, name, pwd).then(function (result) {
-                if (!result.ok) {
-                    errEl.textContent = result.error || "Error al registrarse.";
-                    return;
-                }
-                if (result.pendingEmailConfirmation) {
-                    switchAuthTab("login");
-                    document.getElementById("login-identificador").value = email;
-                    document.getElementById("auth-login-error").textContent = "Registro creado. Revisá tu correo para confirmar la cuenta y luego iniciá sesión.";
-                    return;
-                }
-                showApp();
-            }).catch(function (err) {
-                errEl.textContent = mapSupabaseAuthError(err);
-            });
-        };
-    }
 }
 
 function initAuth() {
-    attachAuthListeners();
+    if (window.__basketLabRedirecting) return;
     if (!isSupabaseReady()) {
-        showAuthScreen();
-        var msg = "No pudimos conectar con el servicio de inicio de sesión. Probá de nuevo en unos segundos.";
-        setAuthUiError(msg);
+        showAuthScreen("servicio");
         return;
     }
-    loadCurrentUserFromSession()
+    bindAuthLifecycle();
+    var client = getSupabaseClient();
+    client.auth.getUser()
+        .then(function (res) {
+            // getUser valida el token con Supabase (no solo lo lee del almacenamiento).
+            if (res.data && res.data.user) return loadCurrentUserFromSession();
+            var status = Number((res.error && res.error.status) || 0);
+            // Sin conexión o servicio caído: no tiramos la sesión guardada.
+            if (res.error && (status === 0 || status >= 500)) return loadCurrentUserFromSession();
+            return null;
+        })
         .then(function (user) {
             if (user) showApp(); else showAuthScreen();
         })
-        .catch(function (error) {
-            console.error("[Auth][init] session validation error", error);
+        .catch(function () {
             showAuthScreen();
-            setAuthUiError("No se pudo validar la sesión. Verificá la configuración de Supabase.");
         });
 }
 
@@ -5006,6 +4773,7 @@ function renderDashboard() {
         "      </button>" +
         '      <div class="dashboard-user-menu-dropdown" id="dashboard-user-menu-dropdown" role="menu" hidden>' +
         '        <button type="button" class="dashboard-user-menu-item" id="dashboard-user-menu-edit-name" role="menuitem">Cambiar nombre</button>' +
+        '        <a class="dashboard-user-menu-item" href="/cuenta" role="menuitem">Mi cuenta y contraseña</a>' +
         '        <button type="button" class="dashboard-user-menu-item dashboard-user-menu-item-danger" id="dashboard-user-menu-logout" role="menuitem">Cerrar sesión</button>' +
         "      </div>" +
         "    </div>" +

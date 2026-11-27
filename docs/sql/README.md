@@ -23,6 +23,13 @@ Ejecutar en **Supabase SQL Editor** en este orden:
   (favoritos y punto de lectura de los contenidos educativos). Solo amplía la restricción CHECK
   de `data_type`; no toca datos. Mientras no se ejecute, favoritos y lectura quedan solo en el dispositivo.
 
+## Autenticación
+
+- `010-auth-profiles.sql` — columnas opcionales de onboarding en `profiles` (rol deportivo, club,
+  categorías) y trigger que crea el perfil al registrarse. No borra ni cambia datos existentes.
+  Sin esta migración la app funciona igual: guarda esos datos en la cuenta del usuario.
+  Reversión: `010-auth-profiles-rollback.sql`.
+
 ## Staging primero
 
 Probar en proyecto de staging antes de producción.

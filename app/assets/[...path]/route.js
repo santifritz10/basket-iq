@@ -39,11 +39,18 @@ export async function GET(_req, context) {
     const supabaseAnonKey = String(
       process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
     );
-    const script = `(function initSupabaseConfig(){var SUPABASE_URL=${JSON.stringify(
+    // Si un enlace de correo cae en la página principal (por ejemplo, con la
+    // plantilla por defecto o la Site URL), lo manda a /auth/confirm antes de
+    // crear el cliente, para que la recuperación pida la contraseña nueva.
+    const authCallbackRedirect =
+      'var h=String(location.hash||""),q=String(location.search||"");' +
+      'if(location.pathname!=="/auth/confirm"&&(/[#&](access_token|error_code|error)=/.test(h)||/[?&]token_hash=/.test(q))){' +
+      'window.__basketLabRedirecting=true;location.replace("/auth/confirm"+q+h);return;}';
+    const script = `(function initSupabaseConfig(){${authCallbackRedirect}var SUPABASE_URL=${JSON.stringify(
       supabaseUrl
     )};var SUPABASE_ANON_KEY=${JSON.stringify(
       supabaseAnonKey
-    )};var hasValidConfig=SUPABASE_URL.indexOf("https://")===0&&SUPABASE_ANON_KEY&&SUPABASE_ANON_KEY.indexOf("TU_")!==0;if(!window.supabase||typeof window.supabase.createClient!=="function"){window.basketLabSupabase={client:null,error:"SDK de Supabase no disponible."};return;}if(!hasValidConfig){window.basketLabSupabase={client:null,error:"Configurar SUPABASE_URL y SUPABASE_ANON_KEY en variables de entorno."};return;}window.basketLabSupabase={client:window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY),error:null};})();`;
+    )};var hasValidConfig=(SUPABASE_URL.indexOf("https://")===0||/^http:\\/\\/(localhost|127\\.0\\.0\\.1)(:|\\/|$)/.test(SUPABASE_URL))&&SUPABASE_ANON_KEY&&SUPABASE_ANON_KEY.indexOf("TU_")!==0;if(!window.supabase||typeof window.supabase.createClient!=="function"){window.basketLabSupabase={client:null,error:"SDK de Supabase no disponible."};return;}if(!hasValidConfig){window.basketLabSupabase={client:null,error:"Configurar SUPABASE_URL y SUPABASE_ANON_KEY en variables de entorno."};return;}window.basketLabSupabase={client:window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{flowType:"implicit",persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}}),error:null};})();`;
     return new NextResponse(script, {
       status: 200,
       headers: {

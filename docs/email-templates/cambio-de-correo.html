@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="color-scheme" content="dark light">
+  <meta name="supported-color-schemes" content="dark light">
+  <title>Confirmá tu nuevo correo</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0b0c10;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">Confirmá el cambio de correo de tu cuenta de Basket Lab.</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0b0c10" style="background-color:#0b0c10;">
+    <tr>
+      <td align="center" style="padding:32px 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+          <tr>
+            <td align="center" style="padding:0 0 20px 0;">
+              <img src="{{ .SiteURL }}/assets/images/logo-basketlab-email.png" width="112" height="112" alt="Basket Lab · By Coach Fritz" style="display:block;width:112px;height:112px;border:0;outline:none;text-decoration:none;">
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#15161c;border:1px solid #262833;border-radius:18px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="height:4px;line-height:4px;font-size:0;background-color:#ff7a1a;border-radius:18px 18px 0 0;">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td style="padding:32px 32px 8px 32px;font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:30px;font-weight:bold;color:#f4f5f8;">Confirmá tu nuevo correo</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 32px 20px 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:24px;color:#c9ccd6;">Recibimos un pedido para cambiar el correo de tu cuenta de Basket Lab de <strong style="color:#f4f5f8;">{{ .Email }}</strong> a <strong style="color:#f4f5f8;">{{ .NewEmail }}</strong>. Para completar el cambio, confirmalo con el botón.</td>
+                </tr>
+              <tr>
+                <td align="center" style="padding:8px 32px 8px 32px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td align="center" bgcolor="#ff7a1a" style="border-radius:12px;">
+                        <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email_change" target="_blank" style="display:inline-block;padding:15px 34px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;line-height:20px;color:#1a0d00;text-decoration:none;border-radius:12px;">Confirmar el cambio</a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:20px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#9ea3b3;">
+                  Si el botón no funciona, copiá y pegá este enlace en tu navegador:<br>
+                  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email_change" target="_blank" style="color:#ff9a45;word-break:break-all;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email_change</a>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:24px 32px 0 32px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td style="padding:14px 16px;background-color:#1d1f27;border-radius:10px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#b7bbc8;">
+                        <strong style="color:#e9eaef;">Seguridad:</strong> si no pediste este cambio, no toques el botón y cambiá tu contraseña desde Basket Lab cuanto antes.
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+                <tr>
+                  <td style="padding:28px 32px 32px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;color:#c9ccd6;">Nos vemos en la cancha,<br><strong style="color:#f4f5f8;">Basket Lab</strong></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:20px 24px 0 24px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#6f7486;">
+              Basket Lab · By Coach Fritz<br>
+              Recibiste este correo porque se usó esta dirección en <a href="{{ .SiteURL }}" style="color:#8c92a5;">Basket Lab</a>.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

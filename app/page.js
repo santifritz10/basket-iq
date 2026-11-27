@@ -185,8 +185,8 @@ export default async function HomePage() {
   return (
     <>
       <div dangerouslySetInnerHTML={{ __html: legacyBodyMarkup }} />
-      <Script src="https://unpkg.com/lucide@latest" strategy="afterInteractive" />
-      <Script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" strategy="beforeInteractive" />
+      <Script src="https://unpkg.com/lucide@1.70.0" strategy="afterInteractive" />
+      <Script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.100.1/dist/umd/supabase.js" strategy="beforeInteractive" />
       <Script id="player-domain-config" strategy="beforeInteractive">
         {playerDomainConfigScript}
       </Script>
@@ -209,7 +209,7 @@ export default async function HomePage() {
       <Script src="/assets/js/academy-content/spacing.js?v=20261126i" strategy="afterInteractive" />
       <Script src="/assets/js/academy-content/presion.js?v=20261126i" strategy="afterInteractive" />
       <Script src="/assets/js/academy-content/desafios.js?v=20261126i" strategy="afterInteractive" />
-      <Script src="/assets/js/main.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/main.js?v=20261127a" strategy="afterInteractive" />
       <Script id="legacy-toggle-sidebar" strategy="afterInteractive">
         {toggleSidebarScript}
       </Script>
