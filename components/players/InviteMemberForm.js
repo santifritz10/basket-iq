@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { inviteMember } from "@/lib/client/player-api";
+import { ACCESS_LEVELS, RELATIONSHIP_TYPES } from "@/lib/player-domain/membership-rules";
 
 export default function InviteMemberForm({ playerId, onInvited }) {
   const [email, setEmail] = useState("");
-  const [inviteAs, setInviteAs] = useState("player");
+  const [relationship, setRelationship] = useState("coach");
+  const [access, setAccess] = useState("viewer");
   const [status, setStatus] = useState("");
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,11 +19,10 @@ export default function InviteMemberForm({ playerId, onInvited }) {
     setStatus("");
     setToken("");
     try {
-      const isPlayer = inviteAs === "player";
       const result = await inviteMember(playerId, {
         email: email.trim().toLowerCase(),
-        relationship_type: isPlayer ? "player" : "coach",
-        access_level: isPlayer ? "admin" : "editor"
+        relationship_type: relationship,
+        access_level: access
       });
       setStatus("Invitación creada.");
       if (result.token) setToken(result.token);
@@ -38,13 +39,22 @@ export default function InviteMemberForm({ playerId, onInvited }) {
     <form className="player-tab-card" onSubmit={submit} style={{ marginTop: 12 }}>
       <h4>Invitar colaborador</h4>
       <p className="text-muted">
-        Invitá al jugador (admin del perfil) o a otro entrenador para trabajar sobre este perfil.
+        El rol describe el vínculo con el jugador; el permiso define qué puede hacer. Elegir un rol no da permisos.
       </p>
       <div className="form-row">
-        <label>Tipo</label>
-        <select value={inviteAs} onChange={(e) => setInviteAs(e.target.value)}>
-          <option value="player">Jugador (admin del perfil)</option>
-          <option value="coach">Entrenador (editor)</option>
+        <label>Rol</label>
+        <select value={relationship} onChange={(e) => setRelationship(e.target.value)}>
+          {RELATIONSHIP_TYPES.map((r) => (
+            <option key={r.id} value={r.id}>{r.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="form-row">
+        <label>Permiso</label>
+        <select value={access} onChange={(e) => setAccess(e.target.value)}>
+          {ACCESS_LEVELS.map((a) => (
+            <option key={a.id} value={a.id}>{a.label}</option>
+          ))}
         </select>
       </div>
       <div className="form-row">

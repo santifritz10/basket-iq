@@ -18,6 +18,7 @@ import {
   formatSessionFecha,
   getPlayerShootingSessions,
   getZonesWithShots,
+  playerSessionView,
   pctLabel,
   sessionTotalShots,
   zoneStats
@@ -560,11 +561,13 @@ export default function PlayersModule({
                   </div>
                 ) : (
                   playerShootingSessions.map((session, index) => {
-                    const totals = sessionTotalShots(session.zones || {});
+                    const view = playerSessionView(session, selected.id);
+                    const zones = view.zones;
+                    const totals = sessionTotalShots(zones);
                     const customName = String(session.nombre || "").trim();
                     const showName = customName && customName !== "Sesión de tiro";
-                    const activeZones = getZonesWithShots(session.zones || {});
-                    const maxAttempts = Math.max(1, ...activeZones.map((z) => zoneStats(session.zones, z.id).attempts));
+                    const activeZones = getZonesWithShots(zones);
+                    const maxAttempts = Math.max(1, ...activeZones.map((z) => zoneStats(zones, z.id).attempts));
                     return (
                       <details key={session.id} className="player-shooting-session-item">
                         <summary className="player-shooting-session-summary">
@@ -572,11 +575,12 @@ export default function PlayersModule({
                           {showName ? <span className="player-shooting-session-name">{customName}</span> : null}
                           <span className="player-shooting-session-date">{formatSessionFecha(session.fecha)}</span>
                           <span className="player-shooting-session-meta">
-                            {totals.attempts} intentos · {totals.made} encestados · {pctLabel(totals.attempts, totals.made)} global
+                            {view.label} · {totals.attempts} intentos · {totals.made} encestados · {pctLabel(totals.attempts, totals.made)}
                           </span>
                           <span className="player-shooting-session-chevron" aria-hidden="true">▶</span>
                         </summary>
                         <div className="player-shooting-session-body">
+                          {view.note ? <p className="text-muted">{view.note}</p> : null}
                           <table className="shx-table">
                             <thead>
                               <tr>
@@ -594,7 +598,7 @@ export default function PlayersModule({
                                 </tr>
                               ) : (
                                 activeZones.map((zone) => {
-                                  const stats = zoneStats(session.zones, zone.id);
+                                  const stats = zoneStats(zones, zone.id);
                                   const vol = Math.max(6, Math.round((stats.attempts / maxAttempts) * 100));
                                   return (
                                     <tr key={zone.id}>
