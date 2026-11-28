@@ -3719,6 +3719,7 @@ var navBackInProgress = false;
 
 var NAV_ROOT_SECTIONS = {
     dashboard: true,
+    fundamentos: true,
     planificacion_hub: true,
     player_tracking_hub: true,
     jugadas_hub: true,
@@ -3795,6 +3796,16 @@ function loadContent(sectionId) {
     if (sectionId === "pizarra_virtual") {
         loadBoard();
         return;
+    }
+
+    // Fundamentos (academia): portada, áreas, fichas. Resuelve también los ids antiguos
+    // (fund_*, fund_cat_*) para que los enlaces y favoritos anteriores sigan funcionando.
+    if (window.BasketFundCatalog && window.BasketFundamentos) {
+        var fundRoute = window.BasketFundCatalog.resolve(sectionId);
+        if (fundRoute) {
+            renderFundamentosSection(fundRoute);
+            return;
+        }
     }
 
     if (FUNDAMENTOS_CATEGORY_VIEWS[sectionId]) {
@@ -5455,6 +5466,60 @@ function openAcademyBoardInEditor(doc, boardDef, article) {
     injectNavBackButton();
 }
 
+// ===============================
+// FUNDAMENTOS · academia (js/fundamentos-*.js)
+// ===============================
+
+var FUND_MODE_KEY = "basketLab_fundMode";
+var pendingFundArticleOpts = null;
+
+function getFundamentosMode() {
+    try { return localStorage.getItem(FUND_MODE_KEY) === "coach" ? "coach" : "player"; } catch (e) { return "player"; }
+}
+
+function setFundamentosMode(mode) {
+    try { localStorage.setItem(FUND_MODE_KEY, mode === "coach" ? "coach" : "player"); } catch (e) { /* sin almacenamiento */ }
+}
+
+function getFundamentosHost() {
+    return {
+        go: function (id) { loadContent(id); },
+        getProgress: getAcademyProgress,
+        setFavorite: function (id, on) { updateLearningProgress(id, { favorite: !!on }); },
+        legacyContent: window.FUNDAMENTOS_CONTENIDO || {},
+        openArticle: openFundamentosArticle
+    };
+}
+
+/** Abre una ficha completa en una pestaña y sección (por ejemplo, un ejercicio compartido). */
+function openFundamentosArticle(articleId, opts) {
+    var cat = window.BasketFundCatalog;
+    var concept = cat && cat.CONCEPTS.find(function (c) { return c.article === articleId; });
+    if (!concept) return;
+    pendingFundArticleOpts = opts || null;
+    loadContent(cat.conceptSection(concept.id));
+}
+
+function renderFundamentosSection(route) {
+    var contentDiv = document.getElementById("content");
+    if (!contentDiv) return;
+    var ui = window.BasketFundamentos;
+    var cat = window.BasketFundCatalog;
+    var host = getFundamentosHost();
+    if (route.type === "home") { ui.renderHome(contentDiv, host); return; }
+    if (route.type === "area") { ui.renderArea(contentDiv, route.area, route.sub, host); return; }
+    var concept = cat.getConcept(route.concept);
+    var article = concept && concept.article && window.BasketAcademy ? window.BasketAcademy.get(concept.article) : null;
+    if (article) {
+        ui.pushHistory(concept.id);
+        var opts = pendingFundArticleOpts || (route.variant ? { tab: "aprender", section: "variantes" } : {});
+        pendingFundArticleOpts = null;
+        renderAcademyArticle(article.id, opts);
+        return;
+    }
+    ui.renderConcept(contentDiv, route.concept, route.variant, host);
+}
+
 function renderAcademyArticle(articleId, opts) {
     var contentDiv = document.getElementById("content");
     if (!contentDiv) return;
@@ -5486,9 +5551,13 @@ function renderAcademyArticle(articleId, opts) {
                 steps: []
             });
         },
-        onAskAssistant: window.BasketAssistantBridge ? function (art, sel) {
+        // Las fichas de Fundamentos todavía no están en el contexto del asistente.
+        onAskAssistant: window.BasketAssistantBridge && !article.conceptId ? function (art, sel) {
             openAcademyAssistant(art, sel || {});
-        } : null
+        } : null,
+        getMode: getFundamentosMode,
+        setMode: setFundamentosMode,
+        onOpenArticle: openFundamentosArticle
     }, opts || {});
     injectNavBackButton();
 }
