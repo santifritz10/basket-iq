@@ -118,7 +118,11 @@ test("las pizarras de las fichas son animables y quedan en media cancha", () => 
 test("catálogo de videos: válido, sin duplicados y sin marcas de tiempo no revisadas", () => {
   assert.deepEqual(Videos.validate(), []);
   for (const v of Videos.VIDEOS) {
-    for (const rel of v.concepts) assert.ok(Cat.getConcept(rel.id), `${v.id} → ${rel.id}`);
+    for (const rel of v.concepts) {
+      // "tl:<id>" relaciona el video con un contenido del laboratorio táctico.
+      const ok = rel.id.startsWith("tl:") ? require("../js/tactical-catalog.js").getEntry(rel.id.slice(3)) : Cat.getConcept(rel.id);
+      assert.ok(ok, `${v.id} → ${rel.id}`);
+    }
   }
   const used = fichas.flatMap((a) => JSON.stringify(a.tabs.visualizar).match(/"video":"([^"]+)"/g) || []).map((m) => m.split('"')[3]);
   for (const id of used) assert.ok(Videos.get(id), id);

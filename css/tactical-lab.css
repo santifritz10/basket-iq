@@ -1,0 +1,257 @@
+/* ==========================================================================
+   Basket Lab · Laboratorio táctico
+   Reutiliza la identidad de la academia de Fundamentos (css/fundamentos.css: .fa-*).
+   Acá solo van las piezas propias: herramientas, cinco áreas, tipo de contenido,
+   relaciones dentro de las fichas y el aviso de las páginas anteriores.
+   ========================================================================== */
+
+/* ---------- Herramientas (simuladores, lecturas, libro de juego) ---------- */
+.tl-tools {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+}
+
+@container (max-width: 760px) {
+    .tl-tools {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+}
+
+.tl-tool {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 64px;
+    padding: 12px 14px;
+    border: 1px solid var(--fa-line);
+    border-radius: 14px;
+    background: var(--fa-card);
+    color: var(--fa-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s var(--fa-ease), border-color 0.2s var(--fa-ease);
+}
+
+.tl-tool:hover {
+    background: var(--fa-card-hover);
+    border-color: rgba(255, 139, 43, 0.35);
+}
+
+.tl-tool-icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(255, 139, 43, 0.14);
+    color: var(--fa-accent-soft);
+}
+
+.tl-tool-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.tl-tool-text strong {
+    font-size: 15px;
+}
+
+.tl-tool-text span {
+    color: var(--fa-muted);
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+/* ---------- Cinco áreas: tres arriba y dos más anchas abajo ---------- */
+.tl-section-title {
+    margin: 28px 0 12px;
+    font-size: 20px;
+}
+
+.fa-areas.tl-areas {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.tl-areas .fa-acard {
+    grid-column: span 2;
+    aspect-ratio: auto;
+    min-height: 300px;
+}
+
+.tl-areas .fa-acard:nth-child(n + 4) {
+    grid-column: span 3;
+    min-height: 260px;
+}
+
+@container (max-width: 760px) {
+    .fa-areas.tl-areas {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .tl-areas .fa-acard,
+    .tl-areas .fa-acard:nth-child(n + 4) {
+        grid-column: span 1;
+        min-height: 220px;
+    }
+
+    .tl-areas .fa-acard:last-child {
+        grid-column: span 2;
+        min-height: 200px;
+    }
+}
+
+@container (max-width: 420px) {
+    .tl-areas .fa-acard,
+    .tl-areas .fa-acard:nth-child(n + 4),
+    .tl-areas .fa-acard:last-child {
+        grid-column: span 2;
+        min-height: 200px;
+    }
+}
+
+/* Sin foto: composición tipográfica. */
+.tl-acard--plain {
+    background: radial-gradient(120% 120% at 100% 0%, rgba(255, 139, 43, 0.25), transparent 60%), #111722;
+}
+
+.tl-acard-word {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    font-size: 44px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    color: rgba(255, 255, 255, 0.08);
+}
+
+/* ---------- Tarjeta de contenido ---------- */
+.tl-type {
+    color: var(--fa-accent-soft);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.tl-cc-sum {
+    color: var(--fa-muted);
+    font-size: 13.5px;
+    line-height: 1.4;
+}
+
+.tl-lead {
+    margin: 0 0 14px;
+    max-width: 70ch;
+    color: var(--fa-muted);
+    line-height: 1.5;
+}
+
+.tl-next {
+    margin: 10px 0 0;
+    color: var(--fa-muted);
+    font-size: 13.5px;
+    line-height: 1.5;
+}
+
+.tl-next span {
+    color: var(--fa-text);
+    font-weight: 600;
+}
+
+/* ---------- Simuladores ---------- */
+.tl-viewhead h1 {
+    margin: 6px 0 8px;
+    font-size: clamp(26px, 4cqw, 36px);
+}
+
+.tl-viewhead p {
+    max-width: 72ch;
+}
+
+.tl-simlist {
+    display: grid;
+    gap: 10px;
+    margin: 18px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.tl-simlist li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: var(--fa-card);
+}
+
+.tl-simlist li > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+@container (max-width: 560px) {
+    .tl-simlist li {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+/* ---------- Relaciones dentro de las fichas ---------- */
+.ac-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0 4px;
+}
+
+.ac-links-label {
+    width: 100%;
+    color: var(--fa-muted, #a4b2cf);
+    font-size: 13px;
+}
+
+.ac-linkpill {
+    min-height: 36px;
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 139, 43, 0.35);
+    border-radius: 999px;
+    background: rgba(255, 139, 43, 0.08);
+    color: inherit;
+    font: inherit;
+    font-size: 13.5px;
+    cursor: pointer;
+}
+
+.ac-linkpill:hover {
+    background: rgba(255, 139, 43, 0.18);
+}
+
+/* ---------- Aviso en las páginas anteriores ---------- */
+.tl-legacy-note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    margin: 12px 0 18px;
+    padding: 12px 14px;
+    border-left: 3px solid var(--accent, #ff8b2b);
+    border-radius: 10px;
+    background: rgba(255, 139, 43, 0.08);
+}
+
+.tl-legacy-note p {
+    flex: 1 1 260px;
+    margin: 0;
+}

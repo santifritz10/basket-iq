@@ -59,7 +59,8 @@
             type: "clinic",
             concepts: [
                 { id: "crossover", why: "Capítulo oficial sobre habilidades de penetración con dribbling, donde se inscribe el cambio de mano para atacar al defensor.", timestamps: [] },
-                { id: "drible-avance", why: "Mismo capítulo: atacar el aro con dribbling.", timestamps: [] }
+                { id: "drible-avance", why: "Mismo capítulo: atacar el aro con dribbling.", timestamps: [] },
+                { id: "tl:ventajas", why: "Laboratorio táctico: la penetración con dribbling es una de las formas de crear una ventaja que obliga a ayudar.", timestamps: [] }
             ],
             availability: "available",
             embed: "allowed",

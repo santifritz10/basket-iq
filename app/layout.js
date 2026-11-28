@@ -3,6 +3,7 @@ import "../css/styles.css";
 import "../css/tactical-board.css";
 import "../css/academy.css";
 import "../css/fundamentos.css";
+import "../css/tactical-lab.css";
 
 export const metadata = {
   title: "Basket Lab",
