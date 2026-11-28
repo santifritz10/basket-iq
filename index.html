@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="css/tactical-board.css">
     <link rel="stylesheet" href="css/academy.css">
     <link rel="stylesheet" href="css/fundamentos.css">
+    <link rel="stylesheet" href="css/tactical-lab.css">
 </head>
 <body class="app-body">
 
@@ -33,6 +34,8 @@
         </div>
 
         <nav class="sidebar-nav">
+            <p class="sidebar-section-title">Academia</p>
+
             <!-- Fundamentos -->
             <div class="sidebar-group">
                 <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="fundamentos">
@@ -52,75 +55,27 @@
                 </ul>
             </div>
 
-            <!-- Ataques -->
+            <!-- Laboratorio táctico: reemplaza a Ataques, Defensas en zona y Presión.
+                 Los sistemas viven dentro del laboratorio; los ids antiguos siguen funcionando. -->
             <div class="sidebar-group">
-                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="ataques">
+                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="tactical-lab">
                     <span class="sidebar-toggle-icon">▶</span>
-                    <span>Ataques</span>
+                    <span>Laboratorio táctico</span>
                 </div>
-                <ul class="sidebar-submenu" id="ataques">
-                    <li class="sidebar-group">
-                        <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="ataques-zona">
-                            <span class="sidebar-toggle-icon">▶</span>
-                            <span>Zona</span>
-                        </div>
-                        <ul class="sidebar-submenu" id="ataques-zona">
-                            <li onclick="loadContent('vs23')">vs 2-3</li>
-                            <li onclick="loadContent('vs131')">vs 1-3-1</li>
-                            <li onclick="loadContent('vs32')">vs 3-2</li>
-                            <li onclick="loadContent('vs41')">vs 4-1</li>
-                        </ul>
-                    </li>
-                    <li class="sidebar-group">
-                        <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="ataques-hombre">
-                            <span class="sidebar-toggle-icon">▶</span>
-                            <span>Hombre a Hombre</span>
-                        </div>
-                        <ul class="sidebar-submenu" id="ataques-hombre">
-                            <li onclick="loadContent('abierto')">Sistema Abierto</li>
-                            <li onclick="loadContent('cerrado')">Sistema Cerrado</li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- Defensas en Zona -->
-            <div class="sidebar-group">
-                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="defensas-zona">
-                    <span class="sidebar-toggle-icon">▶</span>
-                    <span>Defensas en Zona</span>
-                </div>
-                <ul class="sidebar-submenu" id="defensas-zona">
-                    <li onclick="loadContent('zone23_defense')">Zona 2-3</li>
-                    <li onclick="loadContent('zone32_defense')">Zona 3-2</li>
-                    <li onclick="loadContent('zone131_defense')">Zona 1-3-1</li>
-                </ul>
-            </div>
-
-            <!-- Presión -->
-            <div class="sidebar-group">
-                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="presion">
-                    <span class="sidebar-toggle-icon">▶</span>
-                    <span>Presión</span>
-                </div>
-                <ul class="sidebar-submenu" id="presion">
-                    <li onclick="loadContent('fullcourt')">Full Court</li>
-                    <li onclick="loadContent('press221')">2-2-1</li>
-                    <li onclick="loadContent('doubleteam')">Double Team</li>
-                </ul>
-            </div>
-
-            <!-- Aprendizaje -->
-            <div class="sidebar-group">
-                <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="aprendizaje">
-                    <span class="sidebar-toggle-icon">▶</span>
-                    <span>Aprendizaje</span>
-                </div>
-                <ul class="sidebar-submenu" id="aprendizaje">
-                    <li onclick="loadContent('desafios_tacticos')">Desafíos tácticos</li>
+                <ul class="sidebar-submenu" id="tactical-lab">
+                    <li onclick="loadContent('tactical_lab')"><strong>Entendé el juego</strong></li>
+                    <li onclick="loadContent('tl_area_principios')">Principios del juego</li>
+                    <li onclick="loadContent('tl_area_ataque')">Ataque colectivo</li>
+                    <li onclick="loadContent('tl_area_defensa')">Defensa colectiva</li>
+                    <li onclick="loadContent('tl_area_transicion')">Transiciones</li>
+                    <li onclick="loadContent('tl_area_especiales')">Situaciones especiales</li>
+                    <li onclick="loadContent('tl_tool_simuladores')">Simuladores</li>
+                    <li onclick="loadContent('desafios_tacticos')">Lecturas de juego</li>
                     <li onclick="loadContent('mi_progreso')">Mi progreso</li>
                 </ul>
             </div>
+
+            <p class="sidebar-section-title">Herramientas</p>
 
             <!-- Planilla -->
             <div class="sidebar-group">
@@ -158,14 +113,15 @@
                 </ul>
             </div>
 
-            <!-- Jugadas Guardadas -->
+            <!-- Mi libro de juego (jugadas guardadas) -->
             <div class="sidebar-group">
                 <div class="sidebar-toggle" onclick="toggleSidebarGroup(this)" data-group="jugadas">
                     <span class="sidebar-toggle-icon">▶</span>
-                    <span>Jugadas Guardadas</span>
+                    <span>Mi libro de juego</span>
                 </div>
                 <ul class="sidebar-submenu" id="jugadas">
-                    <li onclick="loadContent('plays_library')">Biblioteca de jugadas</li>
+                    <li onclick="loadContent('plays_library')">Mis jugadas guardadas</li>
+                    <li onclick="loadBoard()">Crear en la pizarra</li>
                 </ul>
             </div>
 
@@ -211,7 +167,15 @@
 <script src="js/academy-content/fund-catch-shoot.js"></script>
 <script src="js/academy-content/fund-bandeja.js"></script>
 <script src="js/academy-content/fund-closeout.js"></script>
+<script src="js/academy-content/tl-ventajas.js"></script>
+<script src="js/academy-content/tl-5-out.js"></script>
+<script src="js/academy-content/tl-ataque-zona-2-3.js"></script>
+<script src="js/academy-content/tl-drop.js"></script>
+<script src="js/academy-content/tl-balance-defensivo.js"></script>
 <script src="js/fundamentos-academy.js"></script>
+<script src="js/tactical-media.js"></script>
+<script src="js/tactical-catalog.js"></script>
+<script src="js/tactical-lab.js"></script>
 <script src="js/main.js"></script>
 <script>
     function toggleSidebarGroup(elm) {

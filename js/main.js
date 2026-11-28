@@ -3724,6 +3724,7 @@ var NAV_ROOT_SECTIONS = {
     player_tracking_hub: true,
     jugadas_hub: true,
     ataques_hub: true,
+    tactical_lab: true,
     defensas_zona_hub: true,
     desafios_tacticos: true,
     mi_progreso: true,
@@ -3796,6 +3797,17 @@ function loadContent(sectionId) {
     if (sectionId === "pizarra_virtual") {
         loadBoard();
         return;
+    }
+
+    // Laboratorio táctico: portada, áreas, simuladores y fichas. También redirige los hubs
+    // antiguos (ataques_hub, defensas_zona_hub, presion_hub...) a su área nueva. Las hojas
+    // antiguas (vs23, zone23_defense...) siguen abriendo su contenido más abajo.
+    if (window.BasketTacticalCatalog && window.BasketTacticalLab) {
+        var tlRoute = window.BasketTacticalCatalog.resolve(sectionId);
+        if (tlRoute) {
+            renderTacticalSection(tlRoute);
+            return;
+        }
     }
 
     // Fundamentos (academia): portada, áreas, fichas. Resuelve también los ids antiguos
@@ -3924,22 +3936,7 @@ function loadContent(sectionId) {
                         <li>Fouls innecesarios si se usan mal las manos en la trampa.</li>
                         <li>Ser castigados con pases largos si nadie protege la espalda de la defensa.</li>
                     </ul>
-
-                    <h3 class="section-title">Videos de referencia</h3>
-                    <div class="video-grid">
-                        <div class="video-card">
-                            <h4>Trampas en banda</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/embed/JGwWNGJdvx8"
-                                    title="Double team en banda"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-                    </div>
+                    <p class="text-muted">Los videos que acompañaban esta página no correspondían al tema (se comprobaron el 28/11/2026) y se retiraron.</p>
                 </section>
             `;
             break;
@@ -3983,35 +3980,7 @@ function loadContent(sectionId) {
                         <li>Cuando el reloj de posesión ya está bajo y conviene volver a una defensa más compacta.</li>
                         <li>Si el equipo está muy cargado de faltas y se necesita bajar el riesgo.</li>
                     </ul>
-
-                    <h3 class="section-title">Videos: ejemplo de presión 2-2-1</h3>
-                    <div class="video-grid">
-                        <div class="video-card">
-                            <h4>Estructura y rotaciones 2-2-1</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/embed/hT_nvWreIhg"
-                                    title="Presión 2-2-1 estructura"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-
-                        <div class="video-card">
-                            <h4>Trampas y robos en 2-2-1</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/embed/kJQP7kiw5Fk"
-                                    title="Presión 2-2-1 traps"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-                    </div>
+                    <p class="text-muted">Los videos que acompañaban esta página no correspondían al tema (se comprobaron el 28/11/2026) y se retiraron.</p>
                 </section>
             `;
             break;
@@ -4080,40 +4049,7 @@ function loadContent(sectionId) {
                         <li>Contra defensas que ayudan demasiado desde el lado fuerte.</li>
                         <li>Para castigar pívots lentos que quedan defendiendo en el perímetro tras cambios defensivos.</li>
                     </ul>
-
-                    <h3 class="section-title">Videos de referencia de juego abierto</h3>
-                    <p>
-                        Estos ejemplos muestran ideas de juego 5-out / 4-out, con énfasis en spacing, cortes y decisiones
-                        tras la penetración.
-                    </p>
-
-                    <div class="video-grid">
-                        <div class="video-card">
-                            <h4>Conceptos básicos 5-out</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/embed/1xXNoB3t8vM"
-                                    title="Conceptos 5-out"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-
-                        <div class="video-card">
-                            <h4>Penetrar y pasar (drive & kick)</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/embed/Pkh8UtuejGw"
-                                    title="Drive and kick"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-                    </div>
+                    <p class="text-muted">Los videos que acompañaban esta página no correspondían al tema (se comprobaron el 28/11/2026) y se retiraron.</p>
                 </section>
             `;
             break;
@@ -4150,40 +4086,7 @@ function loadContent(sectionId) {
                         <li>Contra defensas que no ayudan bien desde el lado débil.</li>
                         <li>Para castigar defensas pequeñas o equipos que cambian todo sin tener protección del aro.</li>
                     </ul>
-
-                    <h3 class="section-title">Videos de referencia de juego interior</h3>
-                    <p>
-                        En estos videos se ven conceptos de juego al poste, high-low y lectura de ayudas, que podés adaptar
-                        a tu sistema cerrado.
-                    </p>
-
-                    <div class="video-grid">
-                        <div class="video-card">
-                            <h4>Juego al poste bajo</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/embed/9bZkp7q19f0"
-                                    title="Poste bajo fundamentos"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-
-                        <div class="video-card">
-                            <h4>High-low y lecturas</h4>
-                            <div class="video-wrapper">
-                                <iframe
-                                    src="https://www.youtube.com/embed/3JZ_D3ELwOQ"
-                                    title="High-low juego interior"
-                                    frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
-                                </iframe>
-                            </div>
-                        </div>
-                    </div>
+                    <p class="text-muted">Los videos que acompañaban esta página no correspondían al tema (se comprobaron el 28/11/2026) y se retiraron.</p>
                 </section>
             `;
             break;
@@ -4290,6 +4193,7 @@ function loadContent(sectionId) {
                 <p>Seleccioná un sistema en el menú izquierdo para ver el contenido.</p>
             `;
     }
+    injectTacticalLegacyNotice(sectionId);
 }
 
 // ===============================
@@ -4779,6 +4683,7 @@ function resolveDashboardSearchTarget(query) {
 
     var routes = [
         { keys: ["fundamentos", "dribbling", "pase", "tiro", "defensa", "rebote"], action: "content", value: "fundamentos", label: "Fundamentos" },
+        { keys: ["laboratorio", "tactic", "táctic", "zona", "pick and roll", "sistema", "ataque", "presion", "presión", "transicion", "transición"], action: "content", value: "tactical_lab", label: "Laboratorio táctico" },
         { keys: ["entrenamiento", "entrenamientos", "planificacion", "planificar"], action: "content", value: "planificacion", label: "Planificación de entrenamientos" },
         { keys: ["anual", "temporada", "ciclos", "bimestral"], action: "content", value: "planificacion_anual", label: "Planificación anual" },
         { keys: ["jugadas", "biblioteca", "playbook"], action: "content", value: "plays_library", label: "Biblioteca de jugadas" },
@@ -5544,6 +5449,72 @@ function renderFundamentosSection(route) {
     ui.renderConcept(contentDiv, route.concept, route.variant, host);
 }
 
+// ===============================
+// LABORATORIO TÁCTICO (js/tactical-*.js)
+// ===============================
+
+var pendingTacticalOpts = null;
+
+function getTacticalHost() {
+    return {
+        go: function (id) { loadContent(id); },
+        getProgress: getAcademyProgress,
+        openEntry: function (entryId, opts) {
+            pendingTacticalOpts = opts || null;
+            loadContent(window.BasketTacticalCatalog.entrySection(entryId));
+        }
+    };
+}
+
+function renderTacticalSection(route) {
+    var contentDiv = document.getElementById("content");
+    if (!contentDiv) return;
+    var ui = window.BasketTacticalLab;
+    var cat = window.BasketTacticalCatalog;
+    var host = getTacticalHost();
+    if (route.type === "home") { ui.renderHome(contentDiv, host); return; }
+    if (route.type === "area") { ui.renderArea(contentDiv, route.area, route.family, host); return; }
+    if (route.type === "tool") { ui.renderSimulators(contentDiv, host); return; }
+    var entry = cat.getEntry(route.entry);
+    if (entry && entry.article && window.BasketAcademy && window.BasketAcademy.get(entry.article)) {
+        var opts = pendingTacticalOpts || {};
+        pendingTacticalOpts = null;
+        renderAcademyArticle(entry.article, opts);
+        return;
+    }
+    if (entry && entry.section) {
+        // Contenido anterior: se abre con su id de siempre, sin duplicar la entrada en "Volver".
+        currentNavSection = navHistory.length ? navHistory.pop() : null;
+        loadContent(entry.section);
+    }
+}
+
+/** Aviso al pie de una página anterior que ya tiene ficha nueva en el laboratorio táctico. */
+function injectTacticalLegacyNotice(sectionId) {
+    var cat = window.BasketTacticalCatalog;
+    var contentDiv = document.getElementById("content");
+    if (!cat || !contentDiv) return;
+    var entry = cat.entryForLegacy(sectionId);
+    if (!entry) return;
+    var section = contentDiv.querySelector(".manual-section");
+    if (!section) return;
+    var note = document.createElement("aside");
+    note.className = "tl-legacy-note";
+    var area = cat.getArea(entry.area);
+    note.innerHTML = entry.status === "ficha"
+        ? '<p><strong>Hay una ficha nueva de este tema.</strong> Esta es la versión anterior; la ficha del laboratorio táctico la amplía con pizarras, ejercicios y fuentes.</p>'
+        : '<p><strong>Versión anterior.</strong> Este contenido se conserva tal cual mientras se renueva. Ahora vive en el laboratorio táctico, en ' + escapeHtml(area ? area.name : "") + '.</p>';
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tb-btn tb-btn--small tb-btn--accent";
+    btn.textContent = entry.status === "ficha" ? "Abrir la ficha nueva" : "Ir a " + (area ? area.name : "el laboratorio táctico");
+    btn.addEventListener("click", function () {
+        loadContent(entry.status === "ficha" ? cat.entrySection(entry.id) : cat.areaSection(entry.area, entry.family));
+    });
+    note.appendChild(btn);
+    section.insertBefore(note, section.children[1] || null);
+}
+
 function renderAcademyArticle(articleId, opts) {
     var contentDiv = document.getElementById("content");
     if (!contentDiv) return;
@@ -5553,6 +5524,7 @@ function renderAcademyArticle(articleId, opts) {
         contentDiv.innerHTML = '<section class="manual-section"><p>No se pudo cargar este contenido. Recargá la página e intentá de nuevo.</p></section>';
         return;
     }
+    var tacticalEntry = window.BasketTacticalCatalog && window.BasketTacticalLab ? window.BasketTacticalCatalog.entryForArticle(articleId) : null;
     academy.render(contentDiv, articleId, {
         onAddExercise: function (art, exerciseId) { openAddExerciseModal(art.id, exerciseId); },
         onOpenLibrary: function () { loadContent("biblioteca_ejercicios"); },
@@ -5575,14 +5547,16 @@ function renderAcademyArticle(articleId, opts) {
                 steps: []
             });
         },
-        // Las fichas de Fundamentos todavía no están en el contexto del asistente.
-        onAskAssistant: window.BasketAssistantBridge && !article.conceptId ? function (art, sel) {
+        // Las fichas de Fundamentos y las fichas nuevas del laboratorio táctico (tl-*) todavía no
+        // están en el contexto del asistente (lib/server/assistant/academy-registry.js).
+        onAskAssistant: window.BasketAssistantBridge && !article.conceptId && article.id.indexOf("tl-") !== 0 ? function (art, sel) {
             openAcademyAssistant(art, sel || {});
         } : null,
         getMode: getFundamentosMode,
         setMode: setFundamentosMode,
         onOpenArticle: openFundamentosArticle,
-        heroMedia: article.conceptId ? getFundamentosHeroMedia : null,
+        heroMedia: article.conceptId ? getFundamentosHeroMedia : (tacticalEntry ? window.BasketTacticalLab.heroMedia : null),
+        tabLabels: tacticalEntry ? window.BasketTacticalLab.TAB_LABELS : null,
         isExerciseFavorite: function (artId, exId) { return isExerciseFavorite(artId + ":" + exId); },
         setExerciseFavorite: function (artId, exId, on) { updateLearningProgress("ex:" + artId + ":" + exId, { favorite: !!on }); },
         go: function (id) { loadContent(id); }

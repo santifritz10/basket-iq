@@ -24,6 +24,7 @@
         { id: "visualizar", label: "Visualizar" },
         { id: "simular", label: "Simular" },
         { id: "entrenar", label: "Entrenar" },
+        { id: "variantes", label: "Variantes" },
         { id: "evaluar", label: "Evaluar" },
         { id: "fuentes", label: "Fuentes" }
     ];
@@ -60,9 +61,18 @@
     ];
 
     /** Pestañas visibles de un artículo (las fichas de Fundamentos no tienen simulador). */
-    function tabsFor(article) {
-        if (!article || !Array.isArray(article.tabOrder)) return TABS;
-        return TABS.filter(function (t) { return article.tabOrder.indexOf(t.id) >= 0; });
+    function tabsFor(article, labels) {
+        var list;
+        if (!article || !Array.isArray(article.tabOrder)) {
+            // "Variantes" solo aparece en los artículos que la tienen.
+            list = TABS.filter(function (t) { return t.id !== "variantes" || (article && article.tabs && article.tabs.variantes); });
+        } else {
+            list = TABS.filter(function (t) { return article.tabOrder.indexOf(t.id) >= 0; });
+        }
+        // Nombres propios de una sección (por ejemplo, el laboratorio táctico: Comprender, Enseñar...).
+        labels = (article && article.tabLabels) || labels;
+        if (!labels) return list;
+        return list.map(function (t) { return labels[t.id] ? { id: t.id, label: labels[t.id] } : t; });
     }
 
     /** Modo jugador / entrenador: una sección sin audience vale para los dos. */
@@ -123,7 +133,7 @@
         (a.tabs.visualizar || []).forEach(function (v) {
             if (typeof v === "string" && !boardIds[v]) errors.push("visualizar: pizarra inexistente " + v);
         });
-        ["aprender", "visualizar", "entrenar", "evaluar"].forEach(function (tab) {
+        ["aprender", "visualizar", "entrenar", "variantes", "evaluar"].forEach(function (tab) {
             (a.tabs[tab] || []).forEach(function (sec) {
                 if (typeof sec === "string") return;
                 if (sec.audience && !MODES[sec.audience]) errors.push(tab + "/" + sec.id + ": audiencia inválida " + sec.audience);
@@ -329,7 +339,7 @@
         }
         if (bl.video) {
             var V = root && root.BasketVideos;
-            return V ? V.renderCard(bl.video, { conceptId: ctx.conceptId, observe: bl.observe, purpose: bl.purpose }) : "";
+            return V ? V.renderCard(bl.video, { conceptId: bl.concept || ctx.conceptId, observe: bl.observe, purpose: bl.purpose }) : "";
         }
         if (bl.figure) {
             var F = root && root.BasketFundFigures;
@@ -348,6 +358,12 @@
             return '<div class="ac-exlink"><div><span class="ac-muted">Ejercicio compartido · está en la ficha de ' + esc(other.title) + "</span><strong>" + fmt(oex.name) + "</strong><p>" + fmt(oex.objective) + "</p>" +
                 (oex.works && oex.works.length ? '<p class="ac-ex-works">Trabaja: ' + oex.works.map(esc).join(" · ") + "</p>" : "") + "</div>" +
                 '<button type="button" class="tb-btn tb-btn--small tb-btn--accent" data-open-article="' + esc(other.id) + '" data-open-section="' + esc(oex.id) + '">Ver ejercicio</button></div>';
+        }
+        if (bl.links) {
+            // Relaciones con otros contenidos (laboratorio táctico, fundamentos...). Navegan por host.go.
+            return '<div class="ac-links">' + (bl.label ? '<span class="ac-links-label">' + esc(bl.label) + "</span>" : "") + bl.links.map(function (l) {
+                return '<button type="button" class="ac-linkpill" data-go="' + esc(l.go) + '">' + esc(l.label) + "</button>";
+            }).join("") + "</div>";
         }
         if (bl.checklist) {
             return '<ul class="ac-checklist">' + bl.checklist.map(function (c, i) {
@@ -494,7 +510,7 @@
             };
             return '<section class="ac-ficha ac-ficha--compact" aria-label="Resumen del fundamento">' +
                 '<p class="ac-ficha-lead">' + fmt(f.definition) + "</p>" +
-                '<dl class="ac-facts">' + fact("Objetivo", f.objective) + fact("Antes conviene dominar", f.prereqs) + fact("Se usa en el juego", f.applications) + "</dl>" +
+                '<dl class="ac-facts">' + fact((f.labels && f.labels.objective) || "Objetivo", f.objective) + fact((f.labels && f.labels.prereqs) || "Antes conviene dominar", f.prereqs) + fact((f.labels && f.labels.applications) || "Se usa en el juego", f.applications) + "</dl>" +
                 (intro0 ? '<p class="ac-ficha-mode">' + fmt(intro0) + "</p>" : "") +
                 "</section>";
         }
@@ -786,7 +802,7 @@
         var isStudied = !!(progress.studied || {})[article.id];
         var challenges = host.getChallenges ? (host.getChallenges(article.id) || []) : [];
         var current = { tab: opts.tab || "aprender", mode: article.modes ? (host.getMode ? host.getMode() : "player") : null };
-        var TABS_A = tabsFor(article);
+        var TABS_A = tabsFor(article, host.tabLabels);
 
         var media = host.heroMedia ? host.heroMedia(article) : null;
         var modesHtml = article.modes ? '<div class="ac-modes" role="group" aria-label="Perspectiva">' + (media ? '<span class="ac-modes-label">Ver como</span>' : "") + Object.keys(MODES).map(function (k) {
@@ -820,6 +836,7 @@
                 '<div class="ac-hero-actions">' + jumpsHtml +
                 '<button type="button" class="tb-btn ac-fav' + (isFav ? " is-on" : "") + '" aria-pressed="' + (isFav ? "true" : "false") + '">' + favLabel(isFav) + "</button>" +
                 (host.setStudied ? studiedButton() : "") +
+                (host.onAskAssistant ? '<button type="button" class="tb-btn ac-ask" data-ask-article>Analizar con mi Asistente IA</button>' : "") +
                 "</div></div></header>" +
                 '<div class="ac-resume" hidden></div>' +
                 '<div class="ac-ficha-slot"></div>' +
