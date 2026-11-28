@@ -235,9 +235,27 @@
         return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : iso;
     }
 
+    /** Idioma en pocas palabras para la tarjeta (el detalle completo queda en «Datos del recurso»). */
+    function langShort(v) {
+        if (v.languageShort) return v.languageShort;
+        return /^(es|español)/i.test(v.language) ? "Español" : "Idioma no confirmado";
+    }
+
+    /** Portada propia de Basket Lab (foto del área del fundamento). Nunca la miniatura de YouTube:
+     *  pedirla conectaría con Google antes de que la persona decida reproducir. */
+    function poster(v, conceptId) {
+        var M = root && root.BasketFundMedia;
+        var C = root && root.BasketFundCatalog;
+        if (!M || !C) return "";
+        var c = C.getConcept(conceptId) || C.getConcept(((v.concepts || [])[0] || {}).id);
+        var key = M.conceptPhoto(c);
+        return key ? M.img(key, { variant: "card", alt: "", cls: "bv-poster", sizes: "(max-width: 760px) 100vw, 480px" }) : "";
+    }
+
     /*
      * Tarjeta de un video para un fundamento.
-     * opts = { conceptId, observe: [..] (qué mirar, texto original de Basket Lab), purpose }
+     * opts = { conceptId, observe: [..] (qué mirar, texto original de Basket Lab), purpose, compact,
+     *          poster: true para usar la foto del área (no se usa donde la página ya muestra esa foto) }
      */
     function renderCard(videoId, opts) {
         opts = opts || {};
@@ -245,37 +263,57 @@
         if (!v || !isListed(v)) {
             return '<div class="bv-card bv-card--missing"><p><strong>Video no disponible.</strong> Este recurso se retiró del catálogo o todavía no se comprobó. La ficha sigue completa sin él.</p></div>';
         }
-        var rel = (v.concepts || []).filter(function (c) { return c.id === opts.conceptId; })[0] || {};
+        var rel = (v.concepts || []).filter(function (c) { return c.id === opts.conceptId; })[0] || (v.concepts || [])[0] || {};
         var stamps = (rel.timestamps || []).map(function (t) {
             return '<li><button type="button" class="bv-stamp" data-video-load="' + esc(v.id) + '" data-start="' + Number(t.start) + '">' + esc(t.label) + "</button> " + esc(t.note || "") + "</li>";
         }).join("");
+        var chips = '<span class="bv-chip">' + esc(TYPES[v.type]) + "</span>" +
+            '<span class="bv-chip">' + esc(langShort(v)) + "</span>" +
+            (v.duration ? '<span class="bv-chip">' + esc(v.duration) + "</span>" : "");
         var player = canEmbed(v)
             ? '<div class="bv-frame" data-video-slot="' + esc(v.id) + '">' +
-                '<button type="button" class="bv-facade" data-video-load="' + esc(v.id) + '" aria-label="Cargar el reproductor de YouTube para ' + esc(v.title) + '">' +
-                '<span class="bv-facade-play" aria-hidden="true"><svg viewBox="0 0 48 48" width="56" height="56"><circle cx="24" cy="24" r="22" fill="rgba(0,0,0,.55)" stroke="#ff9800" stroke-width="2"/><path d="M19 15l15 9-15 9z" fill="#fff"/></svg></span>' +
-                '<span class="bv-facade-text"><strong>Cargar el reproductor de YouTube</strong><small>Al cargarlo te conectás con YouTube (modo de privacidad mejorada). El video no empieza solo.</small></span>' +
+                '<button type="button" class="bv-facade" data-video-load="' + esc(v.id) + '" aria-label="Reproducir ' + esc(v.title) + ' (carga el reproductor de YouTube)">' +
+                (opts.poster ? poster(v, opts.conceptId) : "") +
+                '<span class="bv-facade-play" aria-hidden="true"><svg viewBox="0 0 48 48" width="34" height="34"><path d="M17 12l20 12-20 12z" fill="currentColor"/></svg></span>' +
+                '<span class="bv-facade-chips">' + chips + "</span>" +
+                '<span class="bv-facade-text">Al reproducir se carga YouTube en modo de privacidad mejorada. No empieza solo.</span>' +
                 "</button></div>"
             : '<div class="bv-frame bv-frame--blocked"><p><strong>Este video no se puede ver dentro de Basket Lab.</strong> ' +
                 (v.embed === "blocked" ? "Su propietario no permite insertarlo en otros sitios." : "No pudimos confirmar que se pueda insertar.") +
                 ' Podés verlo en su fuente original.</p><p><a class="tb-btn tb-btn--small" href="' + esc(v.url) + '" target="_blank" rel="noopener noreferrer">Ver en YouTube</a></p></div>';
-        return '<article class="bv-card" id="bv-' + esc(v.id) + '">' +
-            '<header class="bv-head"><span class="bv-type">' + esc(TYPES[v.type]) + "</span><h4>" + esc(v.title) + "</h4>" +
-            '<p class="bv-by">' + esc(v.institution) + " · canal <a href=\"" + esc(v.channelUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(v.channel) + "</a></p></header>" +
+        var observe = opts.observe && opts.observe.length
+            ? '<p class="bv-label">Qué observar</p><ul class="bv-observe">' + opts.observe.map(function (o) { return "<li>" + esc(o) + "</li>"; }).join("") + "</ul>"
+            : "";
+        var why = opts.purpose || rel.why || "";
+        return '<article class="bv-card' + (opts.compact ? " bv-card--compact" : "") + '" id="bv-' + esc(v.id) + '">' +
             player +
             '<div class="bv-body">' +
-            (opts.purpose ? "<p><strong>Para qué verlo:</strong> " + esc(opts.purpose) + "</p>" : (rel.why ? "<p><strong>Relación con este fundamento:</strong> " + esc(rel.why) + "</p>" : "")) +
-            (opts.observe && opts.observe.length ? "<p><strong>Qué observar:</strong></p><ul class=\"ac-list\">" + opts.observe.map(function (o) { return "<li>" + esc(o) + "</li>"; }).join("") + "</ul>" : "") +
-            (stamps ? "<p><strong>Segmentos revisados:</strong></p><ul class=\"bv-stamps\">" + stamps + "</ul>" : '<p class="bv-note">Sin marcas de tiempo: todavía no revisamos este video minuto a minuto, así que no indicamos desde dónde mirarlo.</p>') +
+            "<h4>" + esc(v.title) + "</h4>" +
+            '<p class="bv-by">' + esc(v.institution) + ' · <a href="' + esc(v.channelUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(v.channel) + "</a></p>" +
+            (why ? '<p class="bv-why">' + esc(why) + "</p>" : "") +
+            observe +
+            (stamps ? '<p class="bv-label">Segmentos revisados</p><ul class="bv-stamps">' + stamps + "</ul>" : "") +
             '<details class="bv-details"><summary>Datos del recurso</summary><dl>' +
             "<dt>Idioma</dt><dd>" + esc(v.language) + "</dd>" +
             "<dt>Subtítulos</dt><dd>" + esc(v.captions || "No verificado") + "</dd>" +
             "<dt>Duración</dt><dd>" + esc(v.duration || "No verificada") + "</dd>" +
+            "<dt>Marcas de tiempo</dt><dd>" + (stamps ? "Revisadas por Basket Lab." : "Sin marcas: todavía no revisamos este video minuto a minuto, así que no indicamos desde dónde mirarlo.") + "</dd>" +
             "<dt>Comprobado</dt><dd>" + esc(fmtDate(v.check.date)) + ". " + esc(v.check.note || "") + "</dd>" +
             "<dt>Contenido</dt><dd>" + (v.contentReviewed ? "Revisado por Basket Lab." : "No revisado minuto a minuto: la relación con el fundamento surge del título, la serie y la página oficial donde se publica.") + "</dd>" +
             "<dt>Licencia</dt><dd>" + esc(v.license) + "</dd>" +
             (v.foundAt && /^https:/.test(v.foundAt) ? '<dt>Dónde lo encontramos</dt><dd><a href="' + esc(v.foundAt) + '" target="_blank" rel="noopener noreferrer">' + esc(v.foundAt) + "</a></dd>" : "") +
             '<dt>Original</dt><dd><a href="' + esc(v.url) + '" target="_blank" rel="noopener noreferrer">' + esc(v.url) + "</a></dd>" +
             "</dl></details></div></article>";
+    }
+
+    /** Vuelve a la portada cualquier reproductor abierto: nunca hay más de un iframe a la vez. */
+    function closeOthers(except) {
+        if (typeof document === "undefined") return;
+        document.querySelectorAll(".bv-frame.is-playing").forEach(function (slot) {
+            if (slot === except || !slot.__facade) return;
+            slot.innerHTML = slot.__facade;
+            slot.classList.remove("is-playing");
+        });
     }
 
     /** Reemplaza la portada por el iframe oficial cuando la persona lo pide. */
@@ -287,9 +325,11 @@
         var card = button.closest(".bv-card");
         var slot = card ? card.querySelector('[data-video-slot="' + id + '"]') : null;
         if (!slot) return;
+        closeOthers(slot);
+        if (!slot.__facade) slot.__facade = slot.innerHTML;
         var start = Number(button.getAttribute("data-start") || 0);
-        slot.innerHTML = '<div class="bv-iframe-wrap"><iframe src="' + esc(embedUrl(v, start)) + '" title="' + esc(v.title) + '" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>' +
-            '<p class="bv-note">Reproductor oficial de YouTube. Si no carga, <a href="' + esc(v.url) + '" target="_blank" rel="noopener noreferrer">abrilo en YouTube</a>.</p>';
+        slot.classList.add("is-playing");
+        slot.innerHTML = '<div class="bv-iframe-wrap"><iframe src="' + esc(embedUrl(v, start)) + '" title="' + esc(v.title) + '" referrerpolicy="strict-origin-when-cross-origin" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>';
         var frame = slot.querySelector("iframe");
         if (frame && frame.focus) frame.focus();
     }
@@ -313,6 +353,7 @@
         embedUrl: embedUrl,
         validate: validate,
         renderCard: renderCard,
+        langShort: langShort,
         activate: activate
     };
 });

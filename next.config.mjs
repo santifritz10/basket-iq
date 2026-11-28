@@ -10,6 +10,11 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Fotos de la academia: WebP ya optimizados con sufijo de contenido en el nombre.
+        source: "/images/academy/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }]
+      },
+      {
         source: "/:path*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },

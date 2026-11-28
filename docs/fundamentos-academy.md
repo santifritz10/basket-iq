@@ -99,6 +99,27 @@ de FIBA. Pendiente para la titular del sitio: decidir si el sitio se declara «d
 niños» ante YouTube y revisar los Términos de YouTube API Services y su política para
 contenido infantil; es una decisión legal que no tomamos desde el código.
 
+## 5. Rediseño visual (fotos)
+
+- Fotos: imágenes ilustrativas generadas con IA para Basket Lab (una portada general y una por
+  área). No son fuentes ni demostraciones técnicas: la ficha lo aclara al pie de la foto.
+- Archivos: `public/images/academy/fundamentals/*.webp`, servidos como estáticos por Vercel
+  (sin función ni Supabase) con caché permanente (`next.config.mjs`), porque el nombre lleva un
+  sufijo del contenido. Los originales no se guardan en el repositorio.
+- Se regeneran con `python3 scripts/optimize-fund-images.py <carpeta-con-originales>` (Pillow,
+  local y gratuito). El script reescribe el manifiesto de `js/fundamentos-media.js`.
+- Tamaños: tarjetas 480 y 800 px, portadas de área y ficha 960 px, portada general 1440 y 800
+  px (recorte propio para celular). `srcset` + `sizes`, `width`/`height` explícitos y carga
+  diferida salvo la imagen principal de cada pantalla.
+- Por qué no `next/image`: la sección vive en la SPA (HTML generado por JS), donde no se puede
+  usar el componente; y el optimizador de Vercel tiene cupo limitado en el plan gratuito. Los
+  archivos ya salen optimizados, así que no hace falta.
+- Las fichas usan la foto de su área (sin duplicar archivos). En una misma pantalla la foto no
+  se repite: las tarjetas de fundamentos son de texto y los videos dentro de un área o una ficha
+  no usan foto de portada.
+- Videos: nunca se pide la miniatura de YouTube (conectaría con Google antes de que la persona
+  decida reproducir). Solo hay un reproductor abierto a la vez.
+
 ## 4. Qué queda pendiente
 
 - Etapa 2: más videos (buscar material oficial en español; revisar contenido y marcas de

@@ -5481,9 +5481,33 @@ function setFundamentosMode(mode) {
     try { localStorage.setItem(FUND_MODE_KEY, mode === "coach" ? "coach" : "player"); } catch (e) { /* sin almacenamiento */ }
 }
 
+/** Foto y ruta de una ficha completa de Fundamentos (la foto es la de su área). */
+function getFundamentosHeroMedia(article) {
+    var cat = window.BasketFundCatalog;
+    var media = window.BasketFundMedia;
+    var concept = cat && cat.getConcept(article.conceptId);
+    if (!concept || !media) return null;
+    var area = cat.getArea(concept.area);
+    var key = media.conceptPhoto(concept);
+    if (!key) return null;
+    return {
+        img: media.img(key, { variant: "cover", priority: true, cls: "ac-hero-img", sizes: "(max-width: 760px) 100vw, (max-width: 1200px) 45vw, 560px" }),
+        note: media.AI_NOTE,
+        kicker: (area ? area.name : "") + " · " + cat.subName(concept.area, concept.sub),
+        crumbs: [
+            { label: "Fundamentos", go: "fundamentos" },
+            { label: area ? area.name : "", go: cat.areaSection(concept.area) },
+            { label: concept.name }
+        ]
+    };
+}
+
 function getFundamentosHost() {
     return {
         go: function (id) { loadContent(id); },
+        addExercise: function (articleId, exerciseId) { openAddExerciseModal(articleId, exerciseId); },
+        isExerciseFavorite: function (artId, exId) { return isExerciseFavorite(artId + ":" + exId); },
+        setExerciseFavorite: function (artId, exId, on) { updateLearningProgress("ex:" + artId + ":" + exId, { favorite: !!on }); },
         getProgress: getAcademyProgress,
         setFavorite: function (id, on) { updateLearningProgress(id, { favorite: !!on }); },
         legacyContent: window.FUNDAMENTOS_CONTENIDO || {},
@@ -5557,7 +5581,11 @@ function renderAcademyArticle(articleId, opts) {
         } : null,
         getMode: getFundamentosMode,
         setMode: setFundamentosMode,
-        onOpenArticle: openFundamentosArticle
+        onOpenArticle: openFundamentosArticle,
+        heroMedia: article.conceptId ? getFundamentosHeroMedia : null,
+        isExerciseFavorite: function (artId, exId) { return isExerciseFavorite(artId + ":" + exId); },
+        setExerciseFavorite: function (artId, exId, on) { updateLearningProgress("ex:" + artId + ":" + exId, { favorite: !!on }); },
+        go: function (id) { loadContent(id); }
     }, opts || {});
     injectNavBackButton();
 }
@@ -5694,6 +5722,12 @@ function openAcademyExercise(articleId, exerciseId) {
 // ===============================
 
 var exerciseThumbCache = {};
+
+/** Favoritos de ejercicios: la misma marca que usa la biblioteca de ejercicios. */
+function isExerciseFavorite(key) {
+    var item = getLearningProgressItems().find(function (x) { return x.id === "ex:" + key; });
+    return !!(item && item.favorite);
+}
 
 function getExercisesHost() {
     return {

@@ -108,7 +108,7 @@
                 ball(196, 104) + ball(160, 124, 4.5) + ball(122, 104) +
                 label(312, 150, "1. llevar al defensor", "end") + label(312, 162, "hacia un lado", "end") +
                 label(150, 140, "2. cambio de mano bajo,") + label(150, 152, "cerca y por delante") +
-                label(70, 70, "3. primer paso", "end") + label(70, 82, "hacia el otro lado", "end") +
+                label(8, 122, "3. primer paso", "start") + label(8, 134, "hacia el otro lado", "start") +
                 label(160, 182, "Esquema orientativo visto desde arriba", "middle", "rgba(232,238,251,.5)"),
                 "Crossover visto desde arriba: llevar al defensor, cambiar de mano bajo y por delante, atacar el otro lado");
         },

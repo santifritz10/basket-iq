@@ -124,6 +124,8 @@
             ]
         }
     ];
+    // Los videos van primero: son la referencia real de la ejecución.
+    visualizar.unshift(visualizar.pop());
 
     var entrenar = [
         {

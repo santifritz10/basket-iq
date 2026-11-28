@@ -162,3 +162,44 @@ test("modo jugador / entrenador filtra secciones sin duplicar contenido", () => 
   assert.ok(player.includes("progresion") && coach.includes("progresion"));
   assert.deepEqual(Academy.tabsFor(a).map((t) => t.id), ["aprender", "visualizar", "entrenar", "evaluar", "fuentes"]);
 });
+
+test("fotos de la academia: WebP optimizados, una por área y sin pasarse del presupuesto", async () => {
+  const Media = require("../js/fundamentos-media.js");
+  const { statSync, existsSync } = await import("node:fs");
+  for (const a of Cat.AREAS) {
+    const key = Media.areaPhoto(a.id);
+    assert.ok(key, `${a.id} sin foto`);
+    assert.ok(Media.PHOTOS[key].alt.length > 20, `${key} sin texto alternativo`);
+  }
+  assert.ok(Media.has("portada"), "falta la portada general");
+  let total = 0;
+  for (const [key, entry] of Object.entries(Media.MANIFEST)) {
+    for (const [size, [name, bytes]] of Object.entries(entry.files)) {
+      const file = new URL(`../public/images/academy/fundamentals/${name}`, import.meta.url);
+      assert.ok(existsSync(file), name);
+      assert.equal(statSync(file).size, bytes, name);
+      assert.ok(name.endsWith(".webp"), name);
+      const limit = { "480": 40e3, "800": 100e3, "960": 120e3, "1440": 200e3 }[size];
+      assert.ok(bytes <= limit, `${name}: ${bytes} bytes`);
+      total += bytes;
+    }
+  }
+  assert.ok(total <= 1.5e6, `paquete total ${total} bytes`);
+  // Las fichas reutilizan la foto de su área (sin archivos duplicados).
+  assert.equal(Media.conceptPhoto(Cat.getConcept("closeout")), "defensa");
+  const img = Media.img("pase", { variant: "card" });
+  assert.ok(/loading="lazy"/.test(img) && /width="800"/.test(img) && /height="450"/.test(img) && /srcset=/.test(img));
+  assert.ok(!/base64|data:/.test(img));
+});
+
+test("buscador: pocket pass y pase al roll llegan a la misma ficha", () => {
+  assert.equal(Cat.search({ q: "Pocket pass" })[0].id, "pocket");
+  assert.equal(Cat.search({ q: "pase al roll" })[0].id, "pocket");
+});
+
+test("las tarjetas de video no piden la miniatura de YouTube", () => {
+  for (const v of Videos.VIDEOS) {
+    const html = Videos.renderCard(v.id, { conceptId: v.concepts[0].id, poster: true });
+    assert.ok(!/ytimg|img\.youtube|<iframe/.test(html), v.id);
+  }
+});

@@ -366,7 +366,41 @@
             "</section>";
     }
 
+    /** Ejercicio en formato compacto (fichas con foto): lo esencial a la vista y el resto plegado. */
+    function renderExerciseCompact(ex, ctx) {
+        function group(title, fields, open, id) {
+            var rows = fields.map(function (k) {
+                var f = EXERCISE_FIELDS.filter(function (x) { return x[0] === k; })[0];
+                var v = ex[k];
+                if (!f || v == null || v === "" || (Array.isArray(v) && !v.length)) return "";
+                var html = Array.isArray(v) ? '<ul class="ac-list">' + v.map(function (x) { return "<li>" + fmt(x) + "</li>"; }).join("") + "</ul>" : "<p>" + fmt(v) + "</p>";
+                return '<div class="ac-ex-row"><dt>' + esc(f[1]) + "</dt><dd>" + html + "</dd></div>";
+            }).join("");
+            if (!rows) return "";
+            return '<details class="ac-ex-fold"' + (open ? " open" : "") + (id ? ' data-fold="' + id + '"' : "") + "><summary>" + esc(title) + '</summary><dl class="ac-ex-grid">' + rows + "</dl></details>";
+        }
+        var fav = ctx.isExFav ? ctx.isExFav(ex.id) : null;
+        var hasVariants = ex.variants && ex.variants.length;
+        return '<article class="ac-exercise ac-exercise--compact" id="ac-sec-' + esc(ex.id) + '" data-section="' + esc(ex.id) + '">' +
+            '<header class="ac-ex-head"><div><p class="ac-ex-kicker">Ejercicio' + (ex.solo ? " · se puede practicar solo" : "") + "</p><h3>" + fmt(ex.name) + "</h3></div>" + provenanceBadge(ex.kind || "method", ex.refs) + "</header>" +
+            '<div class="ac-ex-chips"><span>' + esc(ex.level) + "</span><span>" + esc(ex.playersShort || ex.players) + "</span><span>" + esc(ex.duration) + "</span><span>" + esc(ex.space) + "</span></div>" +
+            '<p class="ac-ex-objective">' + fmt(ex.objective) + "</p>" +
+            (ex.works && ex.works.length ? '<p class="ac-ex-works">Trabaja: ' + ex.works.map(esc).join(" · ") + "</p>" : "") +
+            '<div class="ac-ex-actions">' +
+            (ctx.canAdd ? '<button type="button" class="tb-btn tb-btn--accent" data-add-exercise="' + esc(ex.id) + '">Añadir al entrenamiento</button>' : "") +
+            (fav != null ? '<button type="button" class="tb-btn ac-exfav' + (fav ? " is-on" : "") + '" data-fav-exercise="' + esc(ex.id) + '" aria-pressed="' + (fav ? "true" : "false") + '">' + (fav ? "★ Guardado" : "☆ Guardar") + "</button>" : "") +
+            (hasVariants ? '<button type="button" class="tb-btn" data-show-variants="' + esc(ex.id) + '">Ver variantes</button>' : "") +
+            "</div>" +
+            (ex.board ? '<div class="ac-board-slot" data-board="' + esc(ex.board) + '"></div>' : "") +
+            group("Organización y desarrollo", ["organization", "development", "rules", "materials", "hoops", "category", "secondary"], false) +
+            group("Consignas, errores y correcciones", ["cues", "errors", "corrections"], false) +
+            group("Variantes, progresiones y evaluación", ["variants"].concat(EXERCISE_FIELDS.map(function (f) { return f[0]; }).filter(function (k) { return ["objective", "secondary", "category", "level", "players", "duration", "space", "hoops", "materials", "organization", "development", "rules", "cues", "errors", "corrections", "variants", "basis"].indexOf(k) < 0; })), false, "variants") +
+            '<p class="ac-ex-basis">Fuente o fundamento técnico: ' + fmt(ex.basis) + "</p>" +
+            "</article>";
+    }
+
     function renderExercise(ex, ctx) {
+        if (ctx.compact) return renderExerciseCompact(ex, ctx);
         var rows = EXERCISE_FIELDS.filter(function (f) { return f[0] !== "basis"; }).map(function (f) {
             var v = ex[f[0]];
             var html = Array.isArray(v) ? '<ul class="ac-list">' + v.map(function (x) { return "<li>" + fmt(x) + "</li>"; }).join("") + "</ul>" : "<p>" + fmt(v) + "</p>";
@@ -448,9 +482,22 @@
     }
 
     /** Resumen de la ficha de un fundamento (encabezado). */
-    function renderFicha(article, mode) {
+    function renderFicha(article, mode, compact) {
         var f = article.ficha;
         if (!f) return "";
+        if (compact) {
+            var intro0 = mode && f.modeIntro ? f.modeIntro[mode] : "";
+            var fact = function (label, v) {
+                if (!v || (Array.isArray(v) && !v.length)) return "";
+                var html = Array.isArray(v) ? v.map(function (x) { return fmt(x); }).join(" · ") : fmt(v);
+                return '<div class="ac-fact"><dt>' + esc(label) + "</dt><dd>" + html + "</dd></div>";
+            };
+            return '<section class="ac-ficha ac-ficha--compact" aria-label="Resumen del fundamento">' +
+                '<p class="ac-ficha-lead">' + fmt(f.definition) + "</p>" +
+                '<dl class="ac-facts">' + fact("Objetivo", f.objective) + fact("Antes conviene dominar", f.prereqs) + fact("Se usa en el juego", f.applications) + "</dl>" +
+                (intro0 ? '<p class="ac-ficha-mode">' + fmt(intro0) + "</p>" : "") +
+                "</section>";
+        }
         function row(label, v) {
             if (!v || (Array.isArray(v) && !v.length)) return "";
             var html = Array.isArray(v) ? '<ul class="ac-list">' + v.map(function (x) { return "<li>" + fmt(x) + "</li>"; }).join("") + "</ul>" : "<p>" + fmt(v) + "</p>";
@@ -741,6 +788,45 @@
         var current = { tab: opts.tab || "aprender", mode: article.modes ? (host.getMode ? host.getMode() : "player") : null };
         var TABS_A = tabsFor(article);
 
+        var media = host.heroMedia ? host.heroMedia(article) : null;
+        var modesHtml = article.modes ? '<div class="ac-modes" role="group" aria-label="Perspectiva">' + (media ? '<span class="ac-modes-label">Ver como</span>' : "") + Object.keys(MODES).map(function (k) {
+            return '<button type="button" class="ac-mode" data-mode="' + k + '" aria-pressed="' + (current.mode === k ? "true" : "false") + '">' + (media ? esc(MODES[k]) : "Modo " + esc(MODES[k].toLowerCase())) + "</button>";
+        }).join("") + "</div>" : "";
+        var favLabel = function (on) { return on ? "★ En favoritos" : "☆ Guardar en favoritos"; };
+        var tabsHtml = '<nav class="ac-tabs" role="tablist" aria-label="Secciones del contenido">' +
+            TABS_A.map(function (t) {
+                return '<button type="button" role="tab" class="ac-tab" data-tab="' + t.id + '" aria-selected="false">' + esc(t.label) + "</button>";
+            }).join("") + "</nav>";
+        var jumpsHtml = article.quickJumps ? article.quickJumps.map(function (q, i) {
+            return '<button type="button" class="tb-btn' + (!media || i === 0 ? " tb-btn--accent" : "") + '" data-jump-tab="' + esc(q.tab) + '"' + (q.section ? ' data-jump-section="' + esc(q.section) + '"' : "") + ">" + esc(q.label) + "</button>";
+        }).join("") : "";
+
+        if (media) {
+            // Variante fotográfica (academia de Fundamentos): foto + datos clave, resumen breve,
+            // barra de pestañas con el modo jugador/entrenador al costado.
+            container.innerHTML =
+                '<article class="ac ac--photo">' +
+                (media.crumbs && media.crumbs.length ? '<nav class="ac-crumbnav" aria-label="Ruta">' + media.crumbs.map(function (c) {
+                    return c.go ? '<button type="button" class="ac-crumb" data-go="' + esc(c.go) + '">' + esc(c.label) + "</button>" : '<span aria-current="page">' + esc(c.label) + "</span>";
+                }).join('<span class="ac-crumb-sep" aria-hidden="true">/</span>') + "</nav>" : "") +
+                '<header class="ac-hero ac-hero--photo">' +
+                '<figure class="ac-hero-media">' + media.img + (media.note ? "<figcaption>" + esc(media.note) + "</figcaption>" : "") + "</figure>" +
+                '<div class="ac-hero-info">' +
+                (media.kicker ? '<p class="ac-hero-kicker">' + esc(media.kicker) + "</p>" : "") +
+                "<h2>" + esc(article.title) + "</h2>" +
+                (article.ficha && article.ficha.en ? '<p class="ac-hero-en">' + esc(article.ficha.en) + "</p>" : "") +
+                '<p class="ac-subtitle">' + fmt(article.subtitle) + "</p>" +
+                '<div class="ac-meta">' + (article.meta || []).map(function (m) { return "<span>" + esc(m) + "</span>"; }).join("") + "</div>" +
+                '<div class="ac-hero-actions">' + jumpsHtml +
+                '<button type="button" class="tb-btn ac-fav' + (isFav ? " is-on" : "") + '" aria-pressed="' + (isFav ? "true" : "false") + '">' + favLabel(isFav) + "</button>" +
+                (host.setStudied ? studiedButton() : "") +
+                "</div></div></header>" +
+                '<div class="ac-resume" hidden></div>' +
+                '<div class="ac-ficha-slot"></div>' +
+                '<div class="ac-tabbar">' + tabsHtml + modesHtml + "</div>" +
+                '<div class="ac-layout"><aside class="ac-toc" aria-label="Índice"></aside><div class="ac-content" role="tabpanel"></div></div>' +
+                "</article>";
+        } else {
         container.innerHTML =
             '<article class="ac">' +
             '<header class="ac-hero">' +
@@ -748,26 +834,20 @@
             "<h2>" + esc(article.title) + "</h2>" +
             '<p class="ac-subtitle">' + fmt(article.subtitle) + "</p>" +
             '<div class="ac-meta">' + (article.meta || []).map(function (m) { return "<span>" + esc(m) + "</span>"; }).join("") + "</div>" +
-            (article.modes ? '<div class="ac-modes" role="group" aria-label="Perspectiva">' + Object.keys(MODES).map(function (k) {
-                return '<button type="button" class="ac-mode" data-mode="' + k + '" aria-pressed="' + (current.mode === k ? "true" : "false") + '">Modo ' + esc(MODES[k].toLowerCase()) + "</button>";
-            }).join("") + "</div>" : "") +
+            modesHtml +
             '<div class="ac-ficha-slot"></div>' +
             '<div class="ac-hero-actions">' +
-            (article.quickJumps ? article.quickJumps.map(function (q) {
-                return '<button type="button" class="tb-btn tb-btn--accent" data-jump-tab="' + esc(q.tab) + '"' + (q.section ? ' data-jump-section="' + esc(q.section) + '"' : "") + ">" + esc(q.label) + "</button>";
-            }).join("") : "") +
-            '<button type="button" class="tb-btn ac-fav' + (isFav ? " is-on" : "") + '" aria-pressed="' + (isFav ? "true" : "false") + '">' + (isFav ? "★ En favoritos" : "☆ Guardar en favoritos") + "</button>" +
+            jumpsHtml +
+            '<button type="button" class="tb-btn ac-fav' + (isFav ? " is-on" : "") + '" aria-pressed="' + (isFav ? "true" : "false") + '">' + favLabel(isFav) + "</button>" +
             (host.setStudied ? studiedButton() : "") +
             (host.onAskAssistant ? '<button type="button" class="tb-btn tb-btn--accent ac-ask" data-ask-article>Analizar con mi Asistente IA</button>' : "") +
             "</div>" +
             '<div class="ac-resume" hidden></div>' +
             "</header>" +
-            '<nav class="ac-tabs" role="tablist" aria-label="Secciones del contenido">' +
-            TABS_A.map(function (t) {
-                return '<button type="button" role="tab" class="ac-tab" data-tab="' + t.id + '" aria-selected="false">' + esc(t.label) + "</button>";
-            }).join("") + "</nav>" +
+            tabsHtml +
             '<div class="ac-layout"><aside class="ac-toc" aria-label="Índice"></aside><div class="ac-content" role="tabpanel"></div></div>' +
             "</article>";
+        }
 
         function studiedButton() {
             return '<button type="button" class="tb-btn ac-studied' + (isStudied ? " is-on" : "") + '" aria-pressed="' + (isStudied ? "true" : "false") + '">' + (isStudied ? "✓ Estudiada" : "Marcar como estudiada") + "</button>";
@@ -787,7 +867,7 @@
             });
             activeViewers.forEach(function (v) { v.stop(); });
             activeViewers = [];
-            var ctx = { mode: current.mode, conceptId: article.conceptId || null, boardsById: boardsById, canAdd: !!host.onAddExercise, canLibrary: !!host.onOpenLibrary, canAsk: !!host.onAskAssistant, challenges: host.onOpenChallenge ? challenges : [], canStudy: !!host.setStudied, isStudied: isStudied };
+            var ctx = { compact: !!media, isExFav: host.isExerciseFavorite ? function (exId) { return host.isExerciseFavorite(article.id, exId); } : null, mode: current.mode, conceptId: article.conceptId || null, boardsById: boardsById, canAdd: !!host.onAddExercise, canLibrary: !!host.onOpenLibrary, canAsk: !!host.onAskAssistant, challenges: host.onOpenChallenge ? challenges : [], canStudy: !!host.setStudied, isStudied: isStudied };
             content.innerHTML = renderTab(article, tab, ctx);
             var secs = tabSections(article, tab, ctx);
             toc.innerHTML = '<p class="ac-toc-title">En esta pestaña</p><ol>' + secs.map(function (s) {
@@ -812,7 +892,7 @@
                         } : null,
                         onShowExercises: (article.exercises || []).length ? function () {
                             showTab("entrenar");
-                            container.querySelector(".ac-tabs").scrollIntoView({ behavior: "smooth", block: "start" });
+                            (container.querySelector(".ac-tabbar") || container.querySelector(".ac-tabs")).scrollIntoView({ behavior: "smooth", block: "start" });
                         } : null
                     });
                 } else {
@@ -877,7 +957,7 @@
 
         function paintFicha() {
             var slot = container.querySelector(".ac-ficha-slot");
-            if (slot) slot.innerHTML = renderFicha(article, current.mode);
+            if (slot) slot.innerHTML = renderFicha(article, current.mode, !!media);
         }
         paintFicha();
 
@@ -891,11 +971,16 @@
                 showTab(current.tab);
                 return;
             }
+            var crumb = e.target.closest("[data-go]");
+            if (crumb && host.go) {
+                host.go(crumb.getAttribute("data-go"));
+                return;
+            }
             var jump = e.target.closest("[data-jump-tab]");
             if (jump) {
                 container.querySelector(".ac-resume").hidden = true;
                 showTab(jump.getAttribute("data-jump-tab"), jump.getAttribute("data-jump-section") || null);
-                if (!jump.getAttribute("data-jump-section")) container.querySelector(".ac-tabs").scrollIntoView({ behavior: "smooth", block: "start" });
+                if (!jump.getAttribute("data-jump-section")) (container.querySelector(".ac-tabbar") || container.querySelector(".ac-tabs")).scrollIntoView({ behavior: "smooth", block: "start" });
                 return;
             }
             var openArt = e.target.closest("[data-open-article]");
@@ -907,7 +992,7 @@
             if (tabBtn) {
                 container.querySelector(".ac-resume").hidden = true;
                 showTab(tabBtn.getAttribute("data-tab"));
-                container.querySelector(".ac-tabs").scrollIntoView({ behavior: "smooth", block: "start" });
+                (container.querySelector(".ac-tabbar") || container.querySelector(".ac-tabs")).scrollIntoView({ behavior: "smooth", block: "start" });
                 return;
             }
             var go = e.target.closest("[data-goto]");
@@ -938,6 +1023,22 @@
             var askEx = e.target.closest("[data-ask-exercise]");
             if (askEx && host.onAskAssistant) {
                 host.onAskAssistant(article, { exerciseId: askEx.getAttribute("data-ask-exercise"), returnFocus: askEx });
+                return;
+            }
+            var favEx = e.target.closest("[data-fav-exercise]");
+            if (favEx && host.setExerciseFavorite) {
+                var exOn = favEx.getAttribute("aria-pressed") !== "true";
+                favEx.setAttribute("aria-pressed", exOn ? "true" : "false");
+                favEx.classList.toggle("is-on", exOn);
+                favEx.textContent = exOn ? "★ Guardado" : "☆ Guardar";
+                host.setExerciseFavorite(article.id, favEx.getAttribute("data-fav-exercise"), exOn);
+                return;
+            }
+            var showVar = e.target.closest("[data-show-variants]");
+            if (showVar) {
+                var card = showVar.closest(".ac-exercise");
+                var fold = card && card.querySelector('[data-fold="variants"]');
+                if (fold) { fold.open = true; fold.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
                 return;
             }
             var addEx = e.target.closest("[data-add-exercise]");
