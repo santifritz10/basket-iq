@@ -59,6 +59,19 @@
         ["basis", "Fuente o fundamento técnico"]
     ];
 
+    /** Pestañas visibles de un artículo (las fichas de Fundamentos no tienen simulador). */
+    function tabsFor(article) {
+        if (!article || !Array.isArray(article.tabOrder)) return TABS;
+        return TABS.filter(function (t) { return article.tabOrder.indexOf(t.id) >= 0; });
+    }
+
+    /** Modo jugador / entrenador: una sección sin audience vale para los dos. */
+    var MODES = { player: "Jugador", coach: "Entrenador" };
+    function forMode(list, mode) {
+        if (!mode) return list || [];
+        return (list || []).filter(function (s) { return !s || typeof s !== "object" || !s.audience || s.audience === mode; });
+    }
+
     var registry = {};
     if (root && Array.isArray(root.BasketAcademyQueue)) {
         root.BasketAcademyQueue.forEach(function (a) { if (a && a.id) registry[a.id] = a; });
@@ -106,8 +119,14 @@
                 return "";
             });
         }
-        ["aprender", "entrenar", "evaluar"].forEach(function (tab) {
+        if (a.tabOrder) a.tabOrder.forEach(function (t) { if (!TABS.some(function (x) { return x.id === t; })) errors.push("Pestaña inexistente " + t); });
+        (a.tabs.visualizar || []).forEach(function (v) {
+            if (typeof v === "string" && !boardIds[v]) errors.push("visualizar: pizarra inexistente " + v);
+        });
+        ["aprender", "visualizar", "entrenar", "evaluar"].forEach(function (tab) {
             (a.tabs[tab] || []).forEach(function (sec) {
+                if (typeof sec === "string") return;
+                if (sec.audience && !MODES[sec.audience]) errors.push(tab + "/" + sec.id + ": audiencia inválida " + sec.audience);
                 if (!sec.id || !sec.title) errors.push(tab + ": sección sin id o título");
                 if (!PROVENANCE[sec.kind]) errors.push(tab + "/" + sec.id + ": origen inválido " + sec.kind);
                 if (sec.kind === "official" && !(sec.refs && sec.refs.length)) errors.push(tab + "/" + sec.id + ": contenido oficial sin referencia");
@@ -308,6 +327,28 @@
             return '<details class="ac-qa"><summary>' + fmt(bl.qa) + '</summary><div class="ac-qa-body">' +
                 (bl.answer || []).map(function (x) { return "<p>" + fmt(x) + "</p>"; }).join("") + "</div></details>";
         }
+        if (bl.video) {
+            var V = root && root.BasketVideos;
+            return V ? V.renderCard(bl.video, { conceptId: ctx.conceptId, observe: bl.observe, purpose: bl.purpose }) : "";
+        }
+        if (bl.figure) {
+            var F = root && root.BasketFundFigures;
+            var art = F ? F.render(bl.figure) : "";
+            return art ? '<figure class="ac-figure">' + art + (bl.caption ? "<figcaption>" + fmt(bl.caption) + "</figcaption>" : "") + "</figure>" : "";
+        }
+        if (bl.steps) {
+            return '<ol class="ac-steps">' + bl.steps.map(function (st, i) {
+                return '<li><span class="ac-step-n">' + (i + 1) + "</span><div><strong>" + fmt(st.title) + "</strong>" + (st.text ? "<p>" + fmt(st.text) + "</p>" : "") + "</div></li>";
+            }).join("") + "</ol>";
+        }
+        if (bl.exerciseLink) {
+            var other = get(bl.exerciseLink.article);
+            var oex = other && (other.exercises || []).filter(function (x) { return x.id === bl.exerciseLink.id; })[0];
+            if (!oex) return "";
+            return '<div class="ac-exlink"><div><span class="ac-muted">Ejercicio compartido · está en la ficha de ' + esc(other.title) + "</span><strong>" + fmt(oex.name) + "</strong><p>" + fmt(oex.objective) + "</p>" +
+                (oex.works && oex.works.length ? '<p class="ac-ex-works">Trabaja: ' + oex.works.map(esc).join(" · ") + "</p>" : "") + "</div>" +
+                '<button type="button" class="tb-btn tb-btn--small tb-btn--accent" data-open-article="' + esc(other.id) + '" data-open-section="' + esc(oex.id) + '">Ver ejercicio</button></div>';
+        }
         if (bl.checklist) {
             return '<ul class="ac-checklist">' + bl.checklist.map(function (c, i) {
                 return '<li><label><input type="checkbox" data-check="' + esc(ctx.sectionId + "_" + i) + '"> <span>' + fmt(c) + "</span></label></li>";
@@ -325,7 +366,41 @@
             "</section>";
     }
 
+    /** Ejercicio en formato compacto (fichas con foto): lo esencial a la vista y el resto plegado. */
+    function renderExerciseCompact(ex, ctx) {
+        function group(title, fields, open, id) {
+            var rows = fields.map(function (k) {
+                var f = EXERCISE_FIELDS.filter(function (x) { return x[0] === k; })[0];
+                var v = ex[k];
+                if (!f || v == null || v === "" || (Array.isArray(v) && !v.length)) return "";
+                var html = Array.isArray(v) ? '<ul class="ac-list">' + v.map(function (x) { return "<li>" + fmt(x) + "</li>"; }).join("") + "</ul>" : "<p>" + fmt(v) + "</p>";
+                return '<div class="ac-ex-row"><dt>' + esc(f[1]) + "</dt><dd>" + html + "</dd></div>";
+            }).join("");
+            if (!rows) return "";
+            return '<details class="ac-ex-fold"' + (open ? " open" : "") + (id ? ' data-fold="' + id + '"' : "") + "><summary>" + esc(title) + '</summary><dl class="ac-ex-grid">' + rows + "</dl></details>";
+        }
+        var fav = ctx.isExFav ? ctx.isExFav(ex.id) : null;
+        var hasVariants = ex.variants && ex.variants.length;
+        return '<article class="ac-exercise ac-exercise--compact" id="ac-sec-' + esc(ex.id) + '" data-section="' + esc(ex.id) + '">' +
+            '<header class="ac-ex-head"><div><p class="ac-ex-kicker">Ejercicio' + (ex.solo ? " · se puede practicar solo" : "") + "</p><h3>" + fmt(ex.name) + "</h3></div>" + provenanceBadge(ex.kind || "method", ex.refs) + "</header>" +
+            '<div class="ac-ex-chips"><span>' + esc(ex.level) + "</span><span>" + esc(ex.playersShort || ex.players) + "</span><span>" + esc(ex.duration) + "</span><span>" + esc(ex.space) + "</span></div>" +
+            '<p class="ac-ex-objective">' + fmt(ex.objective) + "</p>" +
+            (ex.works && ex.works.length ? '<p class="ac-ex-works">Trabaja: ' + ex.works.map(esc).join(" · ") + "</p>" : "") +
+            '<div class="ac-ex-actions">' +
+            (ctx.canAdd ? '<button type="button" class="tb-btn tb-btn--accent" data-add-exercise="' + esc(ex.id) + '">Añadir al entrenamiento</button>' : "") +
+            (fav != null ? '<button type="button" class="tb-btn ac-exfav' + (fav ? " is-on" : "") + '" data-fav-exercise="' + esc(ex.id) + '" aria-pressed="' + (fav ? "true" : "false") + '">' + (fav ? "★ Guardado" : "☆ Guardar") + "</button>" : "") +
+            (hasVariants ? '<button type="button" class="tb-btn" data-show-variants="' + esc(ex.id) + '">Ver variantes</button>' : "") +
+            "</div>" +
+            (ex.board ? '<div class="ac-board-slot" data-board="' + esc(ex.board) + '"></div>' : "") +
+            group("Organización y desarrollo", ["organization", "development", "rules", "materials", "hoops", "category", "secondary"], false) +
+            group("Consignas, errores y correcciones", ["cues", "errors", "corrections"], false) +
+            group("Variantes, progresiones y evaluación", ["variants"].concat(EXERCISE_FIELDS.map(function (f) { return f[0]; }).filter(function (k) { return ["objective", "secondary", "category", "level", "players", "duration", "space", "hoops", "materials", "organization", "development", "rules", "cues", "errors", "corrections", "variants", "basis"].indexOf(k) < 0; })), false, "variants") +
+            '<p class="ac-ex-basis">Fuente o fundamento técnico: ' + fmt(ex.basis) + "</p>" +
+            "</article>";
+    }
+
     function renderExercise(ex, ctx) {
+        if (ctx.compact) return renderExerciseCompact(ex, ctx);
         var rows = EXERCISE_FIELDS.filter(function (f) { return f[0] !== "basis"; }).map(function (f) {
             var v = ex[f[0]];
             var html = Array.isArray(v) ? '<ul class="ac-list">' + v.map(function (x) { return "<li>" + fmt(x) + "</li>"; }).join("") + "</ul>" : "<p>" + fmt(v) + "</p>";
@@ -333,7 +408,8 @@
         }).join("");
         return '<article class="ac-exercise" id="ac-sec-' + esc(ex.id) + '" data-section="' + esc(ex.id) + '">' +
             '<header class="ac-section-head"><h3>' + fmt(ex.name) + "</h3>" + provenanceBadge(ex.kind || "method", ex.refs) + "</header>" +
-            '<div class="ac-ex-chips"><span>' + esc(ex.category) + "</span><span>" + esc(ex.level) + "</span><span>" + esc(ex.playersShort || ex.players) + "</span><span>" + esc(ex.duration) + "</span><span>" + esc(ex.space) + "</span></div>" +
+            '<div class="ac-ex-chips"><span>' + esc(ex.category) + "</span><span>" + esc(ex.level) + "</span><span>" + esc(ex.playersShort || ex.players) + "</span><span>" + esc(ex.duration) + "</span><span>" + esc(ex.space) + "</span>" + (ex.solo ? '<span class="ac-chip-solo">Se puede practicar solo</span>' : "") + "</div>" +
+            (ex.works && ex.works.length ? '<p class="ac-ex-works"><strong>Fundamentos que trabaja:</strong> ' + ex.works.map(esc).join(" · ") + "</p>" : "") +
             (ex.board ? '<div class="ac-board-slot" data-board="' + esc(ex.board) + '"></div>' : "") +
             '<dl class="ac-ex-grid">' + rows + "</dl>" +
             '<p class="ac-ex-basis"><strong>Fuente o fundamento técnico:</strong> ' + fmt(ex.basis) + "</p>" +
@@ -386,14 +462,61 @@
             out.push({ id: "origen", title: "Origen del contenido" });
             return out;
         }
-        if (tab === "visualizar") return (article.tabs.visualizar || []).map(function (id) {
+        var mode = ctx && ctx.mode;
+        if (tab === "visualizar") return forMode(article.tabs.visualizar, mode).map(function (id) {
+            if (typeof id === "object") return { id: id.id, title: id.title };
             var b = (article.boards || []).filter(function (x) { return x.id === id; })[0];
             return { id: "board-" + id, title: b ? b.title : id };
         });
-        var secs = (article.tabs[tab] || []).map(function (s) { return { id: s.id, title: s.title, number: s.number }; });
-        if (tab === "entrenar") secs = secs.concat((article.exercises || []).map(function (e) { return { id: e.id, title: e.name }; }));
+        var secs = forMode(article.tabs[tab], mode).map(function (s) { return { id: s.id, title: s.title, number: s.number }; });
+        if (tab === "entrenar") secs = secs.concat(orderExercises(article, mode).map(function (e) { return { id: e.id, title: e.name }; }));
         if (tab === "evaluar" && ctx && ctx.challenges && ctx.challenges.length) secs.push({ id: "desafios", title: "Desafíos tácticos" });
         return secs;
+    }
+
+    /** En modo jugador, primero los ejercicios que se pueden practicar solo. */
+    function orderExercises(article, mode) {
+        var list = (article.exercises || []).slice();
+        if (mode === "player") list.sort(function (a, b) { return (b.solo ? 1 : 0) - (a.solo ? 1 : 0); });
+        return list;
+    }
+
+    /** Resumen de la ficha de un fundamento (encabezado). */
+    function renderFicha(article, mode, compact) {
+        var f = article.ficha;
+        if (!f) return "";
+        if (compact) {
+            var intro0 = mode && f.modeIntro ? f.modeIntro[mode] : "";
+            var fact = function (label, v) {
+                if (!v || (Array.isArray(v) && !v.length)) return "";
+                var html = Array.isArray(v) ? v.map(function (x) { return fmt(x); }).join(" · ") : fmt(v);
+                return '<div class="ac-fact"><dt>' + esc(label) + "</dt><dd>" + html + "</dd></div>";
+            };
+            return '<section class="ac-ficha ac-ficha--compact" aria-label="Resumen del fundamento">' +
+                '<p class="ac-ficha-lead">' + fmt(f.definition) + "</p>" +
+                '<dl class="ac-facts">' + fact("Objetivo", f.objective) + fact("Antes conviene dominar", f.prereqs) + fact("Se usa en el juego", f.applications) + "</dl>" +
+                (intro0 ? '<p class="ac-ficha-mode">' + fmt(intro0) + "</p>" : "") +
+                "</section>";
+        }
+        function row(label, v) {
+            if (!v || (Array.isArray(v) && !v.length)) return "";
+            var html = Array.isArray(v) ? '<ul class="ac-list">' + v.map(function (x) { return "<li>" + fmt(x) + "</li>"; }).join("") + "</ul>" : "<p>" + fmt(v) + "</p>";
+            return '<div class="ac-ficha-row"><dt>' + esc(label) + "</dt><dd>" + html + "</dd></div>";
+        }
+        var intro = mode && f.modeIntro ? f.modeIntro[mode] : "";
+        return '<section class="ac-ficha" aria-label="Ficha del fundamento">' +
+            (f.figure && root && root.BasketFundFigures ? '<div class="ac-ficha-art">' + root.BasketFundFigures.render(f.figure) + "</div>" : "") +
+            '<dl class="ac-ficha-grid">' +
+            row("Nombre en inglés", f.en) +
+            row("Definición", f.definition) +
+            row("Objetivo", f.objective) +
+            row("Nivel orientativo", f.level) +
+            row("Habilidades previas", f.prereqs) +
+            row("Se usa en el juego", f.applications) +
+            row("Material audiovisual", f.media) +
+            "</dl>" +
+            (intro ? '<p class="ac-ficha-mode">' + fmt(intro) + "</p>" : "") +
+            "</section>";
     }
 
     function renderTab(article, tab, ctx) {
@@ -406,14 +529,15 @@
                 '<p>Este contenido todavía no tiene simulador. Las situaciones están animadas en <strong>Visualizar</strong>.</p></section>';
         }
         if (tab === "visualizar") {
-            return (article.tabs.visualizar || []).map(function (id) {
+            return forMode(article.tabs.visualizar, ctx.mode).map(function (id) {
+                if (typeof id === "object") return renderSection(id, ctx);
                 var b = ctx.boardsById[id];
                 if (!b) return "";
                 return '<section class="ac-section" id="ac-sec-board-' + esc(id) + '" data-section="board-' + esc(id) + '"><div class="ac-board-slot" data-board="' + esc(id) + '"></div></section>';
             }).join("");
         }
-        var html = (article.tabs[tab] || []).map(function (s) { return renderSection(s, ctx); }).join("");
-        if (tab === "entrenar") html += (article.exercises || []).map(function (e) { return renderExercise(e, ctx); }).join("");
+        var html = forMode(article.tabs[tab], ctx.mode).map(function (s) { return renderSection(s, ctx); }).join("");
+        if (tab === "entrenar") html += orderExercises(article, ctx.mode).map(function (e) { return renderExercise(e, ctx); }).join("");
         if (tab === "evaluar" && ctx.challenges && ctx.challenges.length) html += renderChallengeList(ctx.challenges, ctx);
         return html;
     }
@@ -661,28 +785,69 @@
         var isFav = !!(progress.favorites || {})[article.id];
         var isStudied = !!(progress.studied || {})[article.id];
         var challenges = host.getChallenges ? (host.getChallenges(article.id) || []) : [];
-        var current = { tab: opts.tab || "aprender" };
+        var current = { tab: opts.tab || "aprender", mode: article.modes ? (host.getMode ? host.getMode() : "player") : null };
+        var TABS_A = tabsFor(article);
 
+        var media = host.heroMedia ? host.heroMedia(article) : null;
+        var modesHtml = article.modes ? '<div class="ac-modes" role="group" aria-label="Perspectiva">' + (media ? '<span class="ac-modes-label">Ver como</span>' : "") + Object.keys(MODES).map(function (k) {
+            return '<button type="button" class="ac-mode" data-mode="' + k + '" aria-pressed="' + (current.mode === k ? "true" : "false") + '">' + (media ? esc(MODES[k]) : "Modo " + esc(MODES[k].toLowerCase())) + "</button>";
+        }).join("") + "</div>" : "";
+        var favLabel = function (on) { return on ? "★ En favoritos" : "☆ Guardar en favoritos"; };
+        var tabsHtml = '<nav class="ac-tabs" role="tablist" aria-label="Secciones del contenido">' +
+            TABS_A.map(function (t) {
+                return '<button type="button" role="tab" class="ac-tab" data-tab="' + t.id + '" aria-selected="false">' + esc(t.label) + "</button>";
+            }).join("") + "</nav>";
+        var jumpsHtml = article.quickJumps ? article.quickJumps.map(function (q, i) {
+            return '<button type="button" class="tb-btn' + (!media || i === 0 ? " tb-btn--accent" : "") + '" data-jump-tab="' + esc(q.tab) + '"' + (q.section ? ' data-jump-section="' + esc(q.section) + '"' : "") + ">" + esc(q.label) + "</button>";
+        }).join("") : "";
+
+        if (media) {
+            // Variante fotográfica (academia de Fundamentos): foto + datos clave, resumen breve,
+            // barra de pestañas con el modo jugador/entrenador al costado.
+            container.innerHTML =
+                '<article class="ac ac--photo">' +
+                (media.crumbs && media.crumbs.length ? '<nav class="ac-crumbnav" aria-label="Ruta">' + media.crumbs.map(function (c) {
+                    return c.go ? '<button type="button" class="ac-crumb" data-go="' + esc(c.go) + '">' + esc(c.label) + "</button>" : '<span aria-current="page">' + esc(c.label) + "</span>";
+                }).join('<span class="ac-crumb-sep" aria-hidden="true">/</span>') + "</nav>" : "") +
+                '<header class="ac-hero ac-hero--photo">' +
+                '<figure class="ac-hero-media">' + media.img + (media.note ? "<figcaption>" + esc(media.note) + "</figcaption>" : "") + "</figure>" +
+                '<div class="ac-hero-info">' +
+                (media.kicker ? '<p class="ac-hero-kicker">' + esc(media.kicker) + "</p>" : "") +
+                "<h2>" + esc(article.title) + "</h2>" +
+                (article.ficha && article.ficha.en ? '<p class="ac-hero-en">' + esc(article.ficha.en) + "</p>" : "") +
+                '<p class="ac-subtitle">' + fmt(article.subtitle) + "</p>" +
+                '<div class="ac-meta">' + (article.meta || []).map(function (m) { return "<span>" + esc(m) + "</span>"; }).join("") + "</div>" +
+                '<div class="ac-hero-actions">' + jumpsHtml +
+                '<button type="button" class="tb-btn ac-fav' + (isFav ? " is-on" : "") + '" aria-pressed="' + (isFav ? "true" : "false") + '">' + favLabel(isFav) + "</button>" +
+                (host.setStudied ? studiedButton() : "") +
+                "</div></div></header>" +
+                '<div class="ac-resume" hidden></div>' +
+                '<div class="ac-ficha-slot"></div>' +
+                '<div class="ac-tabbar">' + tabsHtml + modesHtml + "</div>" +
+                '<div class="ac-layout"><aside class="ac-toc" aria-label="Índice"></aside><div class="ac-content" role="tabpanel"></div></div>' +
+                "</article>";
+        } else {
         container.innerHTML =
             '<article class="ac">' +
             '<header class="ac-hero">' +
-            '<p class="ac-crumbs">Basket Lab Academy · ' + esc(article.sectionLabel || "") + "</p>" +
+            '<p class="ac-crumbs">' + esc(article.crumbs || ("Basket Lab Academy · " + (article.sectionLabel || ""))) + "</p>" +
             "<h2>" + esc(article.title) + "</h2>" +
             '<p class="ac-subtitle">' + fmt(article.subtitle) + "</p>" +
             '<div class="ac-meta">' + (article.meta || []).map(function (m) { return "<span>" + esc(m) + "</span>"; }).join("") + "</div>" +
+            modesHtml +
+            '<div class="ac-ficha-slot"></div>' +
             '<div class="ac-hero-actions">' +
-            '<button type="button" class="tb-btn ac-fav' + (isFav ? " is-on" : "") + '" aria-pressed="' + (isFav ? "true" : "false") + '">' + (isFav ? "★ En favoritos" : "☆ Guardar en favoritos") + "</button>" +
+            jumpsHtml +
+            '<button type="button" class="tb-btn ac-fav' + (isFav ? " is-on" : "") + '" aria-pressed="' + (isFav ? "true" : "false") + '">' + favLabel(isFav) + "</button>" +
             (host.setStudied ? studiedButton() : "") +
             (host.onAskAssistant ? '<button type="button" class="tb-btn tb-btn--accent ac-ask" data-ask-article>Analizar con mi Asistente IA</button>' : "") +
             "</div>" +
             '<div class="ac-resume" hidden></div>' +
             "</header>" +
-            '<nav class="ac-tabs" role="tablist" aria-label="Secciones del contenido">' +
-            TABS.map(function (t) {
-                return '<button type="button" role="tab" class="ac-tab" data-tab="' + t.id + '" aria-selected="false">' + esc(t.label) + "</button>";
-            }).join("") + "</nav>" +
+            tabsHtml +
             '<div class="ac-layout"><aside class="ac-toc" aria-label="Índice"></aside><div class="ac-content" role="tabpanel"></div></div>' +
             "</article>";
+        }
 
         function studiedButton() {
             return '<button type="button" class="tb-btn ac-studied' + (isStudied ? " is-on" : "") + '" aria-pressed="' + (isStudied ? "true" : "false") + '">' + (isStudied ? "✓ Estudiada" : "Marcar como estudiada") + "</button>";
@@ -702,7 +867,7 @@
             });
             activeViewers.forEach(function (v) { v.stop(); });
             activeViewers = [];
-            var ctx = { boardsById: boardsById, canAdd: !!host.onAddExercise, canLibrary: !!host.onOpenLibrary, canAsk: !!host.onAskAssistant, challenges: host.onOpenChallenge ? challenges : [], canStudy: !!host.setStudied, isStudied: isStudied };
+            var ctx = { compact: !!media, isExFav: host.isExerciseFavorite ? function (exId) { return host.isExerciseFavorite(article.id, exId); } : null, mode: current.mode, conceptId: article.conceptId || null, boardsById: boardsById, canAdd: !!host.onAddExercise, canLibrary: !!host.onOpenLibrary, canAsk: !!host.onAskAssistant, challenges: host.onOpenChallenge ? challenges : [], canStudy: !!host.setStudied, isStudied: isStudied };
             content.innerHTML = renderTab(article, tab, ctx);
             var secs = tabSections(article, tab, ctx);
             toc.innerHTML = '<p class="ac-toc-title">En esta pestaña</p><ol>' + secs.map(function (s) {
@@ -727,7 +892,7 @@
                         } : null,
                         onShowExercises: (article.exercises || []).length ? function () {
                             showTab("entrenar");
-                            container.querySelector(".ac-tabs").scrollIntoView({ behavior: "smooth", block: "start" });
+                            (container.querySelector(".ac-tabbar") || container.querySelector(".ac-tabs")).scrollIntoView({ behavior: "smooth", block: "start" });
                         } : null
                     });
                 } else {
@@ -790,12 +955,44 @@
             try { localStorage.setItem(CHECK_KEY, JSON.stringify(saved)); } catch (err) { /* no-op */ }
         });
 
+        function paintFicha() {
+            var slot = container.querySelector(".ac-ficha-slot");
+            if (slot) slot.innerHTML = renderFicha(article, current.mode, !!media);
+        }
+        paintFicha();
+
         container.addEventListener("click", function (e) {
+            var modeBtn = e.target.closest("[data-mode]");
+            if (modeBtn && article.modes) {
+                current.mode = modeBtn.getAttribute("data-mode");
+                container.querySelectorAll("[data-mode]").forEach(function (b) { b.setAttribute("aria-pressed", b === modeBtn ? "true" : "false"); });
+                if (host.setMode) host.setMode(current.mode);
+                paintFicha();
+                showTab(current.tab);
+                return;
+            }
+            var crumb = e.target.closest("[data-go]");
+            if (crumb && host.go) {
+                host.go(crumb.getAttribute("data-go"));
+                return;
+            }
+            var jump = e.target.closest("[data-jump-tab]");
+            if (jump) {
+                container.querySelector(".ac-resume").hidden = true;
+                showTab(jump.getAttribute("data-jump-tab"), jump.getAttribute("data-jump-section") || null);
+                if (!jump.getAttribute("data-jump-section")) (container.querySelector(".ac-tabbar") || container.querySelector(".ac-tabs")).scrollIntoView({ behavior: "smooth", block: "start" });
+                return;
+            }
+            var openArt = e.target.closest("[data-open-article]");
+            if (openArt && host.onOpenArticle) {
+                host.onOpenArticle(openArt.getAttribute("data-open-article"), { tab: "entrenar", section: openArt.getAttribute("data-open-section") });
+                return;
+            }
             var tabBtn = e.target.closest("[data-tab]");
             if (tabBtn) {
                 container.querySelector(".ac-resume").hidden = true;
                 showTab(tabBtn.getAttribute("data-tab"));
-                container.querySelector(".ac-tabs").scrollIntoView({ behavior: "smooth", block: "start" });
+                (container.querySelector(".ac-tabbar") || container.querySelector(".ac-tabs")).scrollIntoView({ behavior: "smooth", block: "start" });
                 return;
             }
             var go = e.target.closest("[data-goto]");
@@ -826,6 +1023,22 @@
             var askEx = e.target.closest("[data-ask-exercise]");
             if (askEx && host.onAskAssistant) {
                 host.onAskAssistant(article, { exerciseId: askEx.getAttribute("data-ask-exercise"), returnFocus: askEx });
+                return;
+            }
+            var favEx = e.target.closest("[data-fav-exercise]");
+            if (favEx && host.setExerciseFavorite) {
+                var exOn = favEx.getAttribute("aria-pressed") !== "true";
+                favEx.setAttribute("aria-pressed", exOn ? "true" : "false");
+                favEx.classList.toggle("is-on", exOn);
+                favEx.textContent = exOn ? "★ Guardado" : "☆ Guardar";
+                host.setExerciseFavorite(article.id, favEx.getAttribute("data-fav-exercise"), exOn);
+                return;
+            }
+            var showVar = e.target.closest("[data-show-variants]");
+            if (showVar) {
+                var card = showVar.closest(".ac-exercise");
+                var fold = card && card.querySelector('[data-fold="variants"]');
+                if (fold) { fold.open = true; fold.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
                 return;
             }
             var addEx = e.target.closest("[data-add-exercise]");
@@ -874,11 +1087,11 @@
             }
         });
 
-        var validTab = reading && TABS.some(function (t) { return t.id === reading.tab; });
+        var validTab = reading && TABS_A.some(function (t) { return t.id === reading.tab; });
         if (!opts.tab && validTab && (reading.tab !== "aprender" || (reading.section && reading.section !== ((article.tabs.aprender || [])[0] || {}).id))) {
             var secTitle = "";
-            tabSections(article, reading.tab).forEach(function (s) { if (s.id === reading.section) secTitle = s.title; });
-            var tabLabel = TABS.filter(function (t) { return t.id === reading.tab; })[0].label;
+            tabSections(article, reading.tab, { mode: current.mode }).forEach(function (s) { if (s.id === reading.section) secTitle = s.title; });
+            var tabLabel = TABS_A.filter(function (t) { return t.id === reading.tab; })[0].label;
             var banner = container.querySelector(".ac-resume");
             banner.innerHTML = "<span>La última vez llegaste a <strong>" + esc(tabLabel) + (secTitle ? " › " + fmt(secTitle) : "") + "</strong>.</span>" +
                 '<span><button type="button" class="tb-btn tb-btn--small tb-btn--accent" data-resume>Retomar lectura</button>' +
@@ -890,6 +1103,9 @@
 
     return {
         TABS: TABS,
+        MODES: MODES,
+        tabsFor: tabsFor,
+        forMode: forMode,
         PROVENANCE: PROVENANCE,
         EXERCISE_FIELDS: EXERCISE_FIELDS,
         register: register,

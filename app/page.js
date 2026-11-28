@@ -86,6 +86,7 @@ const sidebarUiEnhancerScript = `
         '<div class="sidebar-group">' +
         '  <div class="sidebar-toggle sidebar-toggle-flat sidebar-toggle-collapsible" data-group="fundamentos-flat" onclick="toggleSidebarGroup(this)"><span class="sidebar-toggle-icon">▶</span><span>Fundamentos</span></div>' +
         '  <ul class="sidebar-submenu" id="fundamentos-flat">' +
+        '    <li onclick="loadContent(\\'fundamentos\\')">Academia de fundamentos</li>' +
         '    <li onclick="loadContent(\\'fund_cat_dribbling\\')">Dribbling</li>' +
         '    <li onclick="loadContent(\\'fund_cat_pase\\')">Pase</li>' +
         '    <li onclick="loadContent(\\'fund_cat_tiro\\')">Tiro</li>' +
@@ -191,13 +192,17 @@ export default async function HomePage() {
         {playerDomainConfigScript}
       </Script>
       <Script src="/assets/js/fundamentos-data.js?v=20260702" strategy="afterInteractive" />
+      <Script src="/assets/js/fundamentos-catalog.js?v=20261128b" strategy="afterInteractive" />
+      <Script src="/assets/js/fundamentos-media.js?v=20261128b" strategy="afterInteractive" />
+      <Script src="/assets/js/video-catalog.js?v=20261128b" strategy="afterInteractive" />
+      <Script src="/assets/js/fundamentos-figures.js?v=20261128a" strategy="afterInteractive" />
       <Script src="/assets/js/player-domain-api.js?v=20260714" strategy="afterInteractive" />
       <Script src="/assets/js/player-domain-realtime.js?v=20260714" strategy="afterInteractive" />
       <Script src="/assets/js/shooting-zones-heatmap.js?v=20260714" strategy="afterInteractive" />
       <Script src="/assets/js/supabase-config.js" strategy="afterInteractive" />
       <Script src="/assets/js/tactical-board.js?v=20261126i" strategy="afterInteractive" />
       <Script src="/assets/js/simulator.js?v=20261126i" strategy="afterInteractive" />
-      <Script src="/assets/js/academy.js?v=20261126i" strategy="afterInteractive" />
+      <Script src="/assets/js/academy.js?v=20261128b" strategy="afterInteractive" />
       <Script src="/assets/js/exercises.js?v=20261126i" strategy="afterInteractive" />
       <Script src="/assets/js/assistant-bridge.js?v=20261126i" strategy="afterInteractive" />
       <Script src="/assets/js/challenges.js?v=20261126i" strategy="afterInteractive" />
@@ -209,7 +214,12 @@ export default async function HomePage() {
       <Script src="/assets/js/academy-content/spacing.js?v=20261126i" strategy="afterInteractive" />
       <Script src="/assets/js/academy-content/presion.js?v=20261126i" strategy="afterInteractive" />
       <Script src="/assets/js/academy-content/desafios.js?v=20261126i" strategy="afterInteractive" />
-      <Script src="/assets/js/main.js?v=20261127a" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/fund-crossover.js?v=20261128a" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/fund-catch-shoot.js?v=20261128a" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/fund-bandeja.js?v=20261128a" strategy="afterInteractive" />
+      <Script src="/assets/js/academy-content/fund-closeout.js?v=20261128a" strategy="afterInteractive" />
+      <Script src="/assets/js/fundamentos-academy.js?v=20261128b" strategy="afterInteractive" />
+      <Script src="/assets/js/main.js?v=20261128b" strategy="afterInteractive" />
       <Script id="legacy-toggle-sidebar" strategy="afterInteractive">
         {toggleSidebarScript}
       </Script>
