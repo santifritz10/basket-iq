@@ -736,7 +736,7 @@
 .fa-cc-flags {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px 12px;
     margin-top: auto;
     padding-top: 6px;
 }
@@ -774,11 +774,6 @@
     color: var(--fa-muted);
 }
 
-.fa-flag + .fa-flag::before {
-    content: "·";
-    margin-right: 2px;
-    opacity: 0.6;
-}
 
 .fa-flag--class {
     color: var(--fa-accent-soft);
